@@ -1,0 +1,19 @@
+package org.di.digital.service;
+
+import org.di.digital.dto.request.AddInterrogationRequest;
+import org.di.digital.dto.request.CreateCaseRequest;
+import org.di.digital.dto.response.CaseInterrogationResponse;
+import org.di.digital.dto.response.CaseResponse;
+import org.springframework.core.io.InputStreamResource;
+
+import java.time.LocalDate;
+import java.util.List;
+
+public interface CaseService {
+    List<CaseResponse> getUserCases(String username);
+    CaseResponse getCaseById(Long id, String username);
+    CaseResponse createCase(CreateCaseRequest request, String username);
+    InputStreamResource downloadFile(Long caseId, String fileUrl, String email);
+    CaseResponse addInterrogation(Long caseId, AddInterrogationRequest request, String email);
+    List<CaseInterrogationResponse> searchInterrogations(Long caseId, String role, String fio, LocalDate date, String email);
+}
