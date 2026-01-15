@@ -23,11 +23,12 @@ public class CaseFile {
     private String contentType;
     private Long fileSize;
     private LocalDateTime uploadedAt;
+    private LocalDateTime completedAt;
 
     @Enumerated(EnumType.STRING)
     private CaseFileStatusEnum status;
 
-    @ManyToOne
-    @JoinColumn(name = "case_id")
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "case_id", nullable = false)
     private Case caseEntity;
 }

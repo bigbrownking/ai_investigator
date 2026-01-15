@@ -4,12 +4,13 @@ import lombok.Getter;
 
 @Getter
 public enum CaseFileStatusEnum {
-    UPLOADED("Загружен"),
-    QUEUED("В очереди"),
-    PENDING("В ожидании"),
-    PROCESSING("В обработке"),
-    COMPLETED("Завершен"),
+    UPLOADED("Загружен"), // minio
+    QUEUED("В очереди"), //mongo
+    PENDING("В ожидании"), //rabbitmq
+    PROCESSING("В обработке"), // model
+    COMPLETED("Обработан"),
     FAILED("Ошибка");
+
     private final String label;
     CaseFileStatusEnum(String s) {
         this.label = s;

@@ -65,6 +65,34 @@ public class CaseController {
         return ResponseEntity.ok(cases);
     }
 
+    @PostMapping(value = "/{caseId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<CaseResponse> addFilesToCase(
+            @PathVariable Long caseId,
+            @RequestParam("files") List<MultipartFile> files,
+            Authentication authentication
+    ) {
+        log.info("Adding {} files to case: {} for user: {}",
+                files.size(), caseId, authentication.getName());
+
+        if (files == null || files.isEmpty()) {
+            return ResponseEntity.badRequest().build();
+        }
+
+        CaseResponse response = caseService.addFilesToCase(caseId, files, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+    @DeleteMapping("/{caseId}/files")
+    public ResponseEntity<CaseResponse> deleteFileFromCase(
+            @PathVariable Long caseId,
+            @RequestParam String fileName,
+            Authentication authentication
+    ) {
+        log.info("Deleting file {} from case: {} for user: {}",
+                fileName, caseId, authentication.getName());
+
+        CaseResponse response = caseService.deleteFileFromCase(caseId, fileName, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
     @GetMapping("/{caseId}/files/download")
     public ResponseEntity<InputStreamResource> downloadFile(
             @PathVariable Long caseId,
