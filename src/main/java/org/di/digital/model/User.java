@@ -66,8 +66,13 @@ public class User {
     )
     private Set<Role> roles = new HashSet<>();
 
-    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
-    private List<Case> cases = new ArrayList<>();
+    @Builder.Default
+    @ManyToMany(mappedBy = "users", fetch = FetchType.LAZY)
+    private Set<Case> cases = new HashSet<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Case> ownedCases = new ArrayList<>();
 
     public void addRole(Role role) {
         this.roles.add(role);

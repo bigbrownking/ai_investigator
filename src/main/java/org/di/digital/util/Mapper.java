@@ -3,6 +3,7 @@ package org.di.digital.util;
 import org.di.digital.dto.response.CaseFileResponse;
 import org.di.digital.dto.response.CaseInterrogationResponse;
 import org.di.digital.dto.response.CaseResponse;
+import org.di.digital.dto.response.CaseUserResponse;
 import org.di.digital.model.Case;
 import org.di.digital.model.CaseInterrogation;
 import org.springframework.stereotype.Component;
@@ -28,6 +29,7 @@ public class Mapper {
                 .title(caseEntity.getTitle())
                 .number(caseEntity.getNumber())
                 .description(caseEntity.getDescription())
+                .status(caseEntity.isStatus())
                 .files(caseEntity.getFiles().stream()
                         .map(f -> CaseFileResponse.builder()
                                 .id(f.getId())
@@ -46,6 +48,16 @@ public class Mapper {
                                 .role(f.getRole())
                                 .date(String.valueOf(f.getDate()))
                                 .status(f.getStatus().getLabel())
+                                .build())
+                        .collect(Collectors.toList()))
+                .users(caseEntity.getUsers().stream()
+                        .map(user -> CaseUserResponse.builder()
+                                .id(user.getId())
+                                .email(user.getEmail())
+                                .name(user.getName())
+                                .surname(user.getSurname())
+                                .fathername(user.getFathername())
+                                .isOwner(caseEntity.isOwner(user))
                                 .build())
                         .collect(Collectors.toList()))
                 .createdDate(caseEntity.getCreatedDate())

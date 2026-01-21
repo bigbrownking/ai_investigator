@@ -4,6 +4,7 @@ import org.di.digital.dto.request.AddInterrogationRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
 import org.di.digital.dto.response.CaseInterrogationResponse;
 import org.di.digital.dto.response.CaseResponse;
+import org.di.digital.dto.response.CaseUserResponse;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -19,4 +20,9 @@ public interface CaseService {
     List<CaseInterrogationResponse> searchInterrogations(Long caseId, String role, String fio, LocalDate date, String email);
     CaseResponse addFilesToCase(Long caseId, List<MultipartFile> files, String email);
     CaseResponse deleteFileFromCase(Long caseId, String fileName, String email);
+    CaseResponse addUserToCase(Long caseId, String userEmailToAdd, String currentUserEmail);
+
+    CaseResponse removeUserFromCase(Long caseId, Long userId, String currentUserEmail);
+
+    List<CaseUserResponse> getCaseUsers(Long caseId, String currentUserEmail);
 }

@@ -6,12 +6,14 @@ import org.di.digital.dto.request.AddInterrogationRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
 import org.di.digital.dto.response.CaseInterrogationResponse;
 import org.di.digital.dto.response.CaseResponse;
+import org.di.digital.dto.response.CaseUserResponse;
 import org.di.digital.model.*;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseService;
 import org.di.digital.util.Mapper;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -31,7 +33,6 @@ public class CaseServiceImpl implements CaseService {
     private final UserRepository userRepository;
     private final MinioService minioService;
     private final TaskQueueService taskQueueService;
-
     private final Mapper mapper;
 
     @Transactional
@@ -44,8 +45,12 @@ public class CaseServiceImpl implements CaseService {
                 .number(request.getNumber())
                 .description(request.getDescription())
                 .files(new ArrayList<>())
-                .user(user)
+                .owner(user)  // Set the owner
+                .users(new java.util.HashSet<>())  // Initialize users set
                 .build();
+
+        // Add the owner to the users set
+        newCase.addUser(user);
 
         caseRepository.save(newCase);
 
@@ -83,8 +88,12 @@ public class CaseServiceImpl implements CaseService {
         Case caseEntity = caseRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Case not found with id: " + id));
 
-        if (!caseEntity.getUser().getEmail().equals(email)) {
-            throw new RuntimeException("Access denied to case: " + id);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        // Check if user has access (is owner or member)
+        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
+            throw new AccessDeniedException("Access denied to case: " + id);
         }
 
         return mapper.mapToCaseResponse(caseEntity);
@@ -95,7 +104,8 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        return caseRepository.findByUser(user).stream()
+        // Get all cases where user is a member (includes owned cases)
+        return user.getCases().stream()
                 .map(mapper::mapToCaseResponse)
                 .collect(Collectors.toList());
     }
@@ -105,9 +115,14 @@ public class CaseServiceImpl implements CaseService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
-        if (!caseEntity.getUser().getEmail().equals(email)) {
-            throw new RuntimeException("Access denied to case: " + caseId);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        // Check if user has access
+        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
+            throw new AccessDeniedException("Access denied to case: " + caseId);
         }
+
         List<CaseFile> newlyUploadedFiles = new ArrayList<>();
         int addedFilesCount = 0;
 
@@ -135,6 +150,7 @@ public class CaseServiceImpl implements CaseService {
                 }
             }
         }
+
         caseRepository.flush();
         for (CaseFile caseFile : newlyUploadedFiles) {
             taskQueueService.addTaskToQueue(
@@ -159,8 +175,12 @@ public class CaseServiceImpl implements CaseService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
-        if (!caseEntity.getUser().getEmail().equals(email)) {
-            throw new RuntimeException("Access denied to case: " + caseId);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        // Check if user has access
+        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
+            throw new AccessDeniedException("Access denied to case: " + caseId);
         }
 
         CaseFile fileToDelete = caseEntity.getFiles().stream()
@@ -170,7 +190,6 @@ public class CaseServiceImpl implements CaseService {
 
         try {
             minioService.deleteFile(fileToDelete.getFileUrl());
-
             caseEntity.getFiles().remove(fileToDelete);
 
             Case savedCase = caseRepository.save(caseEntity);
@@ -189,8 +208,12 @@ public class CaseServiceImpl implements CaseService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found"));
 
-        if (!caseEntity.getUser().getEmail().equals(email)) {
-            throw new RuntimeException("Access denied");
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        // Check if user has access
+        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
+            throw new AccessDeniedException("Access denied");
         }
 
         CaseFile caseFile = caseEntity.getFiles().stream()
@@ -207,8 +230,12 @@ public class CaseServiceImpl implements CaseService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
-        if (!caseEntity.getUser().getEmail().equals(email)) {
-            throw new RuntimeException("Access denied to case: " + caseId);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        // Check if user has access
+        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
+            throw new AccessDeniedException("Access denied to case: " + caseId);
         }
 
         return caseEntity.getInterrogations().stream()
@@ -224,8 +251,12 @@ public class CaseServiceImpl implements CaseService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
-        if (!caseEntity.getUser().getEmail().equals(email)) {
-            throw new RuntimeException("Access denied to case: " + caseId);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        // Check if user has access
+        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
+            throw new AccessDeniedException("Access denied to case: " + caseId);
         }
 
         CaseInterrogation interrogation = CaseInterrogation.builder()
@@ -242,5 +273,96 @@ public class CaseServiceImpl implements CaseService {
 
         log.info("Interrogation added to case: {}", caseId);
         return mapper.mapToCaseResponse(caseEntity);
+    }
+
+    @Override
+    @Transactional
+    public CaseResponse addUserToCase(Long caseId, String userEmailToAdd, String currentUserEmail) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+
+        // Check if current user has access to this case (is owner or already a member)
+        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
+            throw new AccessDeniedException("You don't have permission to add users to this case");
+        }
+
+        User userToAdd = userRepository.findByEmail(userEmailToAdd)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userEmailToAdd));
+
+        if (caseEntity.hasUser(userToAdd)) {
+            throw new IllegalStateException("User is already added to this case");
+        }
+
+        caseEntity.addUser(userToAdd);
+        Case savedCase = caseRepository.save(caseEntity);
+
+        log.info("User {} added to case {} by {}", userEmailToAdd, caseId, currentUserEmail);
+
+        return mapper.mapToCaseResponse(savedCase);
+    }
+
+    @Override
+    @Transactional
+    public CaseResponse removeUserFromCase(Long caseId, Long userId, String currentUserEmail) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+
+        // Only owner can remove users
+        if (!caseEntity.isOwner(currentUser)) {
+            throw new AccessDeniedException("Only the case owner can remove users");
+        }
+
+        User userToRemove = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+
+        // Cannot remove the owner
+        if (caseEntity.isOwner(userToRemove)) {
+            throw new IllegalStateException("Cannot remove the case owner");
+        }
+
+        // Check if user is in the case
+        if (!caseEntity.hasUser(userToRemove)) {
+            throw new IllegalStateException("User is not a member of this case");
+        }
+
+        caseEntity.removeUser(userToRemove);
+        Case savedCase = caseRepository.save(caseEntity);
+
+        log.info("User {} removed from case {} by {}", userToRemove.getEmail(), caseId, currentUserEmail);
+
+        return mapper.mapToCaseResponse(savedCase);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CaseUserResponse> getCaseUsers(Long caseId, String currentUserEmail) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+
+        // Check if current user has access to this case
+        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
+            throw new AccessDeniedException("You don't have permission to view users of this case");
+        }
+
+        // Map users to response
+        return caseEntity.getUsers().stream()
+                .map(user -> CaseUserResponse.builder()
+                        .id(user.getId())
+                        .email(user.getEmail())
+                        .name(user.getName())
+                        .surname(user.getSurname())
+                        .fathername(user.getFathername())
+                        .isOwner(caseEntity.isOwner(user))
+                        .build())
+                .collect(Collectors.toList());
     }
 }

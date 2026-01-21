@@ -1,7 +1,7 @@
 package org.di.digital.config;
 
 import lombok.RequiredArgsConstructor;
-import org.di.digital.security.jwt.AuthEntryPointJwt;
+import org.di.digital.security.jwt.DetailedAuthEntryPoint;
 import org.di.digital.security.jwt.JwtRequestFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
@@ -33,11 +33,11 @@ import java.util.List;
 public class WebConfig {
 
     private final UserDetailsService userDetailsService;
-    private final AuthEntryPointJwt unauthorizedHandler;
+    private final DetailedAuthEntryPoint unauthorizedHandler;
     private final JwtRequestFilter jwtRequestFilter;
 
     @Bean
-    public SecurityFilterChain securityFilterChain(HttpSecurity http) throws Exception {
+    public SecurityFilterChain securityFilterChain(HttpSecurity http) {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(cors -> cors.configurationSource(corsConfigurationSource()))
@@ -63,7 +63,6 @@ public class WebConfig {
                         .requestMatchers("/topic/**").permitAll()
                         .requestMatchers("/app/**").permitAll()
 
-                        .requestMatchers("/receive/**").permitAll()
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/admin/**").hasRole("ADMIN")
                         .anyRequest().authenticated()

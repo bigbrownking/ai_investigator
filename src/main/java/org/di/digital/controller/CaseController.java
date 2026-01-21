@@ -1,11 +1,14 @@
 package org.di.digital.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.AddInterrogationRequest;
+import org.di.digital.dto.request.AddUserToCaseRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
 import org.di.digital.dto.response.CaseInterrogationResponse;
 import org.di.digital.dto.response.CaseResponse;
+import org.di.digital.dto.response.CaseUserResponse;
 import org.di.digital.service.CaseService;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -142,4 +145,41 @@ public class CaseController {
         return ResponseEntity.ok(response);
     }
 
+
+    @PostMapping("/{caseId}/users")
+    public ResponseEntity<CaseResponse> addUserToCase(
+            @PathVariable Long caseId,
+            @Valid @RequestBody AddUserToCaseRequest request,
+            Authentication authentication
+    ) {
+        log.info("Adding user {} to case: {} by user: {}",
+                request.getEmail(), caseId, authentication.getName());
+
+        CaseResponse response = caseService.addUserToCase(caseId, request.getEmail(), authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{caseId}/users/{userId}")
+    public ResponseEntity<CaseResponse> removeUserFromCase(
+            @PathVariable Long caseId,
+            @PathVariable Long userId,
+            Authentication authentication
+    ) {
+        log.info("Removing user {} from case: {} by user: {}",
+                userId, caseId, authentication.getName());
+
+        CaseResponse response = caseService.removeUserFromCase(caseId, userId, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
+    @GetMapping("/{caseId}/users")
+    public ResponseEntity<List<CaseUserResponse>> getCaseUsers(
+            @PathVariable Long caseId,
+            Authentication authentication
+    ) {
+        log.info("Getting users for case: {} by user: {}", caseId, authentication.getName());
+
+        List<CaseUserResponse> users = caseService.getCaseUsers(caseId, authentication.getName());
+        return ResponseEntity.ok(users);
+    }
 }

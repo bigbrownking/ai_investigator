@@ -1,13 +1,18 @@
 package org.di.digital.service;
 
 import org.di.digital.dto.request.ChatRequest;
-import org.di.digital.dto.response.ChatResponse;
+import org.di.digital.dto.response.CaseChatHistoryResponse;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
-import reactor.core.publisher.Flux;
 
 public interface ChatService {
-    void streamChatResponse(ChatRequest request, SseEmitter emitter);
-    Flux<String> streamChatResponseFlux(ChatRequest request);
-    ChatResponse getChatResponse(ChatRequest request);
-    boolean checkModelHealth();
+
+    void streamChatResponseWithHistory(String caseNumber, ChatRequest request, String userEmail, SseEmitter emitter);
+
+    CaseChatHistoryResponse getChatHistoryByCaseNumber(String caseNumber, String userEmail, int page, int size);
+
+    CaseChatHistoryResponse getChatHistory(Long caseId, String userEmail, int page, int size);
+
+    void clearChatHistoryByCaseNumber(String caseNumber, String userEmail);
+
+    void clearChatHistory(Long caseId);
 }

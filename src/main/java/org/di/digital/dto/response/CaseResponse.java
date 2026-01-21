@@ -17,8 +17,13 @@ public class CaseResponse {
     private String title;
     private String number;
     private String description;
+    private boolean status;
+
+    private List<CaseUserResponse> users;
+
     private List<CaseFileResponse> files;
     private List<CaseInterrogationResponse> interrogations;
+
     private LocalDateTime createdDate;
     private LocalDateTime updatedDate;
 }
