@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.AddInterrogationRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
+import org.di.digital.dto.request.FileType;
 import org.di.digital.dto.response.CaseInterrogationResponse;
 import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.CaseUserResponse;
@@ -111,20 +112,20 @@ public class CaseServiceImpl implements CaseService {
     }
 
     @Transactional
-    public CaseResponse addFilesToCase(Long caseId, List<MultipartFile> files, String email) {
+    public CaseResponse addFilesToCase(Long caseId, List<MultipartFile> files, FileType type, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        // Check if user has access
         if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
             throw new AccessDeniedException("Access denied to case: " + caseId);
         }
 
         List<CaseFile> newlyUploadedFiles = new ArrayList<>();
         int addedFilesCount = 0;
+        boolean isQualification = type == FileType.QUALIFICATION;
 
         for (MultipartFile file : files) {
             if (!file.isEmpty()) {
@@ -139,6 +140,7 @@ public class CaseServiceImpl implements CaseService {
 
                     CaseFile caseFile = minioService.uploadFile(file, caseEntity.getNumber());
                     caseFile.setCaseEntity(caseEntity);
+                    caseFile.setQualification(isQualification);
                     caseEntity.getFiles().add(caseFile);
 
                     newlyUploadedFiles.add(caseFile);

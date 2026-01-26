@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.AddInterrogationRequest;
 import org.di.digital.dto.request.AddUserToCaseRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
+import org.di.digital.dto.request.FileType;
 import org.di.digital.dto.response.CaseInterrogationResponse;
 import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.CaseUserResponse;
@@ -72,16 +73,25 @@ public class CaseController {
     public ResponseEntity<CaseResponse> addFilesToCase(
             @PathVariable Long caseId,
             @RequestParam("files") List<MultipartFile> files,
+            @RequestParam("type") String type,
             Authentication authentication
     ) {
-        log.info("Adding {} files to case: {} for user: {}",
-                files.size(), caseId, authentication.getName());
+        FileType fileType;
+        try {
+            fileType = FileType.fromString(type);
+        } catch (IllegalArgumentException e) {
+            log.warn("Invalid type parameter: {}", type);
+            return ResponseEntity.badRequest().build();
+        }
+
+        log.info("Adding {} files to case: {} with type: {} for user: {}",
+                files.size(), caseId, fileType, authentication.getName());
 
         if (files == null || files.isEmpty()) {
             return ResponseEntity.badRequest().build();
         }
 
-        CaseResponse response = caseService.addFilesToCase(caseId, files, authentication.getName());
+        CaseResponse response = caseService.addFilesToCase(caseId, files, fileType, authentication.getName());
         return ResponseEntity.ok(response);
     }
     @DeleteMapping("/{caseId}/files")

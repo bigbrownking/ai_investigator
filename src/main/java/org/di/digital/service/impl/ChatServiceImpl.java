@@ -11,6 +11,7 @@ import org.di.digital.repository.CaseChatRepository;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.ChatService;
+import org.di.digital.util.UrlBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
@@ -35,10 +36,10 @@ public class ChatServiceImpl implements ChatService {
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
 
-    @Value("${python.model.host}")
+    @Value("${qualification.model.host}")
     private String pythonHost;
 
-    @Value("${python.model.port}")
+    @Value("${qualification.model.port}")
     private String pythonPort;
 
     @Value("${chat.context.max-messages:20}")
@@ -77,7 +78,7 @@ public class ChatServiceImpl implements ChatService {
         StringBuilder fullResponse = new StringBuilder();
         final Long messageId = assistantMessage.getId();
 
-        String url = buildUrl("/chat/" + caseNumber);
+        String url = UrlBuilder.buildUrl(pythonHost, pythonPort, "/chat/" + caseNumber);
 
         try {
             WebClient webClient = webClientBuilder.build();
@@ -250,9 +251,5 @@ public class ChatServiceImpl implements ChatService {
             log.warn("Access denied: User {} tried to clear chat for case {}", userEmail, caseEntity.getNumber());
             throw new AccessDeniedException("Only the case owner can clear chat history");
         }
-    }
-
-    private String buildUrl(String endpoint) {
-        return String.format("http://%s:%s%s", pythonHost, pythonPort, endpoint);
     }
 }

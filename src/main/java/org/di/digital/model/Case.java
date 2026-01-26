@@ -47,7 +47,10 @@ public class Case {
     @OneToOne(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     private CaseChat chat;
 
+    @Column(columnDefinition = "TEXT")
     private String qualification;
+
+    @Column(columnDefinition = "TEXT")
     private String indictment;
 
     @Builder.Default
