@@ -215,7 +215,7 @@ public class IndictmentServiceImpl implements IndictmentService {
 
     private Map<String, Object> buildRequestBody(String caseNumber) {
         Map<String, Object> requestBody = new HashMap<>();
-        requestBody.put("working_dir", "workspaces/" + caseNumber);
+        requestBody.put("working_dir",caseNumber);
         requestBody.put("mode", "hybrid");
         return requestBody;
     }

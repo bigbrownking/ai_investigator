@@ -40,30 +40,10 @@ public class CaseChatMessage {
     @Column(name = "created_date", updatable = false)
     private LocalDateTime createdDate;
 
-    /**
-     * Optional: Store metadata like token count, model version, etc.
-     */
     @Column(name = "token_count")
     private Integer tokenCount;
 
-    @Column(name = "model_version")
-    private String modelVersion;
-
-    /**
-     * For streaming messages, track if complete
-     */
     @Builder.Default
     @Column(name = "is_complete")
     private boolean complete = true;
-
-    /**
-     * Optional: Reference to files used in this message context
-     */
-    @ManyToMany
-    @JoinTable(
-            name = "message_files",
-            joinColumns = @JoinColumn(name = "message_id"),
-            inverseJoinColumns = @JoinColumn(name = "file_id")
-    )
-    private List<CaseFile> referencedFiles = new ArrayList<>();
 }

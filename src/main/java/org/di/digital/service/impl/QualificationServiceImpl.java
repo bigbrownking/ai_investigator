@@ -66,8 +66,8 @@ public class QualificationServiceImpl implements QualificationService {
             String rawResponse = fetchQualificationFromModel(caseNumber);
 
             if (rawResponse != null) {
-                streamingService.streamText(emitter, rawResponse);
                 String qualification = extractQualificationFromResponse(rawResponse);
+                streamingService.streamText(emitter, qualification);
                 saveQualificationToCase(caseNumber, qualification);
             }
 
