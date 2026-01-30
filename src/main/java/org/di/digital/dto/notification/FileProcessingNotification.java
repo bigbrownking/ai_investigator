@@ -3,7 +3,7 @@ package org.di.digital.dto.notification;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.di.digital.model.CaseFileStatusEnum;
+import org.di.digital.model.enums.CaseFileStatusEnum;
 
 import java.time.LocalDateTime;
 

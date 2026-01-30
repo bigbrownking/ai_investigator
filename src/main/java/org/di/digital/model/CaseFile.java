@@ -2,6 +2,7 @@ package org.di.digital.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.di.digital.model.enums.CaseFileStatusEnum;
 
 import java.time.LocalDateTime;
 

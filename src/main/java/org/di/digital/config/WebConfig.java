@@ -55,13 +55,8 @@ public class WebConfig {
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
-                        .requestMatchers(
-                                "/actuator/health",
-                                "/actuator/health/**",
-                                "/actuator/metrics",
-                                "/actuator/metrics/**",
-                                "/actuator/info"
-                        ).permitAll()
+                        .requestMatchers("/actuator/**").permitAll()
+
                         .requestMatchers("/ws/**").permitAll()
                         .requestMatchers("/topic/**").permitAll()
                         .requestMatchers("/app/**").permitAll()

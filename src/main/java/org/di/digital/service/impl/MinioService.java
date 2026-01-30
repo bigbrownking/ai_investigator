@@ -4,7 +4,7 @@ import io.minio.*;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.CaseFile;
-import org.di.digital.model.CaseFileStatusEnum;
+import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;

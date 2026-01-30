@@ -6,11 +6,16 @@ import org.di.digital.dto.request.LoginRequest;
 import org.di.digital.dto.request.RefreshTokenRequest;
 import org.di.digital.dto.request.SignUpRequest;
 import org.di.digital.dto.response.JwtResponse;
-import org.di.digital.dto.response.SignUpResponse;
+import org.di.digital.model.Role;
 import org.di.digital.model.User;
+import org.di.digital.model.UserSettings;
+import org.di.digital.model.enums.*;
+import org.di.digital.repository.RoleRepository;
 import org.di.digital.repository.UserRepository;
+import org.di.digital.security.crypto.RsaDecryptor;
 import org.di.digital.security.jwt.JwtTokenUtil;
 import org.di.digital.service.AuthService;
+import org.di.digital.service.LogService;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
@@ -21,8 +26,12 @@ import java.util.HashSet;
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
     private final UserRepository userRepository;
+    private final RoleRepository roleRepository;
+    private final LogService logService;
     private final JwtTokenUtil jwtTokenUtil;
     private final PasswordEncoder passwordEncoder;
+    private final RsaDecryptor rsaDecryptor;
+
 
     @Override
     public String signup(SignUpRequest request) {
@@ -33,6 +42,9 @@ public class AuthServiceImpl implements AuthService {
             return "Email is already registered";
         }
 
+        Role userRole = roleRepository.findByName("LEVEL_3_USER")
+                .orElseThrow(() -> new RuntimeException("Default role not found"));
+
         User user = User.builder()
                 .email(request.getEmail())
                 .username(request.getUsername())
@@ -40,9 +52,18 @@ public class AuthServiceImpl implements AuthService {
                 .surname(request.getSurname())
                 .fathername(request.getFathername())
                 .password(passwordEncoder.encode(request.getPassword()))
-                .roles(new HashSet<>())
+                .roles(new HashSet<>(){{add(userRole);}})
+                .active(true)
                 .build();
 
+        UserSettings userSettings = UserSettings.builder()
+                .level(UserSettingsDetalizationLevel.HIGH)
+                .theme(UserSettingsTheme.LIGHT)
+                .language(UserSettingsLanguage.RU)
+                .user(user)
+                .build();
+
+        user.setSettings(userSettings);
         User savedUser = userRepository.save(user);
         log.info("User created successfully with ID: {}", savedUser.getId());
         return "User registered successfully";
@@ -50,20 +71,15 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public JwtResponse login(LoginRequest request) {
-        log.info("User attempts to login: {}", request.getEmail());
 
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        boolean authenticated = false;
-        if (request.getPassword() != null && !request.getPassword().isBlank()) {
-            if (passwordEncoder.matches(request.getPassword(), user.getPassword())) {
-                authenticated = true;
-            }
-        }
 
-        if (!authenticated) {
-            throw new RuntimeException("Invalid password or login");
+       // String rawPassword = rsaDecryptor.decrypt(request.getPassword());
+
+        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+            throw new RuntimeException("Invalid credentials");
         }
 
         String token = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
@@ -76,6 +92,7 @@ public class AuthServiceImpl implements AuthService {
                 .username(user.getEmail())
                 .build();
     }
+
 
     @Override
     public JwtResponse refreshToken(RefreshTokenRequest request) {
@@ -105,5 +122,10 @@ public class AuthServiceImpl implements AuthService {
                 .type("Bearer")
                 .username(user.getEmail())
                 .build();
+    }
+
+    @Override
+    public void logout(String refreshToken) {
+
     }
 }

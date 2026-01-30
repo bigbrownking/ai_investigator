@@ -6,10 +6,12 @@ import org.di.digital.dto.request.ChatRequest;
 import org.di.digital.dto.response.CaseChatHistoryResponse;
 import org.di.digital.dto.response.CaseChatMessageDto;
 import org.di.digital.model.*;
+import org.di.digital.model.enums.CaseActivityType;
 import org.di.digital.repository.CaseChatMessageRepository;
 import org.di.digital.repository.CaseChatRepository;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.UserRepository;
+import org.di.digital.service.CaseService;
 import org.di.digital.service.ChatService;
 import org.di.digital.util.UrlBuilder;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +37,7 @@ public class ChatServiceImpl implements ChatService {
     private final CaseChatMessageRepository chatMessageRepository;
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
+    private final CaseService caseService;
 
     @Value("${qualification.model.host}")
     private String pythonHost;
@@ -81,9 +84,8 @@ public class ChatServiceImpl implements ChatService {
         String url = UrlBuilder.buildUrl(pythonHost, pythonPort, "/chat/" + caseNumber);
 
         try {
-            WebClient webClient = webClientBuilder.build();
 
-            webClient.post()
+            webClientBuilder.build().post()
                     .uri(url)
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(enhancedRequest)
@@ -103,6 +105,9 @@ public class ChatServiceImpl implements ChatService {
                     })
                     .doOnComplete(() -> {
                         updateAssistantMessage(messageId, fullResponse.toString());
+
+                        caseService.updateCaseActivity(caseNumber, CaseActivityType.CHAT_MESSAGE.name());
+
                         emitter.complete();
                         log.info("Chat streaming completed for case {}, {} characters received",
                                 caseNumber, fullResponse.length());
@@ -233,6 +238,7 @@ public class ChatServiceImpl implements ChatService {
                 .stream(request.getStream())
                 .build();
     }
+
     private void validateUserAccess(Case caseEntity, String userEmail) {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));

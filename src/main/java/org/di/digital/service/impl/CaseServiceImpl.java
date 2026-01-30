@@ -9,11 +9,19 @@ import org.di.digital.dto.response.CaseInterrogationResponse;
 import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.CaseUserResponse;
 import org.di.digital.model.*;
+import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.enums.CaseInterrogationStatusEnum;
+import org.di.digital.model.enums.LogAction;
+import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseService;
+import org.di.digital.service.LogService;
 import org.di.digital.util.Mapper;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -22,6 +30,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -34,6 +43,7 @@ public class CaseServiceImpl implements CaseService {
     private final UserRepository userRepository;
     private final MinioService minioService;
     private final TaskQueueService taskQueueService;
+    //private final LogService logService;
     private final Mapper mapper;
 
     @Transactional
@@ -46,31 +56,31 @@ public class CaseServiceImpl implements CaseService {
                 .number(request.getNumber())
                 .description(request.getDescription())
                 .files(new ArrayList<>())
-                .owner(user)  // Set the owner
-                .users(new java.util.HashSet<>())  // Initialize users set
+                .owner(user)
+                .users(new java.util.HashSet<>())
                 .build();
 
-        // Add the owner to the users set
         newCase.addUser(user);
 
-        caseRepository.save(newCase);
+        Case savedCase = caseRepository.save(newCase);
 
         if (request.getFiles() != null && !request.getFiles().isEmpty()) {
             for (MultipartFile file : request.getFiles()) {
                 if (!file.isEmpty()) {
                     CaseFile caseFile = minioService.uploadFile(file, request.getNumber());
-                    caseFile.setCaseEntity(newCase);
-                    newCase.getFiles().add(caseFile);
+                    caseFile.setCaseEntity(savedCase);
+                    savedCase.getFiles().add(caseFile);
                 }
             }
         }
 
         caseRepository.flush();
-        for (CaseFile caseFile : newCase.getFiles()) {
+
+        for (CaseFile caseFile : savedCase.getFiles()) {
             taskQueueService.addTaskToQueue(
                     email,
-                    newCase.getId(),
-                    newCase.getNumber(),
+                    savedCase.getId(),
+                    savedCase.getNumber(),
                     caseFile.getOriginalFileName(),
                     caseFile.getFileUrl(),
                     caseFile.getId()
@@ -78,8 +88,14 @@ public class CaseServiceImpl implements CaseService {
             caseFile.setStatus(CaseFileStatusEnum.QUEUED);
         }
 
-        Case savedCase = caseRepository.save(newCase);
         log.info("Case created with id: {} for user: {}", savedCase.getId(), email);
+
+        /*logService.log(
+                String.format("Case %s created by user %s", savedCase.getNumber(), email),
+                LogLevel.INFO,
+                LogAction.CASE_CREATED,
+                savedCase
+        );*/
 
         return mapper.mapToCaseResponse(savedCase);
     }
@@ -101,14 +117,50 @@ public class CaseServiceImpl implements CaseService {
     }
 
     @Transactional(readOnly = true)
-    public List<CaseResponse> getUserCases(String email) {
+    public List<CaseResponse> getUserCases(String email, String sort) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        // Get all cases where user is a member (includes owned cases)
+        Comparator<Case> comparator = "asc".equalsIgnoreCase(sort)
+                ? Comparator.comparing(Case::getCreatedDate, Comparator.nullsLast(Comparator.naturalOrder()))
+                : Comparator.comparing(Case::getCreatedDate, Comparator.nullsLast(Comparator.reverseOrder()));
+
         return user.getCases().stream()
+                .sorted(comparator)
                 .map(mapper::mapToCaseResponse)
                 .collect(Collectors.toList());
+    }
+
+    @Override
+    @Transactional
+    public CaseResponse updateCaseStatus(Long caseId, boolean status, String email) {
+        log.info("Updating status for case: {} to {} by user: {}", caseId, status, email);
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found"));
+
+        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
+            throw new RuntimeException("Access denied: User doesn't have access to this case");
+        }
+
+        if (!caseEntity.isOwner(user)) {
+            throw new RuntimeException("Access denied: Only case owner can change status");
+        }
+
+        caseEntity.setStatus(status);
+        Case savedCase = caseRepository.save(caseEntity);
+
+        log.info("Case {} status updated to {}", caseId, status);
+       /* logService.log(
+                String.format("Case %s status updated to %s by user %s", caseEntity.getNumber(), status, email),
+                LogLevel.INFO,
+                LogAction.CASE_STATUS_CHANGED,
+                caseEntity
+        );*/
+        return mapper.mapToCaseResponse(savedCase);
     }
 
     @Transactional
@@ -166,10 +218,14 @@ public class CaseServiceImpl implements CaseService {
             caseFile.setStatus(CaseFileStatusEnum.QUEUED);
         }
 
-        Case savedCase = caseRepository.save(caseEntity);
         log.info("Added {} files to case: {}", addedFilesCount, caseId);
-
-        return mapper.mapToCaseResponse(savedCase);
+        /*logService.log(
+                String.format("Added %d file(s) to case %s", addedFilesCount, caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.FILE_UPLOAD,
+                caseEntity
+        );*/
+        return mapper.mapToCaseResponse(caseEntity);
     }
 
     @Transactional
@@ -366,5 +422,45 @@ public class CaseServiceImpl implements CaseService {
                         .isOwner(caseEntity.isOwner(user))
                         .build())
                 .collect(Collectors.toList());
+    }
+
+    @Transactional
+    public void updateCaseActivity(Long caseId, String activityType) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+
+        caseEntity.updateActivity(activityType);
+        caseRepository.save(caseEntity);
+
+        log.debug("Updated activity for case {}: {}", caseId, activityType);
+    }
+
+    @Transactional
+    public void updateCaseActivity(String caseNumber, String activityType) {
+        Case caseEntity = caseRepository.findByNumber(caseNumber)
+                .orElseThrow(() -> new RuntimeException("Case not found: " + caseNumber));
+
+        caseEntity.updateActivity(activityType);
+        caseRepository.save(caseEntity);
+
+        log.debug("Updated activity for case {}: {}", caseNumber, activityType);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CaseResponse> getRecentCases(String userEmail, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Case> cases = caseRepository.findRecentCasesWithActivity(userEmail, pageable);
+
+        return cases.map(mapper::mapToCaseResponse);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<CaseResponse> getCasesByActivityType(String userEmail, String activityType, int page, int size) {
+        Pageable pageable = PageRequest.of(page, size);
+        Page<Case> cases = caseRepository.findCasesByActivityType(userEmail, activityType, pageable);
+
+        return cases.map(mapper::mapToCaseResponse);
     }
 }

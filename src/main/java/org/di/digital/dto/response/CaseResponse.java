@@ -25,4 +25,11 @@ public class CaseResponse {
 
     private LocalDateTime createdDate;
     private LocalDateTime updatedDate;
+
+    private LocalDateTime lastActivityDate;
+    private String lastActivityType;
+    private LocalDateTime qualificationGeneratedAt;
+    private LocalDateTime indictmentGeneratedAt;
+
+    private String ownerEmail;
 }

@@ -12,6 +12,7 @@ import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.CaseUserResponse;
 import org.di.digital.service.CaseService;
 import org.springframework.core.io.InputStreamResource;
+import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
@@ -63,9 +64,12 @@ public class CaseController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CaseResponse>> getUserCases(Authentication authentication) {
-        log.info("Getting all cases for user: {}", authentication.getName());
-        List<CaseResponse> cases = caseService.getUserCases(authentication.getName());
+    public ResponseEntity<List<CaseResponse>> getUserCases(
+            @RequestParam(required = false, defaultValue = "desc") String sort,
+            Authentication authentication
+    ) {
+        log.info("Getting all cases for user: {} with sort: {}", authentication.getName(), sort);
+        List<CaseResponse> cases = caseService.getUserCases(authentication.getName(), sort);
         return ResponseEntity.ok(cases);
     }
 
@@ -94,6 +98,20 @@ public class CaseController {
         CaseResponse response = caseService.addFilesToCase(caseId, files, fileType, authentication.getName());
         return ResponseEntity.ok(response);
     }
+
+    @PatchMapping("/{caseId}/status")
+    public ResponseEntity<CaseResponse> updateCaseStatus(
+            @PathVariable Long caseId,
+            @RequestParam boolean status,
+            Authentication authentication
+    ) {
+        log.info("Updating case {} status to {} by user: {}",
+                caseId, status, authentication.getName());
+
+        CaseResponse response = caseService.updateCaseStatus(caseId, status, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
     @DeleteMapping("/{caseId}/files")
     public ResponseEntity<CaseResponse> deleteFileFromCase(
             @PathVariable Long caseId,
@@ -191,5 +209,41 @@ public class CaseController {
 
         List<CaseUserResponse> users = caseService.getCaseUsers(caseId, authentication.getName());
         return ResponseEntity.ok(users);
+    }
+
+    @GetMapping("/recent")
+    public ResponseEntity<Page<CaseResponse>> getRecentCases(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            Authentication authentication
+    ) {
+        log.info("Getting recent cases for user: {}", authentication.getName());
+
+        Page<CaseResponse> recentCases = caseService.getRecentCases(
+                authentication.getName(),
+                page,
+                size
+        );
+
+        return ResponseEntity.ok(recentCases);
+    }
+
+    @GetMapping("/activity/{activityType}")
+    public ResponseEntity<Page<CaseResponse>> getCasesByActivity(
+            @PathVariable String activityType,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "10") int size,
+            Authentication authentication
+    ) {
+        log.info("Getting cases with activity type {} for user: {}", activityType, authentication.getName());
+
+        Page<CaseResponse> cases = caseService.getCasesByActivityType(
+                authentication.getName(),
+                activityType,
+                page,
+                size
+        );
+
+        return ResponseEntity.ok(cases);
     }
 }

@@ -9,5 +9,7 @@ public interface AuthService {
     String signup(SignUpRequest request);
     JwtResponse login(LoginRequest request);
     JwtResponse refreshToken(RefreshTokenRequest request);
+    void logout(String refreshToken);
+
 
 }

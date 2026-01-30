@@ -2,16 +2,12 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.CaseFile;
-import org.di.digital.model.CaseFileStatusEnum;
 import org.di.digital.model.TaskQueue;
 import org.di.digital.model.TaskStatus;
-import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.repository.TaskQueueRepository;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
-import org.springframework.messaging.simp.SimpMessagingTemplate;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;

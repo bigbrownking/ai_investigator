@@ -58,6 +58,10 @@ public class User {
     @Column(name = "updated_date")
     private LocalDateTime updatedDate;
 
+    @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private UserSettings settings;
+
+
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",

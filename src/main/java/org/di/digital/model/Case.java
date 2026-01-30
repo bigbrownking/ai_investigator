@@ -70,9 +70,21 @@ public class Case {
     @Column(name = "created_date", updatable = false)
     private LocalDateTime createdDate;
 
-    @LastModifiedDate
-    @Column(name = "updated_date")
-    private LocalDateTime updatedDate;
+    //    @LastModifiedDate
+//    @Column(name = "updated_date")
+//    private LocalDateTime updatedDate;
+
+    @Column(name = "last_activity_date")
+    private LocalDateTime lastActivityDate;
+
+    @Column(name = "last_activity_type", length = 50)
+    private String lastActivityType;
+
+    @Column(name = "qualification_generated_at")
+    private LocalDateTime qualificationGeneratedAt;
+
+    @Column(name = "indictment_generated_at")
+    private LocalDateTime indictmentGeneratedAt;
 
     public void addUser(User user) {
         this.users.add(user);
@@ -92,5 +104,9 @@ public class Case {
 
     public boolean isOwner(User user) {
         return this.owner != null && this.owner.equals(user);
+    }
+    public void updateActivity(String activityType) {
+        this.lastActivityDate = LocalDateTime.now();
+        this.lastActivityType = activityType;
     }
 }

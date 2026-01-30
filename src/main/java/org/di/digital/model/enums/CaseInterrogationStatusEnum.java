@@ -1,4 +1,4 @@
-package org.di.digital.model;
+package org.di.digital.model.enums;
 
 import lombok.Getter;
 
