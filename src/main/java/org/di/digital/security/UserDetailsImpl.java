@@ -20,6 +20,7 @@ public class UserDetailsImpl implements UserDetails {
     private String password;
     private boolean active;
     private Collection<? extends GrantedAuthority> authorities;
+    private User user;
 
     public static UserDetailsImpl build(User user) {
         List<GrantedAuthority> authorities = user.getRoles().stream()
@@ -31,7 +32,8 @@ public class UserDetailsImpl implements UserDetails {
                 user.getEmail(),
                 user.getPassword(),
                 user.isActive(),
-                authorities
+                authorities,
+                user
         );
     }
 

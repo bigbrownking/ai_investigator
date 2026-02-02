@@ -43,7 +43,7 @@ public class CaseServiceImpl implements CaseService {
     private final UserRepository userRepository;
     private final MinioService minioService;
     private final TaskQueueService taskQueueService;
-    //private final LogService logService;
+    private final LogService logService;
     private final Mapper mapper;
 
     @Transactional
@@ -90,12 +90,12 @@ public class CaseServiceImpl implements CaseService {
 
         log.info("Case created with id: {} for user: {}", savedCase.getId(), email);
 
-        /*logService.log(
+        logService.log(
                 String.format("Case %s created by user %s", savedCase.getNumber(), email),
                 LogLevel.INFO,
                 LogAction.CASE_CREATED,
                 savedCase
-        );*/
+        );
 
         return mapper.mapToCaseResponse(savedCase);
     }
@@ -108,7 +108,6 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        // Check if user has access (is owner or member)
         if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
             throw new AccessDeniedException("Access denied to case: " + id);
         }
@@ -154,12 +153,12 @@ public class CaseServiceImpl implements CaseService {
         Case savedCase = caseRepository.save(caseEntity);
 
         log.info("Case {} status updated to {}", caseId, status);
-       /* logService.log(
+        logService.log(
                 String.format("Case %s status updated to %s by user %s", caseEntity.getNumber(), status, email),
                 LogLevel.INFO,
                 LogAction.CASE_STATUS_CHANGED,
                 caseEntity
-        );*/
+        );
         return mapper.mapToCaseResponse(savedCase);
     }
 
@@ -219,12 +218,12 @@ public class CaseServiceImpl implements CaseService {
         }
 
         log.info("Added {} files to case: {}", addedFilesCount, caseId);
-        /*logService.log(
+        logService.log(
                 String.format("Added %d file(s) to case %s", addedFilesCount, caseEntity.getNumber()),
                 LogLevel.INFO,
                 LogAction.FILE_UPLOAD,
                 caseEntity
-        );*/
+        );
         return mapper.mapToCaseResponse(caseEntity);
     }
 
@@ -236,7 +235,6 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        // Check if user has access
         if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
             throw new AccessDeniedException("Access denied to case: " + caseId);
         }
@@ -269,7 +267,6 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        // Check if user has access
         if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
             throw new AccessDeniedException("Access denied");
         }
@@ -291,7 +288,6 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        // Check if user has access
         if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
             throw new AccessDeniedException("Access denied to case: " + caseId);
         }
@@ -312,7 +308,6 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        // Check if user has access
         if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
             throw new AccessDeniedException("Access denied to case: " + caseId);
         }
@@ -342,7 +337,6 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        // Check if current user has access to this case (is owner or already a member)
         if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
             throw new AccessDeniedException("You don't have permission to add users to this case");
         }
@@ -371,7 +365,6 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        // Only owner can remove users
         if (!caseEntity.isOwner(currentUser)) {
             throw new AccessDeniedException("Only the case owner can remove users");
         }
@@ -379,12 +372,10 @@ public class CaseServiceImpl implements CaseService {
         User userToRemove = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
 
-        // Cannot remove the owner
         if (caseEntity.isOwner(userToRemove)) {
             throw new IllegalStateException("Cannot remove the case owner");
         }
 
-        // Check if user is in the case
         if (!caseEntity.hasUser(userToRemove)) {
             throw new IllegalStateException("User is not a member of this case");
         }
@@ -406,12 +397,10 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        // Check if current user has access to this case
         if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
             throw new AccessDeniedException("You don't have permission to view users of this case");
         }
 
-        // Map users to response
         return caseEntity.getUsers().stream()
                 .map(user -> CaseUserResponse.builder()
                         .id(user.getId())

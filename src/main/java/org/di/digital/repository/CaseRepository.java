@@ -11,6 +11,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface CaseRepository extends JpaRepository<Case, Long> {
@@ -40,4 +41,14 @@ public interface CaseRepository extends JpaRepository<Case, Long> {
     );
 
     Optional<Case> findByNumber(String caseNumber);
+
+    @Query("SELECT DISTINCT CASE " +
+            "WHEN u.email IS NOT NULL THEN u.email " +
+            "ELSE o.email END " +
+            "FROM Case c " +
+            "LEFT JOIN c.owner o " +
+            "LEFT JOIN c.users u " +
+            "WHERE c.number = :caseNumber")
+    Set<String> findAllAccessibleUserEmailsByCaseNumber(@Param("caseNumber") String caseNumber);
+
 }

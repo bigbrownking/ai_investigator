@@ -61,8 +61,11 @@ public class Mapper {
                         .collect(Collectors.toList()))
                 .createdDate(caseEntity.getCreatedDate())
                 .ownerEmail(caseEntity.getOwner() != null ? caseEntity.getOwner().getEmail() : null)
-
-              //  .updatedDate(caseEntity.getUpdatedDate())
+                .lastActivityDate(caseEntity.getLastActivityDate())
+                .lastActivityType(caseEntity.getLastActivityType())
+                .qualificationGeneratedAt(caseEntity.getQualificationGeneratedAt())
+                .indictmentGeneratedAt(caseEntity.getIndictmentGeneratedAt())
+                .updatedDate(caseEntity.getUpdatedDate())
                 .build();
     }
 

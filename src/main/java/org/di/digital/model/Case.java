@@ -70,9 +70,9 @@ public class Case {
     @Column(name = "created_date", updatable = false)
     private LocalDateTime createdDate;
 
-    //    @LastModifiedDate
-//    @Column(name = "updated_date")
-//    private LocalDateTime updatedDate;
+    @LastModifiedDate
+    @Column(name = "updated_date")
+    private LocalDateTime updatedDate;
 
     @Column(name = "last_activity_date")
     private LocalDateTime lastActivityDate;
@@ -105,6 +105,7 @@ public class Case {
     public boolean isOwner(User user) {
         return this.owner != null && this.owner.equals(user);
     }
+
     public void updateActivity(String activityType) {
         this.lastActivityDate = LocalDateTime.now();
         this.lastActivityType = activityType;

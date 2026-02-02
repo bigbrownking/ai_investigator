@@ -9,7 +9,6 @@ import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.service.CaseFileService;
 import org.di.digital.service.impl.NotificationService;
-import org.di.digital.service.impl.TaskQueueService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
@@ -21,12 +20,11 @@ public class ProcessingResultConsumer {
     private final CaseFileService caseFileService;
     private final NotificationService notificationService;
     private final CaseFileRepository caseFileRepository;
-    private final TaskQueueService taskQueueService;
 
     @RabbitListener(queues = RabbitMQConfig.RESULT_QUEUE)
     public void handleProcessingResult(ProcessingResultMessage message) {
-        log.info("Received {} notification for file {} from user {}",
-                message.getStatus(), message.getCaseFileId(), message.getUserEmail());
+        log.info("Received {} notification for file {} in case {}",
+                message.getStatus(), message.getCaseFileId(), message.getCaseNumber());
 
         try {
             CaseFile caseFile = caseFileRepository.findById(message.getCaseFileId())
@@ -46,44 +44,37 @@ public class ProcessingResultConsumer {
         caseFile.setStatus(CaseFileStatusEnum.PROCESSING);
         caseFileRepository.save(caseFile);
 
-        notificationService.sendNotification(
-                message.getUserEmail(),
-                message.getCaseNumber(),
-                caseFile,
-                "Начата обработка файла",
-                null
-        );
+        notificationService.notifyFileProcessingStarted(message.getCaseNumber(), caseFile);
 
-        log.info("File {} marked as PROCESSING", message.getCaseFileId());
+        log.info("File {} marked as PROCESSING in case {}", message.getCaseFileId(), message.getCaseNumber());
     }
 
     private void handleCompletion(ProcessingResultMessage message) {
         CaseFile caseFile = caseFileService.markAsCompleted(message.getCaseFileId(), message.getResult());
 
-        notificationService.sendNotification(
-                message.getUserEmail(),
+        // Send case-level notification
+        notificationService.notifyFileProcessingCompleted(
                 message.getCaseNumber(),
                 caseFile,
-                message.getResult(),
-                null
+                message.getResult()
         );
 
-        log.info("File {} marked as COMPLETED ({}s)",
-                message.getCaseFileId(), message.getProcessingDurationSeconds());
+        log.info("File {} marked as COMPLETED in case {} ({}s)",
+                message.getCaseFileId(), message.getCaseNumber(), message.getProcessingDurationSeconds());
     }
 
     private void handleFailure(ProcessingResultMessage message) {
         CaseFile caseFile = caseFileService.markAsFailed(message.getCaseFileId(), message.getErrorMessage());
 
-        notificationService.sendNotification(
-                message.getUserEmail(),
+        // Send case-level notification
+        notificationService.notifyFileProcessingFailed(
                 message.getCaseNumber(),
                 caseFile,
-                null,
                 message.getErrorMessage()
         );
 
-        log.error("File {} marked as FAILED ({}s): {}",
-                message.getCaseFileId(), message.getProcessingDurationSeconds(), message.getErrorMessage());
+        log.error("File {} marked as FAILED in case {} ({}s): {}",
+                message.getCaseFileId(), message.getCaseNumber(),
+                message.getProcessingDurationSeconds(), message.getErrorMessage());
     }
 }

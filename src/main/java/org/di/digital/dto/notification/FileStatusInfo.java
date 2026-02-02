@@ -1,6 +1,7 @@
 package org.di.digital.dto.notification;
 
 import lombok.AllArgsConstructor;
+import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.di.digital.model.enums.CaseFileStatusEnum;
@@ -8,14 +9,14 @@ import org.di.digital.model.enums.CaseFileStatusEnum;
 import java.time.LocalDateTime;
 
 @Data
+@Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class FileProcessingNotification {
-    private Long caseFileId;
-    private String caseNumber;
+public class FileStatusInfo {
+    private Long fileId;
     private String fileName;
     private CaseFileStatusEnum status;
-    private String text;
+    private LocalDateTime uploadedAt;
+    private LocalDateTime completedAt;
     private String errorMessage;
-    private LocalDateTime timestamp;
 }

@@ -23,18 +23,26 @@ public class RoundRobinScheduler {
     private final DocumentQueueService documentQueueService;
     private final CaseFileRepository caseFileRepository;
     private final NotificationService notificationService;
+
     @Scheduled(fixedDelay = 5000)
     @Transactional
     public void processTasksRoundRobin() {
         TaskQueue task = taskQueueService.getNextTaskByRoundRobin();
 
         if (task != null) {
-            log.info("Processing task {} for user {}", task.getFileName(), task.getUserEmail());
-            CaseFile caseFile = caseFileRepository.findById(task.getCaseFileId()).orElseThrow();
+            log.info("Processing task {} (fileId: {}) for user {} in case {}",
+                    task.getFileName(),
+                    task.getCaseFileId(),
+                    task.getUserEmail(),
+                    task.getCaseNumber());
+
+            CaseFile caseFile = caseFileRepository.findById(task.getCaseFileId())
+                    .orElseThrow(() -> new RuntimeException("CaseFile not found: " + task.getCaseFileId()));
 
             caseFile.setStatus(CaseFileStatusEnum.PENDING);
+            caseFileRepository.save(caseFile);
+
             try {
-                // Отправить в RabbitMQ
                 DocumentProcessingMessage message = DocumentProcessingMessage.builder()
                         .caseId(task.getCaseId())
                         .caseFileId(task.getCaseFileId())
@@ -44,17 +52,39 @@ public class RoundRobinScheduler {
                         .caseNumber(task.getCaseNumber())
                         .build();
 
-                notificationService.sendNotification(
-                        task.getUserEmail(),
-                        task.getCaseNumber(),
-                        caseFile,
-                        "Файл добавлен в очередь обработки",
-                        null
-                );
                 documentQueueService.sendDocumentForProcessing(message);
+
+                notificationService.sendCaseNotificationToAllUsers(
+                        task.getCaseNumber(),
+                        "Файл добавлен в очередь обработки: " + task.getFileName(),
+                        task.getCaseFileId(),
+                        task.getFileName()
+                );
+
+                log.info("Task {} (fileId: {}) sent to processing queue for case {}",
+                        task.getFileName(),
+                        task.getCaseFileId(),
+                        task.getCaseNumber());
+
             } catch (Exception e) {
-                log.error("Error processing task: {}", e.getMessage());
+                log.error("Error processing task {} (fileId: {}) in case {}: {}",
+                        task.getFileName(),
+                        task.getCaseFileId(),
+                        task.getCaseNumber(),
+                        e.getMessage(),
+                        e);
+
                 taskQueueService.failTask(task.getCaseFileId(), e.getMessage());
+
+                caseFile.setStatus(CaseFileStatusEnum.FAILED);
+                caseFileRepository.save(caseFile);
+
+                notificationService.sendCaseNotificationToAllUsers(
+                        task.getCaseNumber(),
+                        "Ошибка постановки файла в очередь: " + task.getFileName() + " - " + e.getMessage(),
+                        task.getCaseFileId(),
+                        task.getFileName()
+                );
             }
         }
     }
