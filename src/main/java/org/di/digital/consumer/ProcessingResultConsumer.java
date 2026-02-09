@@ -31,6 +31,7 @@ public class ProcessingResultConsumer {
                     .orElseThrow(() -> new RuntimeException("CaseFile not found: " + message.getCaseFileId()));
 
             switch (message.getStatus()) {
+                case PENDING -> handlePending(message, caseFile);
                 case PROCESSING -> handleProcessing(message, caseFile);
                 case COMPLETED -> handleCompletion(message);
                 case FAILED -> handleFailure(message);
@@ -38,6 +39,14 @@ public class ProcessingResultConsumer {
         } catch (Exception e) {
             log.error("Error handling processing result: {}", e.getMessage(), e);
         }
+    }
+    private void handlePending(ProcessingResultMessage message, CaseFile caseFile) {
+        caseFile.setStatus(CaseFileStatusEnum.PENDING);
+        caseFileRepository.save(caseFile);
+
+        notificationService.notifyFilePending(message.getCaseNumber(), caseFile);
+
+        log.info("File {} marked as PENDING in case {}", message.getCaseFileId(), message.getCaseNumber());
     }
 
     private void handleProcessing(ProcessingResultMessage message, CaseFile caseFile) {

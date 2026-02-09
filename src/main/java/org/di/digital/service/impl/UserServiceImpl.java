@@ -4,8 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.UserSettingsRequest;
 import org.di.digital.dto.response.UserProfile;
-import org.di.digital.dto.response.UserSettingsDto;
-import org.di.digital.model.Role;
 import org.di.digital.model.User;
 import org.di.digital.model.UserSettings;
 import org.di.digital.model.enums.UserSettingsDetalizationLevel;
@@ -15,6 +13,7 @@ import org.di.digital.repository.UserRepository;
 import org.di.digital.service.UserService;
 import org.di.digital.util.Mapper;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @RequiredArgsConstructor
@@ -33,6 +32,7 @@ public class UserServiceImpl implements UserService {
     }
 
     @Override
+    @Transactional
     public UserProfile updateUserSettings(String email, UserSettingsRequest request) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("User not found: " + email));
@@ -43,15 +43,24 @@ public class UserServiceImpl implements UserService {
             settings.setUser(user);
         }
 
-        settings.setLevel(request.getLevel() != null ? UserSettingsDetalizationLevel.valueOf(request.getLevel()) : settings.getLevel());
-        settings.setLanguage(request.getLanguage() != null ? UserSettingsLanguage.valueOf(request.getLanguage()) : settings.getLanguage());
-        settings.setTheme(request.getTheme() != null ? UserSettingsTheme.valueOf(request.getTheme()) : settings.getTheme());
+        if (request.getLevel() != null) {
+            settings.setLevel(UserSettingsDetalizationLevel.fromDisplayName(request.getLevel()));
+        }
+
+        if (request.getLanguage() != null) {
+            settings.setLanguage(UserSettingsLanguage.fromDisplayName(request.getLanguage()));
+        }
+
+        if (request.getTheme() != null) {
+            settings.setTheme(UserSettingsTheme.fromDisplayName(request.getTheme()));
+        }
 
         user.setSettings(settings);
         userRepository.save(user);
 
+        log.info("Updated settings for user {}: level={}, language={}, theme={}",
+                email, settings.getLevel(), settings.getLanguage(), settings.getTheme());
+
         return mapper.mapToUserProfileResponse(user);
     }
-
 }
-

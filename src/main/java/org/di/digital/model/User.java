@@ -78,6 +78,10 @@ public class User {
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Case> ownedCases = new ArrayList<>();
 
+    @Builder.Default
+    @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CaseChat> chats = new ArrayList<>();
+
     public void addRole(Role role) {
         this.roles.add(role);
         log.debug("Added role {} to user {}", role.getName(), username);

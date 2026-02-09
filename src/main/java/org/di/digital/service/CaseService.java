@@ -32,6 +32,5 @@ public interface CaseService {
     // history and activity
     Page<CaseResponse> getRecentCases(String userEmail, int page, int size);
     Page<CaseResponse> getCasesByActivityType(String userEmail, String activityType, int page, int size);
-    void updateCaseActivity(Long caseId, String activityType);
     void updateCaseActivity(String caseNumber, String activityType);
 }

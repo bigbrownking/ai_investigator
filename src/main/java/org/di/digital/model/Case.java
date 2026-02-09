@@ -44,8 +44,8 @@ public class Case {
     @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CaseInterrogation> interrogations = new ArrayList<>();
 
-    @OneToOne(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)
-    private CaseChat chat;
+    @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CaseChat> chats = new ArrayList<>();
 
     @Column(columnDefinition = "TEXT")
     private String qualification;

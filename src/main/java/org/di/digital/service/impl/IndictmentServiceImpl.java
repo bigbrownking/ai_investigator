@@ -74,10 +74,8 @@ public class IndictmentServiceImpl implements IndictmentService {
                             try {
                                 log.info("chunk at {} : {}", System.currentTimeMillis(), chunk);
                                 String text = extractChunk(chunk);
-                                if (!text.isBlank()) {
-                                    fullText.append(text);
-                                    emitter.send(SseEmitter.event().data(text));
-                                }
+                                fullText.append(text);
+                                emitter.send(SseEmitter.event().data(text));
                             } catch (Exception e) {
                                 log.error("Error sending SSE chunk", e);
                             }
@@ -104,7 +102,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 return node.get("delta").asText();
             }
             if (node.has("result")) {
-                return cleanMarkdownFormatting(node.get("result").asText());
+                return node.get("result").asText();
             }
         } catch (Exception ignored) {
         }
@@ -129,24 +127,13 @@ public class IndictmentServiceImpl implements IndictmentService {
         Map<String, Object> body = new HashMap<>();
         body.put("working_dir", caseNumber);
         body.put("mode", "hybrid");
+        body.put("stream", false);
         return body;
-    }
-
-    private String cleanMarkdownFormatting(String text) {
-        return text
-                .replaceAll("\\*\\*([^*]+)\\*\\*", "$1")
-                .replaceAll("\\*([^*]+)\\*", "$1")
-                .replaceAll("(?m)^#{1,6}\\s+", "")
-                .replaceAll("(?m)^---+$", "")
-                .replaceAll("\n{3,}", "\n\n")
-                .trim();
     }
 
     @Override
     public Resource downloadIndictmentAsWord(String caseNumber) {
-        String indictment = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Case not found"))
-                .getIndictment();
+        String indictment = getIndictment(caseNumber);
 
         try {
             return new ByteArrayResource(
@@ -155,5 +142,12 @@ public class IndictmentServiceImpl implements IndictmentService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public String getIndictment(String caseNumber) {
+        return caseRepository.findByNumber(caseNumber)
+                .orElseThrow(() -> new IllegalStateException("Case not found"))
+                .getIndictment();
     }
 }

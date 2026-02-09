@@ -75,10 +75,9 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
+        String rawPassword = rsaDecryptor.decrypt(request.getPassword());
 
-       // String rawPassword = rsaDecryptor.decrypt(request.getPassword());
-
-        if (!passwordEncoder.matches(request.getPassword(), user.getPassword())) {
+        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new RuntimeException("Invalid credentials");
         }
 

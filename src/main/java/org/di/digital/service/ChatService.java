@@ -6,13 +6,15 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 public interface ChatService {
 
-    void streamChatResponseWithHistory(String caseNumber, ChatRequest request, String userEmail, SseEmitter emitter);
+    void streamCaseChatResponseWithHistory(String caseNumber, ChatRequest request, String userEmail, SseEmitter emitter);
+
+    void streamChatResponse(ChatRequest request, SseEmitter emitter);
 
     CaseChatHistoryResponse getChatHistoryByCaseNumber(String caseNumber, String userEmail, int page, int size);
 
-    CaseChatHistoryResponse getChatHistory(Long caseId, String userEmail, int page, int size);
+    CaseChatHistoryResponse getChatHistory(Long caseId, Long userId, int page, int size);
 
     void clearChatHistoryByCaseNumber(String caseNumber, String userEmail);
 
-    void clearChatHistory(Long caseId);
+    void clearChatHistory(Long caseId, Long userId);
 }

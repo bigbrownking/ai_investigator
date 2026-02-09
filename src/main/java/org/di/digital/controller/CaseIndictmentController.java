@@ -87,4 +87,15 @@ public class CaseIndictmentController {
                 .body(resource);
     }
 
+    @GetMapping("/indictment")
+    public ResponseEntity<String> getIndictment(
+            @RequestParam String caseNumber,
+            Authentication authentication){
+        if (authentication == null || !authentication.isAuthenticated()) {
+            log.error("Unauthenticated access attempt to download qualification");
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(indictmentService.getIndictment(caseNumber));
+    }
+
 }

@@ -18,6 +18,7 @@ import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseService;
 import org.di.digital.service.LogService;
 import org.di.digital.util.Mapper;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -26,11 +27,13 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.HashSet;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -39,12 +42,20 @@ import java.util.stream.Collectors;
 @RequiredArgsConstructor
 public class CaseServiceImpl implements CaseService {
 
+    private final WebClient.Builder webClientBuilder;
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final MinioService minioService;
     private final TaskQueueService taskQueueService;
     private final LogService logService;
     private final Mapper mapper;
+
+    @Value("${qualification.model.host}")
+    private String pythonHost;
+
+    @Value("${index.control.port}")
+    private String pythonPort;
+
 
     @Transactional
     public CaseResponse createCase(CreateCaseRequest request, String email) {
@@ -57,7 +68,7 @@ public class CaseServiceImpl implements CaseService {
                 .description(request.getDescription())
                 .files(new ArrayList<>())
                 .owner(user)
-                .users(new java.util.HashSet<>())
+                .users(new HashSet<>())
                 .build();
 
         newCase.addUser(user);
@@ -228,7 +239,7 @@ public class CaseServiceImpl implements CaseService {
     }
 
     @Transactional
-    public CaseResponse deleteFileFromCase(Long caseId, String fileName, String email) {
+        public CaseResponse deleteFileFromCase(Long caseId, String fileName, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
@@ -245,6 +256,8 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new RuntimeException("File not found: " + fileName));
 
         try {
+            deleteFileFromWorkspace(caseEntity.getNumber(), fileName);
+
             minioService.deleteFile(fileToDelete.getFileUrl());
             caseEntity.getFiles().remove(fileToDelete);
 
@@ -258,7 +271,26 @@ public class CaseServiceImpl implements CaseService {
             throw new RuntimeException("Failed to delete file: " + fileName, e);
         }
     }
+    private void deleteFileFromWorkspace(String caseNumber, String fileName) {
+        String url = String.format("http://%s:%s/workspaces/delete_by_case_id/%s/%s",
+                pythonHost, pythonPort, caseNumber, fileName);
 
+        log.info("🗑️ Deleting file from workspace: {}", url);
+
+        try {
+            webClientBuilder.build()
+                    .post()
+                    .uri(url)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            log.info("✅ File deleted from workspace: {}", fileName);
+
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to delete file from workspace (continuing anyway): {}", e.getMessage());
+        }
+    }
     @Transactional(readOnly = true)
     public InputStreamResource downloadFile(Long caseId, String originalFileName, String email) {
         Case caseEntity = caseRepository.findById(caseId)

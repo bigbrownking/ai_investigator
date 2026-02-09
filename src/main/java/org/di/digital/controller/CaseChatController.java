@@ -42,13 +42,12 @@ public class CaseChatController {
 
         try {
             emitter.send(SseEmitter.event()
-                    .name("connected")
                     .data("Chat stream started"));
         } catch (IOException e) {
             log.error("Failed to send initial event", e);
         }
 
-        chatService.streamChatResponseWithHistory(caseNumber, request, authentication.getName(), emitter);
+        chatService.streamCaseChatResponseWithHistory(caseNumber, request, authentication.getName(), emitter);
 
         return emitter;
     }

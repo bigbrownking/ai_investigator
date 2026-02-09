@@ -29,7 +29,7 @@ import java.util.concurrent.Executors;
 public class QualificationServiceImpl implements QualificationService {
 
     private static final String QUALIFICATION_ENDPOINT_TEMPLATE =
-            "/workspaces/%s/generate-qualification?mode=hybrid&stream=true";
+            "/workspaces/%s/generate-qualification?mode=hybrid&stream=false";
 
     private final WebClient.Builder webClientBuilder;
     private final CaseRepository caseRepository;
@@ -118,9 +118,7 @@ public class QualificationServiceImpl implements QualificationService {
 
     @Override
     public Resource downloadQualificationAsWord(String caseNumber) {
-        String qualification = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Case not found"))
-                .getQualification();
+        String qualification = getQualification(caseNumber);
 
         try {
             return new ByteArrayResource(
@@ -129,5 +127,12 @@ public class QualificationServiceImpl implements QualificationService {
         } catch (IOException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    @Override
+    public String getQualification(String caseNumber) {
+        return caseRepository.findByNumber(caseNumber)
+                .orElseThrow(() -> new IllegalStateException("Case not found"))
+                .getQualification();
     }
 }

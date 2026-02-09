@@ -1,5 +1,7 @@
 package org.di.digital.service.impl;
 
+import com.fasterxml.jackson.databind.JsonNode;
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.ChatRequest;
@@ -24,8 +26,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Duration;
-import java.util.Collections;
-import java.util.List;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -38,24 +39,125 @@ public class ChatServiceImpl implements ChatService {
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final CaseService caseService;
+    private final ObjectMapper objectMapper;
 
     @Value("${qualification.model.host}")
     private String pythonHost;
 
     @Value("${qualification.model.port}")
-    private String pythonPort;
+    private String qualificationPort;
+
+    @Value("${chat.model.port}")
+    private String chatPort;
 
     @Value("${chat.context.max-messages:20}")
     private int maxContextMessages;
 
+    @Override
+    public void streamChatResponse(ChatRequest request, SseEmitter emitter) {
+        String url = UrlBuilder.buildUrl(pythonHost, chatPort, "/v1/chat/completions");
+
+        log.info("🤖 Starting general chat stream for question: {}",
+                request.getQuestion().substring(0, Math.min(50, request.getQuestion().length())));
+
+        Map<String, Object> openAIRequest = new HashMap<>();
+        openAIRequest.put("model", "qwen3-next-80b-instruct");
+        openAIRequest.put("messages", List.of(
+                Map.of("role", "user", "content", request.getQuestion())
+        ));
+        openAIRequest.put("max_tokens", 16324);
+        openAIRequest.put("temperature", 0.2);
+        openAIRequest.put("stream", true);
+
+        StringBuilder fullResponse = new StringBuilder();
+
+        try {
+            webClientBuilder.build()
+                    .post()
+                    .uri(url)
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(openAIRequest)
+                    .accept(MediaType.TEXT_EVENT_STREAM)
+                    .retrieve()
+                    .bodyToFlux(String.class)
+                    .timeout(Duration.ofMinutes(5))
+                    .doOnNext(chunk -> {
+                        try {
+                            String content = extractContentFromSSE(chunk);
+                            if (content != null) {
+                                fullResponse.append(content);
+                                emitter.send(SseEmitter.event().data(content));
+                            }
+                        } catch (Exception e) {
+                            log.error("❌ Error sending SSE chunk: ", e);
+                        }
+                    })
+                    .doOnComplete(() -> {
+                        emitter.complete();
+                        log.info("✅ General chat streaming completed, {} characters received",
+                                fullResponse.length());
+                    })
+                    .doOnError(error -> {
+                        log.error("❌ Streaming error: ", error);
+                        emitter.completeWithError(error);
+                    })
+                    .subscribe();
+
+        } catch (Exception e) {
+            log.error("❌ Error initializing general chat streaming: ", e);
+            emitter.completeWithError(e);
+        }
+    }
+
+    private String extractContentFromSSE(String sseChunk) {
+        if (sseChunk == null || sseChunk.trim().isEmpty()) {
+            return null;
+        }
+
+        if (sseChunk.contains("[DONE]")) {
+            return null;
+        }
+
+        try {
+            String jsonStr = sseChunk.trim();
+
+            if (jsonStr.startsWith("data: ")) {
+                jsonStr = jsonStr.substring(6);
+            }
+
+            if (jsonStr.isEmpty() || jsonStr.equals("[DONE]")) {
+                return null;
+            }
+
+            JsonNode node = objectMapper.readTree(jsonStr);
+
+            if (node.has("choices") && node.get("choices").isArray() && !node.get("choices").isEmpty()) {
+                JsonNode choice = node.get("choices").get(0);
+                if (choice.has("delta") && choice.get("delta").has("content")) {
+                    return choice.get("delta").get("content").asText();
+                }
+            }
+
+            return null;
+
+        } catch (Exception e) {
+            log.debug("⚠️ Failed to parse SSE chunk: {}", sseChunk);
+            return null;
+        }
+    }
+
     @Transactional
-    public void streamChatResponseWithHistory(String caseNumber, ChatRequest request, String userEmail, SseEmitter emitter) {
+    @Override
+    public void streamCaseChatResponseWithHistory(String caseNumber, ChatRequest request, String userEmail, SseEmitter emitter) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseNumber));
 
-        validateUserAccess(caseEntity, userEmail);
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
 
-        CaseChat chat = getOrCreateChatForCase(caseEntity.getId());
+        validateUserAccess(caseEntity, user);
+
+        CaseChat chat = getOrCreateChatForCaseAndUser(caseEntity.getId(), user.getId());
 
         CaseChatMessage userMessage = CaseChatMessage.builder()
                 .chat(chat)
@@ -81,10 +183,9 @@ public class ChatServiceImpl implements ChatService {
         StringBuilder fullResponse = new StringBuilder();
         final Long messageId = assistantMessage.getId();
 
-        String url = UrlBuilder.buildUrl(pythonHost, pythonPort, "/chat/" + caseNumber);
+        String url = UrlBuilder.buildUrl(pythonHost, qualificationPort, "/chat/" + caseNumber);
 
         try {
-
             webClientBuilder.build().post()
                     .uri(url)
                     .contentType(MediaType.APPLICATION_JSON)
@@ -94,23 +195,20 @@ public class ChatServiceImpl implements ChatService {
                     .bodyToFlux(String.class)
                     .timeout(Duration.ofMinutes(5))
                     .doOnNext(chunk -> {
+                        log.info("CHUNK IS {}", chunk);
                         fullResponse.append(chunk);
                         try {
-                            emitter.send(SseEmitter.event()
-                                    .data(chunk)
-                                    .name("message"));
+                            emitter.send(SseEmitter.event().data(chunk));
                         } catch (Exception e) {
                             log.error("Error sending SSE chunk: ", e);
                         }
                     })
                     .doOnComplete(() -> {
                         updateAssistantMessage(messageId, fullResponse.toString());
-
                         caseService.updateCaseActivity(caseNumber, CaseActivityType.CHAT_MESSAGE.name());
-
                         emitter.complete();
-                        log.info("Chat streaming completed for case {}, {} characters received",
-                                caseNumber, fullResponse.length());
+                        log.info("Chat streaming completed for case {} (user: {}), {} characters received",
+                                caseNumber, userEmail, fullResponse.length());
                     })
                     .doOnError(error -> {
                         log.error("Streaming error for case {}: ", caseNumber, error);
@@ -130,19 +228,17 @@ public class ChatServiceImpl implements ChatService {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseNumber));
 
-        validateUserAccess(caseEntity, userEmail);
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
 
-        return getChatHistory(caseEntity.getId(), userEmail, page, size);
+        validateUserAccess(caseEntity, user);
+
+        return getChatHistory(caseEntity.getId(), user.getId(), page, size);
     }
 
     @Transactional(readOnly = true)
-    public CaseChatHistoryResponse getChatHistory(Long caseId, String userEmail, int page, int size) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
-
-        validateUserAccess(caseEntity, userEmail);
-
-        CaseChat chat = caseChatRepository.findByCaseId(caseId)
+    public CaseChatHistoryResponse getChatHistory(Long caseId, Long userId, int page, int size) {
+        CaseChat chat = caseChatRepository.findByCaseIdAndUserId(caseId, userId)
                 .orElse(null);
 
         if (chat == null) {
@@ -179,36 +275,44 @@ public class ChatServiceImpl implements ChatService {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseNumber));
 
-        validateOwnerAccess(caseEntity, userEmail);
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
 
-        clearChatHistory(caseEntity.getId());
+        // Users can only clear their own chat history
+        validateUserAccess(caseEntity, user);
+
+        clearChatHistory(caseEntity.getId(), user.getId());
     }
 
     @Transactional
-    public void clearChatHistory(Long caseId) {
-        CaseChat chat = caseChatRepository.findByCaseId(caseId)
-                .orElseThrow(() -> new RuntimeException("Chat not found for case: " + caseId));
+    public void clearChatHistory(Long caseId, Long userId) {
+        CaseChat chat = caseChatRepository.findByCaseIdAndUserId(caseId, userId)
+                .orElseThrow(() -> new RuntimeException("Chat not found for case: " + caseId + " and user: " + userId));
 
         chatMessageRepository.deleteAllByChatId(chat.getId());
         chat.getMessages().clear();
         caseChatRepository.save(chat);
 
-        log.info("Cleared chat history for case {}", caseId);
+        log.info("🗑️ Cleared chat history for case {} and user {}", caseId, userId);
     }
 
     @Transactional
-    protected CaseChat getOrCreateChatForCase(Long caseId) {
-        return caseChatRepository.findByCaseId(caseId)
+    protected CaseChat getOrCreateChatForCaseAndUser(Long caseId, Long userId) {
+        return caseChatRepository.findByCaseIdAndUserId(caseId, userId)
                 .orElseGet(() -> {
                     Case caseEntity = caseRepository.findById(caseId)
                             .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
+                    User user = userRepository.findById(userId)
+                            .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+
                     CaseChat newChat = CaseChat.builder()
                             .caseEntity(caseEntity)
+                            .user(user)
                             .active(true)
                             .build();
 
-                    log.info("Creating new chat for case {}", caseId);
+                    log.info("📝 Creating new chat for case {} and user {}", caseId, user.getEmail());
                     return caseChatRepository.save(newChat);
                 });
     }
@@ -222,7 +326,7 @@ public class ChatServiceImpl implements ChatService {
         message.setComplete(true);
         chatMessageRepository.save(message);
 
-        log.info("Updated message {} with {} characters", messageId, fullContent.length());
+        log.info("💾 Updated message {} with {} characters", messageId, fullContent.length());
     }
 
     private ChatRequest buildRequestWithHistory(CaseChat chat, ChatRequest request) {
@@ -239,23 +343,10 @@ public class ChatServiceImpl implements ChatService {
                 .build();
     }
 
-    private void validateUserAccess(Case caseEntity, String userEmail) {
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
-
+    private void validateUserAccess(Case caseEntity, User user) {
         if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            log.warn("Access denied: User {} tried to access case {} chat", userEmail, caseEntity.getNumber());
+            log.warn("⛔ Access denied: User {} tried to access case {} chat", user.getEmail(), caseEntity.getNumber());
             throw new AccessDeniedException("You don't have permission to access this case's chat");
-        }
-    }
-
-    private void validateOwnerAccess(Case caseEntity, String userEmail) {
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
-
-        if (!caseEntity.isOwner(user)) {
-            log.warn("Access denied: User {} tried to clear chat for case {}", userEmail, caseEntity.getNumber());
-            throw new AccessDeniedException("Only the case owner can clear chat history");
         }
     }
 }

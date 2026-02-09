@@ -1,6 +1,7 @@
 package org.di.digital.service.impl;
 
 import io.minio.*;
+import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.CaseFile;
@@ -11,7 +12,10 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.time.LocalDateTime;
+import java.util.HashMap;
+import java.util.Map;
 import java.util.UUID;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -25,6 +29,9 @@ public class MinioService {
 
     @Value("${minio.url}")
     private String minioUrl;
+
+    @Value("${minio.presigned.url.expiry.hours:24}")
+    private int presignedUrlExpiryHours;
 
     public CaseFile uploadFile(MultipartFile file, String folder) {
         try {
@@ -44,12 +51,13 @@ public class MinioService {
                 );
             }
 
-            String fileUrl = String.format("%s/%s/%s", minioUrl, bucketName, objectName);
+            // Store the object path instead of direct URL
+            String objectPath = bucketName + "/" + objectName;
 
             return CaseFile.builder()
                     .originalFileName(file.getOriginalFilename())
                     .storedFileName(storedFileName)
-                    .fileUrl(fileUrl)
+                    .fileUrl(objectPath)
                     .contentType(file.getContentType())
                     .fileSize(file.getSize())
                     .uploadedAt(LocalDateTime.now())
@@ -59,6 +67,55 @@ public class MinioService {
         } catch (Exception e) {
             log.error("Error uploading file: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to upload file", e);
+        }
+    }
+
+    public String generatePresignedUrlForPreview(String objectPath) {
+        try {
+            String objectName = extractObjectNameFromPath(objectPath);
+
+            Map<String, String> responseHeaders = new HashMap<>();
+            responseHeaders.put("response-content-disposition", "inline");
+
+            String presignedUrl = minioClient.getPresignedObjectUrl(
+                    GetPresignedObjectUrlArgs.builder()
+                            .method(Method.GET)
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .expiry(presignedUrlExpiryHours, TimeUnit.HOURS)
+                            .extraQueryParams(responseHeaders)
+                            .build()
+            );
+
+            log.debug("Generated presigned preview URL for: {}", objectName);
+            return presignedUrl;
+
+        } catch (Exception e) {
+            log.error("Error generating presigned preview URL for: {}", objectPath, e);
+            throw new RuntimeException("Failed to generate presigned preview URL", e);
+        }
+    }
+
+    public String generatePresignedUrlForDownload(String objectPath, String fileName) {
+        try {
+            String objectName = extractObjectNameFromPath(objectPath);
+
+            Map<String, String> responseHeaders = new HashMap<>();
+            responseHeaders.put("response-content-disposition", "attachment; filename=\"" + fileName + "\"");
+
+            return minioClient.getPresignedObjectUrl(
+                    GetPresignedObjectUrlArgs.builder()
+                            .method(Method.GET)
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .expiry(presignedUrlExpiryHours, TimeUnit.HOURS)
+                            .extraQueryParams(responseHeaders)
+                            .build()
+            );
+
+        } catch (Exception e) {
+            log.error("Error generating presigned download URL for: {}", objectPath, e);
+            throw new RuntimeException("Failed to generate presigned download URL", e);
         }
     }
 
@@ -83,16 +140,16 @@ public class MinioService {
         return UUID.randomUUID() + extension;
     }
 
-    public void deleteFile(String fileUrl) {
+    public void deleteFile(String objectPath) {
         try {
-            String objectName = extractObjectNameFromUrl(fileUrl);
+            String objectName = extractObjectNameFromPath(objectPath);
             minioClient.removeObject(
                     RemoveObjectArgs.builder()
                             .bucket(bucketName)
                             .object(objectName)
                             .build()
             );
-            log.info("File deleted successfully: {}", fileUrl);
+            log.info("File deleted successfully: {}", objectPath);
         } catch (Exception e) {
             log.error("Error deleting file from Minio: {}", e.getMessage(), e);
         }
@@ -102,9 +159,31 @@ public class MinioService {
         return fileUrl.substring(fileUrl.indexOf(bucketName) + bucketName.length() + 1);
     }
 
-    public InputStream downloadFile(String fileUrl) {
+    private String extractObjectNameFromPath(String objectPath) {
+        if (objectPath == null || objectPath.isEmpty()) {
+            throw new IllegalArgumentException("Object path cannot be null or empty");
+        }
+
+        if (objectPath.startsWith("http://") || objectPath.startsWith("https://")) {
+            try {
+                int bucketIndex = objectPath.indexOf("/" + bucketName + "/");
+                if (bucketIndex != -1) {
+                    return objectPath.substring(bucketIndex + bucketName.length() + 2);
+                }
+            } catch (Exception e) {
+                log.error("Failed to extract object name from URL: {}", objectPath, e);
+            }
+        }
+
+        if (objectPath.startsWith(bucketName + "/")) {
+            return objectPath.substring(bucketName.length() + 1);
+        }
+
+        return objectPath;
+    }
+    public InputStream downloadFile(String objectPath) {
         try {
-            String objectName = extractObjectNameFromUrl(fileUrl);
+            String objectName = extractObjectNameFromPath(objectPath);
             return minioClient.getObject(
                     GetObjectArgs.builder()
                             .bucket(bucketName)

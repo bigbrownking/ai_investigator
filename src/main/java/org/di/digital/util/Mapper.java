@@ -1,16 +1,20 @@
 package org.di.digital.util;
 
+import lombok.RequiredArgsConstructor;
 import org.di.digital.dto.response.*;
 import org.di.digital.model.Case;
 import org.di.digital.model.CaseInterrogation;
 import org.di.digital.model.Role;
 import org.di.digital.model.User;
+import org.di.digital.service.impl.MinioService;
 import org.springframework.stereotype.Component;
 
 import java.util.stream.Collectors;
 
 @Component
+@RequiredArgsConstructor
 public class Mapper {
+    private final MinioService minioService;
     public CaseInterrogationResponse mapToInterrogationResponse(CaseInterrogation interrogation) {
         return CaseInterrogationResponse.builder()
                 .id(interrogation.getId())
@@ -36,7 +40,13 @@ public class Mapper {
                                 .contentType(f.getContentType())
                                 .fileSize(f.getFileSize())
                                 .status(f.getStatus().getLabel())
+                                .previewUrl(minioService.generatePresignedUrlForPreview(f.getFileUrl()))
+                                .downloadUrl(minioService.generatePresignedUrlForDownload(
+                                        f.getFileUrl(),
+                                        f.getOriginalFileName()
+                                ))
                                 .uploadedAt(String.valueOf(f.getUploadedAt()))
+                                .isQualification(f.isQualification())
                                 .build())
                         .collect(Collectors.toList()))
                 .interrogations(caseEntity.getInterrogations().stream()

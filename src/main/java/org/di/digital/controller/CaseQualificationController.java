@@ -87,5 +87,15 @@ public class CaseQualificationController {
                 .body(resource);
     }
 
+    @GetMapping("/qualification")
+    public ResponseEntity<String> getQualification(
+            @RequestParam String caseNumber,
+            Authentication authentication){
+        if (authentication == null || !authentication.isAuthenticated()) {
+            log.error("Unauthenticated access attempt to download qualification");
+            return ResponseEntity.status(401).build();
+        }
+        return ResponseEntity.ok(qualificationService.getQualification(caseNumber));
+    }
 
 }

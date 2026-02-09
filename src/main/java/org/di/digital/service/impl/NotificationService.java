@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.notification.CaseProcessingNotification;
 import org.di.digital.dto.notification.FileStatusInfo;
+import org.di.digital.model.Case;
 import org.di.digital.model.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.repository.CaseFileRepository;
@@ -92,6 +93,17 @@ public class NotificationService {
         log.info("Case notification sent to all {} users for case {} - Files: {} total, {} processing, {} completed, {} failed",
                 userEmails.size(), caseNumber, caseFiles.size(), processing, completed, failed);
     }
+
+    @Transactional(readOnly = true)
+    public void notifyFilePending(String caseNumber, CaseFile caseFile) {
+        sendCaseNotificationToAllUsers(
+                caseNumber,
+                "Файл добавлен в очередь: " + caseFile.getOriginalFileName(),
+                caseFile.getId(),
+                caseFile.getOriginalFileName()
+        );
+    }
+
     @Transactional(readOnly = true)
     public void notifyFileProcessingStarted(String caseNumber, CaseFile caseFile) {
         sendCaseNotificationToAllUsers(
@@ -124,7 +136,7 @@ public class NotificationService {
     }
     private String getCaseTitle(String caseNumber) {
         return caseRepository.findByNumber(caseNumber)
-                .map(c -> c.getTitle())
+                .map(Case::getTitle)
                 .orElse("Unknown Case");
     }
 }
