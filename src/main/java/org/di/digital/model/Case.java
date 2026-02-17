@@ -110,4 +110,13 @@ public class Case {
         this.lastActivityDate = LocalDateTime.now();
         this.lastActivityType = activityType;
     }
+
+    public boolean hasQualificationUploaded(){
+        for(CaseFile caseFile : files){
+            if(caseFile.isQualification()){
+                return true;
+            }
+        }
+        return false;
+    }
 }

@@ -55,6 +55,15 @@ public class IndictmentServiceImpl implements IndictmentService {
     }
 
     private void streamFromModel(String caseNumber, SseEmitter emitter) {
+        Case entity = caseRepository.findByNumber(caseNumber)
+                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
+
+        if(!entity.hasQualificationUploaded()){
+            String message = "Qualification must be uploaded before generating indictment for case: " + caseNumber;
+            log.warn(message);
+            emitter.completeWithError(new IllegalStateException(message));
+            return;
+        }
         String url = buildIndictmentUrl();
         Map<String, Object> body = buildRequestBody(caseNumber);
 
