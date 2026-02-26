@@ -14,4 +14,6 @@ public interface CaseFileRepository extends JpaRepository<CaseFile, Long> {
     @Query("SELECT cf FROM CaseFile cf WHERE cf.caseEntity.number = :caseNumber ORDER BY cf.uploadedAt DESC")
     List<CaseFile> findByCaseEntityNumber(@Param("caseNumber") String caseNumber);
 
+
+
 }

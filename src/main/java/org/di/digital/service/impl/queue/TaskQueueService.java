@@ -1,4 +1,4 @@
-package org.di.digital.service.impl;
+package org.di.digital.service.impl.queue;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -106,6 +106,10 @@ public class TaskQueueService {
         } else {
             log.warn("No task found for caseFileId {}", caseFileId);
         }
+    }
+
+    public void deleteTask(Long caseFileId) {
+        taskQueueRepository.deleteByCaseFileId(caseFileId);
     }
 
     public List<TaskQueue> getUserTasks(String userEmail) {

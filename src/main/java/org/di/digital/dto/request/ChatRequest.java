@@ -17,6 +17,9 @@ public class ChatRequest {
     @JsonProperty("question")
     private String question;
 
+    @JsonProperty("answer")
+    private String answer;
+
     @JsonProperty("stream")
     @Builder.Default
     private Boolean stream = true;

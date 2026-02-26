@@ -6,6 +6,7 @@ import org.di.digital.model.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.service.CaseFileService;
+import org.di.digital.service.impl.queue.TaskQueueService;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;

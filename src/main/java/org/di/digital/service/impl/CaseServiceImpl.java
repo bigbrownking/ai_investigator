@@ -2,21 +2,20 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.AddInterrogationRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
 import org.di.digital.dto.request.FileType;
-import org.di.digital.dto.response.CaseInterrogationResponse;
 import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.CaseUserResponse;
 import org.di.digital.model.*;
 import org.di.digital.model.enums.CaseFileStatusEnum;
-import org.di.digital.model.enums.CaseInterrogationStatusEnum;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
+import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseService;
 import org.di.digital.service.LogService;
+import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
@@ -30,7 +29,6 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.InputStream;
-import java.time.LocalDate;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashSet;
@@ -44,6 +42,7 @@ public class CaseServiceImpl implements CaseService {
 
     private final WebClient.Builder webClientBuilder;
     private final CaseRepository caseRepository;
+    private final CaseFileRepository caseFileRepository;
     private final UserRepository userRepository;
     private final MinioService minioService;
     private final TaskQueueService taskQueueService;
@@ -61,6 +60,10 @@ public class CaseServiceImpl implements CaseService {
     public CaseResponse createCase(CreateCaseRequest request, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        if(caseRepository.existsByNumber(request.getNumber())){
+            throw new RuntimeException("Case already exists, please inform the case creator.");
+        }
 
         Case newCase = Case.builder()
                 .title(request.getTitle())
@@ -243,6 +246,7 @@ public class CaseServiceImpl implements CaseService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
+
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
@@ -310,54 +314,6 @@ public class CaseServiceImpl implements CaseService {
 
         InputStream inputStream = minioService.downloadFile(caseFile.getFileUrl());
         return new InputStreamResource(inputStream);
-    }
-
-    @Transactional(readOnly = true)
-    public List<CaseInterrogationResponse> searchInterrogations(Long caseId, String role, String fio, LocalDate date, String email) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
-
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
-
-        return caseEntity.getInterrogations().stream()
-                .filter(i -> role.equals("Все") || i.getRole().equalsIgnoreCase(role))
-                .filter(i -> fio == null || i.getFio().toLowerCase().contains(fio.toLowerCase()))
-                .filter(i -> date == null || i.getDate().equals(date))
-                .map(mapper::mapToInterrogationResponse)
-                .collect(Collectors.toList());
-    }
-
-    @Transactional
-    public CaseResponse addInterrogation(Long caseId, AddInterrogationRequest request, String email) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
-
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
-
-        CaseInterrogation interrogation = CaseInterrogation.builder()
-                .iin(request.getIin())
-                .fio(request.getFio())
-                .role(request.getRole())
-                .date(LocalDate.now())
-                .caseEntity(caseEntity)
-                .status(CaseInterrogationStatusEnum.IN_PROGRESS)
-                .build();
-
-        caseEntity.getInterrogations().add(interrogation);
-        caseRepository.save(caseEntity);
-
-        log.info("Interrogation added to case: {}", caseId);
-        return mapper.mapToCaseResponse(caseEntity);
     }
 
     @Override

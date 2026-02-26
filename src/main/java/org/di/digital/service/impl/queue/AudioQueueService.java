@@ -1,10 +1,10 @@
-package org.di.digital.service.impl;
+package org.di.digital.service.impl.queue;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.config.RabbitMQConfig;
-import org.di.digital.dto.message.DocumentProcessingMessage;
+import org.di.digital.dto.message.AudioProcessingMessage;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageDeliveryMode;
@@ -15,12 +15,12 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 @Slf4j
-public class DocumentQueueService {
+public class AudioQueueService {
 
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
 
-    public void sendDocumentForProcessing(DocumentProcessingMessage payload) {
+    public void sendAudioForProcessing(AudioProcessingMessage payload) {
         try {
             byte[] body = objectMapper.writeValueAsBytes(payload);
 
@@ -31,16 +31,16 @@ public class DocumentQueueService {
                     .build();
 
             rabbitTemplate.send(
-                    RabbitMQConfig.DOCUMENT_EXCHANGE,
-                    RabbitMQConfig.DOCUMENT_ROUTING_KEY,
+                    RabbitMQConfig.INTERROGATION_EXCHANGE,
+                    RabbitMQConfig.INTERROGATION_ROUTING_KEY,
                     message
             );
 
-            log.info("Sent document {} to RabbitMQ for processing",
-                    payload.getOriginalFileName());
+            log.info("Sent audio {} for interrogation: {} to RabbitMQ",
+                    payload.getOriginalFileName(), payload.getInterrogationId());
 
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to send message to RabbitMQ", e);
+            throw new IllegalStateException("Failed to send audio message to RabbitMQ", e);
         }
     }
 }

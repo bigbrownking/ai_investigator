@@ -3,24 +3,20 @@ package org.di.digital.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.AddInterrogationRequest;
 import org.di.digital.dto.request.AddUserToCaseRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
 import org.di.digital.dto.request.FileType;
-import org.di.digital.dto.response.CaseInterrogationResponse;
 import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.CaseUserResponse;
 import org.di.digital.service.CaseService;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
-import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.nio.charset.StandardCharsets;
-import java.time.LocalDate;
 import java.util.List;
 
 @Slf4j
@@ -143,36 +139,6 @@ public class CaseController {
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(resource);
     }
-
-    @GetMapping("/{caseId}/interrogations")
-    public ResponseEntity<List<CaseInterrogationResponse>> getInterrogations(
-            @PathVariable Long caseId,
-            @RequestParam(required = false, defaultValue = "Все") String role,
-            @RequestParam(required = false) String fio,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
-            Authentication authentication
-    ) {
-        log.info("Searching interrogations in case: {} with filters - role: {}, fio: {}, date: {}",
-                caseId, role, fio, date);
-
-        List<CaseInterrogationResponse> interrogations = caseService.searchInterrogations(
-                caseId, role, fio, date, authentication.getName()
-        );
-
-        return ResponseEntity.ok(interrogations);
-    }
-
-    @PostMapping("/{caseId}/interrogations")
-    public ResponseEntity<CaseResponse> addInterrogation(
-            @PathVariable Long caseId,
-            @RequestBody AddInterrogationRequest request,
-            Authentication authentication
-    ) {
-        log.info("Adding interrogation to case: {} for user: {}", caseId, authentication.getName());
-        CaseResponse response = caseService.addInterrogation(caseId, request, authentication.getName());
-        return ResponseEntity.ok(response);
-    }
-
 
     @PostMapping("/{caseId}/users")
     public ResponseEntity<CaseResponse> addUserToCase(

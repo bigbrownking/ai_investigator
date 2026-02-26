@@ -2,10 +2,7 @@ package org.di.digital.util;
 
 import lombok.RequiredArgsConstructor;
 import org.di.digital.dto.response.*;
-import org.di.digital.model.Case;
-import org.di.digital.model.CaseInterrogation;
-import org.di.digital.model.Role;
-import org.di.digital.model.User;
+import org.di.digital.model.*;
 import org.di.digital.service.impl.MinioService;
 import org.springframework.stereotype.Component;
 
@@ -23,6 +20,36 @@ public class Mapper {
                 .role(interrogation.getRole())
                 .date(String.valueOf(interrogation.getDate()))
                 .status(interrogation.getStatus().name())
+                .build();
+    }
+    public CaseInterrogationQAResponse mapToInterrogationQAResponse(CaseInterrogationQA caseInterrogationQA){
+        return CaseInterrogationQAResponse.builder()
+                .id(caseInterrogationQA.getId())
+                .interrogationId(caseInterrogationQA.getInterrogation().getId())
+                .question(caseInterrogationQA.getQuestion())
+                .answer(caseInterrogationQA.getAnswer())
+                .status(caseInterrogationQA.getStatus().name())
+                .createAt(caseInterrogationQA.getCreatedAt())
+                .build();
+    }
+
+    public CaseInterrogationProtocolResponse mapToInterrogationProtocolResponse(CaseInterrogationProtocol protocol) {
+        return CaseInterrogationProtocolResponse.builder()
+                .fio(protocol.getFio())
+                .dateOfBirth(protocol.getDateOfBirth())
+                .birthPlace(protocol.getBirthPlace())
+                .citizenship(protocol.getCitizenship())
+                .nationality(protocol.getNationality())
+                .education(protocol.getEducation())
+                .martialStatus(protocol.getMartialStatus())
+                .workOrStudyPlace(protocol.getWorkOrStudyPlace())
+                .position(protocol.getPosition())
+                .address(protocol.getAddress())
+                .contacts(protocol.getContacts())
+                .military(protocol.getMilitary())
+                .criminalRecord(protocol.getCriminalRecord())
+                .iinOrPassport(protocol.getIinOrPassport())
+                .interrogationId(protocol.getInterrogation() != null ? protocol.getInterrogation().getId() : null)
                 .build();
     }
 

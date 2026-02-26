@@ -14,5 +14,6 @@ public interface TaskQueueRepository extends MongoRepository<TaskQueue, String> 
     List<TaskQueue> findByUserEmailAndStatus(String userEmail, TaskStatus status);
     Long countByStatus(TaskStatus status);
     void deleteByStatusAndCompletedAtBefore(TaskStatus status, LocalDateTime dateTime);
+    void deleteByCaseFileId(long caseFileId);
     List<TaskQueue> findByCaseFileId(Long caseFileId);
 }

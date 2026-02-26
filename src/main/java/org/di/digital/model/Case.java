@@ -37,7 +37,7 @@ public class Case {
     private boolean status = true;
 
     @Builder.Default
-    @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<CaseFile> files = new ArrayList<>();
 
     @Builder.Default
@@ -111,12 +111,17 @@ public class Case {
         this.lastActivityType = activityType;
     }
 
-    public boolean hasQualificationUploaded(){
+    public String getQualificationUploaded(){
         for(CaseFile caseFile : files){
             if(caseFile.isQualification()){
-                return true;
+                return caseFile.getOriginalFileName();
             }
         }
-        return false;
+        return null;
+    }
+    public void removeInterrogation(CaseInterrogation interrogation) {
+        this.interrogations.remove(interrogation);
+        interrogation.setCaseEntity(null);
+        log.debug("Removed interrogation {} from case {}", interrogation.getId(), this.number);
     }
 }

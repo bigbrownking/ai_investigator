@@ -51,4 +51,5 @@ public interface CaseRepository extends JpaRepository<Case, Long> {
             "WHERE c.number = :caseNumber")
     Set<String> findAllAccessibleUserEmailsByCaseNumber(@Param("caseNumber") String caseNumber);
 
+    boolean existsByNumber(String number);
 }

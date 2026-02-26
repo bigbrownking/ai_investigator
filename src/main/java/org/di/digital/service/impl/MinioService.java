@@ -69,6 +69,59 @@ public class MinioService {
             throw new RuntimeException("Failed to upload file", e);
         }
     }
+    public String uploadAudio(MultipartFile file, String folder, String fio) {
+        try {
+            ensureBucketExists();
+
+            String storedFileName = generateFileName(file.getOriginalFilename());
+
+            String objectName = folder + "/audio/" + fio + "/" + storedFileName;
+
+            try (InputStream inputStream = file.getInputStream()) {
+                minioClient.putObject(
+                        PutObjectArgs.builder()
+                                .bucket(bucketName)
+                                .object(objectName)
+                                .stream(inputStream, file.getSize(), -1)
+                                .contentType(file.getContentType())
+                                .build()
+                );
+            }
+
+            String objectPath = bucketName + "/" + objectName;
+
+            log.info("Audio uploaded successfully for interrogation: {}, path: {}",
+                    folder, objectPath);
+
+            return objectPath;
+
+        } catch (Exception e) {
+            log.error("Error uploading audio file: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload audio file", e);
+        }
+    }
+
+    public String generatePresignedUrlForAudio(String objectPath) {
+        try {
+            String objectName = extractObjectNameFromPath(objectPath);
+
+            String presignedUrl = minioClient.getPresignedObjectUrl(
+                    GetPresignedObjectUrlArgs.builder()
+                            .method(Method.GET)
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .expiry(presignedUrlExpiryHours, TimeUnit.HOURS)
+                            .build()
+            );
+
+            log.debug("Generated presigned audio URL for: {}", objectName);
+            return presignedUrl;
+
+        } catch (Exception e) {
+            log.error("Error generating presigned audio URL for: {}", objectPath, e);
+            throw new RuntimeException("Failed to generate presigned audio URL", e);
+        }
+    }
 
     public String generatePresignedUrlForPreview(String objectPath) {
         try {

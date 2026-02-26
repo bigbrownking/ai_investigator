@@ -31,4 +31,13 @@ public interface CaseChatMessageRepository extends JpaRepository<CaseChatMessage
     @Modifying
     @Query("DELETE FROM CaseChatMessage m WHERE m.chat.id = :chatId")
     void deleteAllByChatId(@Param("chatId") Long chatId);
+
+    Page<CaseChatMessage> findByInterrogationChatId(Long interrogationChatId, Pageable pageable);
+    long countByInterrogationChatId(Long interrogationChatId);
+
+    @Query("SELECT m FROM CaseChatMessage m WHERE m.interrogationChat.id = :chatId ORDER BY m.createdDate DESC")
+    List<CaseChatMessage> findRecentInterrogationMessages(@Param("chatId") Long chatId, Pageable pageable);
+
+    void deleteAllByInterrogationChatId(Long interrogationChatId);
+
 }

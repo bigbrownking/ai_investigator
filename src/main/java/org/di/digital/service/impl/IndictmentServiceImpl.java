@@ -21,6 +21,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -58,14 +59,16 @@ public class IndictmentServiceImpl implements IndictmentService {
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
 
-        if(!entity.hasQualificationUploaded()){
+        String filename = entity.getQualificationUploaded();
+        if(filename == null){
             String message = "Qualification must be uploaded before generating indictment for case: " + caseNumber;
             log.warn(message);
             emitter.completeWithError(new IllegalStateException(message));
             return;
         }
+
         String url = buildIndictmentUrl();
-        Map<String, Object> body = buildRequestBody(caseNumber);
+        Map<String, Object> body = buildRequestBody(caseNumber, null);
 
         StringBuilder fullText = new StringBuilder();
 
@@ -132,10 +135,11 @@ public class IndictmentServiceImpl implements IndictmentService {
         return UrlBuilder.buildUrl(pythonHost, pythonPort, INDICTMENT_ENDPOINT);
     }
 
-    private Map<String, Object> buildRequestBody(String caseNumber) {
+    private Map<String, Object> buildRequestBody(String caseNumber, List<String> filenames) {
         Map<String, Object> body = new HashMap<>();
         body.put("working_dir", caseNumber);
         body.put("mode", "hybrid");
+       // body.put("qual_names", filenames);
         body.put("stream", false);
         return body;
     }

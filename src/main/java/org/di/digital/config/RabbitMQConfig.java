@@ -27,6 +27,17 @@ public class RabbitMQConfig {
     public static final String RESULT_SUCCESS_ROUTING_KEY = "document.result.success";
     public static final String RESULT_FAILURE_ROUTING_KEY = "document.result.failure";
 
+    // Outgoing - отправка аудио в interrogation сервис
+    public static final String INTERROGATION_QUEUE = "interrogation.processing.queue";
+    public static final String INTERROGATION_EXCHANGE = "interrogation.exchange";
+    public static final String INTERROGATION_ROUTING_KEY = "interrogation.process";
+
+    // Incoming - получение результата транскрипции от interrogation сервиса
+    public static final String INTERROGATION_RESULT_QUEUE = "interrogation.result.queue";
+    public static final String INTERROGATION_RESULT_EXCHANGE = "interrogation.result.exchange";
+    public static final String INTERROGATION_RESULT_ROUTING_KEY = "interrogation.result.transcribed";
+
+
     // ==================== Outgoing Configuration ====================
 
     @Bean
@@ -102,4 +113,44 @@ public class RabbitMQConfig {
         rabbitTemplate.setMessageConverter(jsonMessageConverter);
         return rabbitTemplate;
     }
+
+    @Bean
+    public Queue interrogationQueue() {
+        return QueueBuilder.durable(INTERROGATION_QUEUE)
+                .withArgument("x-dead-letter-exchange", DLQ_EXCHANGE)
+                .withArgument("x-dead-letter-routing-key", DLQ_ROUTING_KEY)
+                .build();
+    }
+
+    @Bean
+    public DirectExchange interrogationExchange() {
+        return new DirectExchange(INTERROGATION_EXCHANGE);
+    }
+
+    @Bean
+    public Binding interrogationBinding(Queue interrogationQueue, DirectExchange interrogationExchange) {
+        return BindingBuilder
+                .bind(interrogationQueue)
+                .to(interrogationExchange)
+                .with(INTERROGATION_ROUTING_KEY);
+    }
+
+    @Bean
+    public Queue interrogationResultQueue() {
+        return QueueBuilder.durable(INTERROGATION_RESULT_QUEUE).build();
+    }
+
+    @Bean
+    public DirectExchange interrogationResultExchange() {
+        return new DirectExchange(INTERROGATION_RESULT_EXCHANGE);
+    }
+
+    @Bean
+    public Binding interrogationResultBinding(Queue interrogationResultQueue, DirectExchange interrogationResultExchange) {
+        return BindingBuilder
+                .bind(interrogationResultQueue)
+                .to(interrogationResultExchange)
+                .with(INTERROGATION_RESULT_ROUTING_KEY);
+    }
+
 }
