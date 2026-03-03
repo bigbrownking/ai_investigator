@@ -21,7 +21,7 @@ public class TaskQueueService {
     private final TaskQueueRepository taskQueueRepository;
     private final MongoTemplate mongoTemplate;
 
-    private int roundRobinIndex = 0;
+    private String lastSelectedUser = null;
 
     public void addTaskToQueue(String userEmail, Long caseId, String caseNumber,
                                String fileName, String fileUrl, Long caseFileId) {
@@ -55,21 +55,30 @@ public class TaskQueueService {
             return null;
         }
 
-        String selectedUser = users.get(roundRobinIndex % users.size());
-        roundRobinIndex = (roundRobinIndex + 1) % users.size();
+        int startIndex = 0;
+        if (lastSelectedUser != null) {
+            int lastIndex = users.indexOf(lastSelectedUser);
+            if (lastIndex != -1) {
+                startIndex = (lastIndex + 1) % users.size();
+            }
+        }
 
-        List<TaskQueue> userTasks = taskQueueRepository
-                .findByUserEmailAndStatus(selectedUser, TaskStatus.PENDING);
+        for (int i = 0; i < users.size(); i++) {
+            String candidate = users.get((startIndex + i) % users.size());
+            List<TaskQueue> userTasks = taskQueueRepository
+                    .findByUserEmailAndStatus(candidate, TaskStatus.PENDING);
 
-        if (!userTasks.isEmpty()) {
-            TaskQueue task = userTasks.get(0);
+            if (!userTasks.isEmpty()) {
+                TaskQueue task = userTasks.get(0);
+                task.setStatus(TaskStatus.PROCESSING);
+                task.setSentToQueueAt(LocalDateTime.now());
+                taskQueueRepository.save(task);
 
-            task.setStatus(TaskStatus.PROCESSING);
-            task.setSentToQueueAt(LocalDateTime.now());
-            taskQueueRepository.save(task);
-            log.info("Selected task {} for user {} by Round-Robin",
-                    task.getFileName(), selectedUser);
-            return task;
+                lastSelectedUser = candidate;
+                log.info("Selected task {} for user {} by Round-Robin",
+                        task.getFileName(), candidate);
+                return task;
+            }
         }
 
         return null;
