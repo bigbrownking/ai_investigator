@@ -2,8 +2,10 @@ package org.di.digital.service.impl.queue;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.model.QueueState;
 import org.di.digital.model.TaskQueue;
 import org.di.digital.model.TaskStatus;
+import org.di.digital.repository.QueueStateRepository;
 import org.di.digital.repository.TaskQueueRepository;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
@@ -19,9 +21,10 @@ import java.util.List;
 public class TaskQueueService {
 
     private final TaskQueueRepository taskQueueRepository;
+    private final QueueStateRepository queueStateRepository;
     private final MongoTemplate mongoTemplate;
 
-    private String lastSelectedUser = null;
+    private static final String ROUND_ROBIN_STATE_ID = "round_robin_state";
 
     public void addTaskToQueue(String userEmail, Long caseId, String caseNumber,
                                String fileName, String fileUrl, Long caseFileId) {
@@ -38,23 +41,30 @@ public class TaskQueueService {
                 .build();
 
         taskQueueRepository.save(task);
-
-
         log.info("Added task {} to queue for user {}", fileName, userEmail);
     }
 
     public TaskQueue getNextTaskByRoundRobin() {
         Query query = new Query();
         query.addCriteria(Criteria.where("status").is(TaskStatus.PENDING));
-        query.fields().include("userEmail");
 
         List<String> users = mongoTemplate.findDistinct(query, "userEmail",
                 TaskQueue.class, String.class);
 
         if (users.isEmpty()) {
+            log.info("No pending tasks found");
             return null;
         }
 
+        QueueState state = queueStateRepository.findById(ROUND_ROBIN_STATE_ID)
+                .orElse(QueueState.builder()
+                        .id(ROUND_ROBIN_STATE_ID)
+                        .lastSelectedUser(null)
+                        .build());
+
+        String lastSelectedUser = state.getLastSelectedUser();
+
+        // Определяем стартовый индекс — следующий после последнего выбранного
         int startIndex = 0;
         if (lastSelectedUser != null) {
             int lastIndex = users.indexOf(lastSelectedUser);
@@ -63,8 +73,10 @@ public class TaskQueueService {
             }
         }
 
+        // Перебираем пользователей начиная со startIndex
         for (int i = 0; i < users.size(); i++) {
             String candidate = users.get((startIndex + i) % users.size());
+
             List<TaskQueue> userTasks = taskQueueRepository
                     .findByUserEmailAndStatus(candidate, TaskStatus.PENDING);
 
@@ -74,7 +86,10 @@ public class TaskQueueService {
                 task.setSentToQueueAt(LocalDateTime.now());
                 taskQueueRepository.save(task);
 
-                lastSelectedUser = candidate;
+                // Сохраняем выбранного пользователя в БД
+                state.setLastSelectedUser(candidate);
+                queueStateRepository.save(state);
+
                 log.info("Selected task {} for user {} by Round-Robin",
                         task.getFileName(), candidate);
                 return task;
@@ -90,7 +105,6 @@ public class TaskQueueService {
         if (!tasks.isEmpty()) {
             TaskQueue task = tasks.get(0);
             task.setStatus(TaskStatus.COMPLETED);
-
             task.setCompletedAt(LocalDateTime.now());
             taskQueueRepository.save(task);
 
@@ -128,5 +142,4 @@ public class TaskQueueService {
     public Long getPendingTasksCount() {
         return taskQueueRepository.countByStatus(TaskStatus.PENDING);
     }
-
 }
