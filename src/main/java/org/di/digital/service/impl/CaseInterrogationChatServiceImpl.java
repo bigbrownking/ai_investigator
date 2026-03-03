@@ -140,7 +140,9 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                     CaseInterrogationChat newChat = CaseInterrogationChat.builder()
                             .interrogation(interrogation).active(true).build();
                     log.info("Creating new chat for interrogation {}", interrogation.getId());
-                    return interrogationChatRepository.save(newChat);
+                    CaseInterrogationChat saved = interrogationChatRepository.save(newChat);
+                    interrogationChatRepository.flush();
+                    return saved;
                 });
     }
 
