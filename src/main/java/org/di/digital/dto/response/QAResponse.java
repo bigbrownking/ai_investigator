@@ -11,6 +11,7 @@ import org.di.digital.model.enums.QAStatusEnum;
 @NoArgsConstructor
 @AllArgsConstructor
 public class QAResponse {
+    private Long id;
     private String question;
     private String answer;
     private int orderIndex;

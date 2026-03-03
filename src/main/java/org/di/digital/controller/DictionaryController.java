@@ -45,4 +45,16 @@ public class DictionaryController {
                         .map(UserSettingsTheme::getTheme)
                         .collect(Collectors.toList()));
     }
+
+    @GetMapping("/interrogationRoles")
+    public ResponseEntity<List<String>> getInterrogationRoles() {
+        return ResponseEntity.ok(
+                List.of("Свидетель", "Подозреваемый", "Потерпевший"));
+    }
+
+    @GetMapping("interrogationDocumentType")
+    public ResponseEntity<List<String>> getInterrogationDocumentTypes(){
+        return ResponseEntity.ok(
+                List.of("ИИН", "Паспорт"));
+    }
 }

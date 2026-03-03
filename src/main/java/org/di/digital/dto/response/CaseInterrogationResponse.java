@@ -9,7 +9,8 @@ import lombok.*;
 @AllArgsConstructor
 public class CaseInterrogationResponse {
     private Long id;
-    private String iin;
+    private String documentType;
+    private String number;
     private String fio;
     private String role;
     private String date;

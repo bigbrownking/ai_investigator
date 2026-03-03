@@ -10,7 +10,10 @@ import lombok.*;
 @AllArgsConstructor
 public class AddInterrogationRequest {
     @NotBlank
-    private String iin;
+    private String number;
+
+    @NotBlank
+    private String documentType;
 
     @NotBlank
     private String fio;

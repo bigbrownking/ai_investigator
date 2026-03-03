@@ -1,9 +1,28 @@
 package org.di.digital.service;
 
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.io.IOException;
+import java.util.Map;
+import java.util.function.Consumer;
+import java.util.function.Function;
 
 public interface StreamingService {
-    void streamText(SseEmitter emitter, String text) throws IOException;
+
+    void stream(
+            String url,
+            Object body,
+            SseEmitter emitter,
+            Function<String, String> chunkExtractor,
+            Consumer<String> onComplete,
+            Consumer<Throwable> onError
+    );
+
+    void streamRaw(
+            String url,
+            Object body,
+            SseEmitter emitter,
+            Consumer<String> onComplete,
+            Consumer<Throwable> onError
+    );
 }

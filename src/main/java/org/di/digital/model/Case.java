@@ -111,13 +111,14 @@ public class Case {
         this.lastActivityType = activityType;
     }
 
-    public String getQualificationUploaded(){
+    public List<String> getQualificationsUploaded(){
+        List<String> qualificationNames = new ArrayList<>();
         for(CaseFile caseFile : files){
             if(caseFile.isQualification()){
-                return caseFile.getOriginalFileName();
+                qualificationNames.add(caseFile.getOriginalFileName());
             }
         }
-        return null;
+        return qualificationNames;
     }
     public void removeInterrogation(CaseInterrogation interrogation) {
         this.interrogations.remove(interrogation);

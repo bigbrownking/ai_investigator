@@ -15,7 +15,8 @@ import java.util.List;
 public class CaseInterrogationFullResponse {
     private long id;
     private String caseNumber;
-    private String iin;
+    private String documentType;
+    private String number;
     private String fio;
     private String role;
     private LocalDate date;

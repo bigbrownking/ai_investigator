@@ -152,7 +152,7 @@ public class InterrogationExportService {
                 {"Отношение к воинской обязанности:", p != null ? safe(p.getMilitary()) : "—"},
                 {"Наличие судимости:", p != null ? safe(p.getCriminalRecord()) : "—"},
                 {"Паспорт или иной документ, удостоверяющий личность:",
-                        "ИИН " + safe(data.getIin()) +
+                        safe(data.getDocumentType())+ " "+ safe(data.getNumber()) +
                                 (p != null && p.getIinOrPassport() != null ? "\n" + p.getIinOrPassport() : "")},
                 {"Иные данные о личности:", "—"},
         };

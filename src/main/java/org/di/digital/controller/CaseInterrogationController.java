@@ -3,6 +3,7 @@ package org.di.digital.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.AddInterrogationRequest;
+import org.di.digital.dto.request.EditAudioTranscribedTextRequest;
 import org.di.digital.dto.request.TimerActionRequest;
 import org.di.digital.dto.request.UpdateProtocolFieldRequest;
 import org.di.digital.dto.response.*;
@@ -116,6 +117,20 @@ public class CaseInterrogationController {
         log.info("Uploading audio for interrogation: {}, case: {}", interrogationId, caseId);
         QAResponse response = caseInterrogationService.uploadAudioAndEnqueue(
                 caseId, interrogationId, question, file, language, authentication.getName()
+        );
+        return ResponseEntity.accepted().body(response);
+    }
+
+    @PatchMapping("/{caseId}/interrogations/{interrogationId}/audio")
+    public ResponseEntity<QAResponse> editTranscribedText(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            @RequestBody EditAudioTranscribedTextRequest request,
+            Authentication authentication
+    ){
+        log.info("Editing audio for interrogation: {}, case: {}", interrogationId, caseId);
+        QAResponse response = caseInterrogationService.editTranscribedText(
+                caseId, interrogationId, request, authentication.getName()
         );
         return ResponseEntity.accepted().body(response);
     }

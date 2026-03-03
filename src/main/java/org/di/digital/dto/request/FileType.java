@@ -8,7 +8,7 @@ public enum FileType {
     REGULAR("regular");
 
     private final String value;
-
+ 
     FileType(String value) {
         this.value = value;
     }

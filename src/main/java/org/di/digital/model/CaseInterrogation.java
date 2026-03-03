@@ -21,7 +21,8 @@ public class CaseInterrogation {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String iin;
+    private String documentType;
+    private String number;
     private String fio;
     private String role;
     private LocalDate date;

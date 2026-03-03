@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.AudioProcessingMessage;
 import org.di.digital.dto.request.AddInterrogationRequest;
+import org.di.digital.dto.request.EditAudioTranscribedTextRequest;
 import org.di.digital.dto.request.UpdateProtocolFieldRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.model.*;
@@ -76,7 +77,8 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .build();
 
         CaseInterrogation interrogation = CaseInterrogation.builder()
-                .iin(request.getIin())
+                .number(request.getNumber())
+                .documentType(request.getDocumentType())
                 .fio(request.getFio())
                 .role(request.getRole())
                 .date(LocalDate.now())
@@ -200,10 +202,46 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .build());
 
         return QAResponse.builder()
+                .id(qaId)
                 .question(question)
                 .answer(null)
                 .orderIndex(orderIndex)
                 .status(QAStatusEnum.TRANSCRIBING)
+                .build();
+    }
+
+    @Override
+    @Transactional
+    public QAResponse editTranscribedText(Long caseId, Long interrogationId, EditAudioTranscribedTextRequest request, String email) {
+        CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
+                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        if (!interrogation.getCaseEntity().isOwner(user) && !interrogation.getCaseEntity().hasUser(user)) {
+            throw new AccessDeniedException("Access denied to case: " + caseId);
+        }
+
+        if (!interrogation.getCaseEntity().getId().equals(caseId)) {
+            throw new RuntimeException("Interrogation does not belong to case: " + caseId);
+        }
+
+        CaseInterrogationQA qa = interrogation.getQaList().stream()
+                .filter(q -> q.getId().equals(request.getQaId()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("QA not found: " + request.getQaId()));
+
+        qa.setAnswer(request.getAnswer());
+        qa.setStatus(QAStatusEnum.TRANSCRIBED);
+        caseInterrogationRepository.save(interrogation);
+
+        return QAResponse.builder()
+                .id(qa.getId())
+                .question(qa.getQuestion())
+                .answer(qa.getAnswer())
+                .orderIndex(qa.getOrderIndex())
+                .status(qa.getStatus())
                 .build();
     }
 
@@ -226,6 +264,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
         return interrogation.getQaList().stream()
                 .map(qa -> QAResponse.builder()
+                        .id(qa.getId())
                         .question(qa.getQuestion())
                         .answer(qa.getAnswer())
                         .orderIndex(qa.getOrderIndex())
@@ -274,7 +313,8 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         return CaseInterrogationFullResponse.builder()
                 .id(interrogation.getId())
                 .caseNumber(interrogation.getCaseEntity().getNumber())
-                .iin(interrogation.getIin())
+                .number(interrogation.getNumber())
+                .documentType(interrogation.getDocumentType())
                 .fio(interrogation.getFio())
                 .role(interrogation.getRole())
                 .date(interrogation.getDate())

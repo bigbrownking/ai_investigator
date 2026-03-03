@@ -1,6 +1,7 @@
 package org.di.digital.service;
 
 import org.di.digital.dto.request.AddInterrogationRequest;
+import org.di.digital.dto.request.EditAudioTranscribedTextRequest;
 import org.di.digital.dto.request.UpdateProtocolFieldRequest;
 import org.di.digital.dto.response.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.CaseInterrogationResponse;
@@ -22,6 +23,7 @@ public interface CaseInterrogationService {
 
     QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question, MultipartFile file, String language, String email);
 
+    QAResponse editTranscribedText(Long caseId, Long interrogationId, EditAudioTranscribedTextRequest request, String email);
     List<QAResponse> getQAList(Long caseId, Long interrogationId, String email);
 
     CaseInterrogationFullResponse getDetailed(long caseId, long interrogationId, String email);
