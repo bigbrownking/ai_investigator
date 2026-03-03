@@ -1,5 +1,6 @@
 package org.di.digital.service.impl.queue;
 
+import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.QueueState;
@@ -25,6 +26,23 @@ public class TaskQueueService {
     private final MongoTemplate mongoTemplate;
 
     private static final String ROUND_ROBIN_STATE_ID = "round_robin_state";
+
+    @PostConstruct
+    public void resetStuckTasks() {
+        Query query = new Query();
+        query.addCriteria(Criteria.where("status").is(TaskStatus.PROCESSING));
+
+        List<TaskQueue> stuckTasks = mongoTemplate.find(query, TaskQueue.class);
+
+        if (!stuckTasks.isEmpty()) {
+            stuckTasks.forEach(task -> {
+                task.setStatus(TaskStatus.PENDING);
+                task.setSentToQueueAt(null);
+            });
+            taskQueueRepository.saveAll(stuckTasks);
+            log.info("Reset {} stuck PROCESSING tasks to PENDING", stuckTasks.size());
+        }
+    }
 
     public void addTaskToQueue(String userEmail, Long caseId, String caseNumber,
                                String fileName, String fileUrl, Long caseFileId) {
