@@ -3,11 +3,13 @@ package org.di.digital.service.impl.queue;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.config.RabbitMQConfig;
 import org.di.digital.model.QueueState;
 import org.di.digital.model.TaskQueue;
 import org.di.digital.model.TaskStatus;
 import org.di.digital.repository.QueueStateRepository;
 import org.di.digital.repository.TaskQueueRepository;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
@@ -24,6 +26,7 @@ public class TaskQueueService {
     private final TaskQueueRepository taskQueueRepository;
     private final QueueStateRepository queueStateRepository;
     private final MongoTemplate mongoTemplate;
+    private final RabbitAdmin rabbitAdmin;
 
     private static final String ROUND_ROBIN_STATE_ID = "round_robin_state";
 
@@ -31,7 +34,6 @@ public class TaskQueueService {
     public void resetStuckTasks() {
         Query query = new Query();
         query.addCriteria(Criteria.where("status").is(TaskStatus.PROCESSING));
-
         List<TaskQueue> stuckTasks = mongoTemplate.find(query, TaskQueue.class);
 
         if (!stuckTasks.isEmpty()) {
@@ -42,6 +44,9 @@ public class TaskQueueService {
             taskQueueRepository.saveAll(stuckTasks);
             log.info("Reset {} stuck PROCESSING tasks to PENDING", stuckTasks.size());
         }
+
+        rabbitAdmin.purgeQueue(RabbitMQConfig.DOCUMENT_QUEUE, false);
+        log.info("Purged RabbitMQ queue on startup");
     }
 
     public void addTaskToQueue(String userEmail, Long caseId, String caseNumber,
@@ -159,5 +164,8 @@ public class TaskQueueService {
 
     public Long getPendingTasksCount() {
         return taskQueueRepository.countByStatus(TaskStatus.PENDING);
+    }
+    public Long getProcessingTasksCount() {
+        return taskQueueRepository.countByStatus(TaskStatus.PROCESSING);
     }
 }
