@@ -3,6 +3,7 @@ package org.di.digital.service.impl.queue;
 import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.bson.Document;
 import org.di.digital.config.RabbitMQConfig;
 import org.di.digital.model.QueueState;
 import org.di.digital.model.TaskQueue;
@@ -10,7 +11,10 @@ import org.di.digital.model.TaskStatus;
 import org.di.digital.repository.QueueStateRepository;
 import org.di.digital.repository.TaskQueueRepository;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
+import org.springframework.data.mongodb.core.aggregation.Aggregation;
+import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.stereotype.Service;
@@ -71,8 +75,7 @@ public class TaskQueueService {
         Query query = new Query();
         query.addCriteria(Criteria.where("status").is(TaskStatus.PENDING));
 
-        List<String> users = mongoTemplate.findDistinct(query, "userEmail",
-                TaskQueue.class, String.class);
+        List<String> users = getOrderedUsersWithPendingTasks();
 
         if (users.isEmpty()) {
             log.info("No pending tasks found");
@@ -137,6 +140,22 @@ public class TaskQueueService {
         }
     }
 
+    private List<String> getOrderedUsersWithPendingTasks() {
+         Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(Criteria.where("status").is(TaskStatus.PENDING)),
+                Aggregation.group("userEmail")
+                        .min("createdAt").as("firstTaskTime"),
+                Aggregation.sort(Sort.Direction.ASC, "firstTaskTime")
+        );
+
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(aggregation, "task_queue", Document.class);
+
+        return results.getMappedResults()
+                .stream()
+                .map(doc -> doc.getString("_id"))
+                .toList();
+    }
     public void failTask(Long caseFileId, String errorMessage) {
         List<TaskQueue> tasks = taskQueueRepository.findByCaseFileId(caseFileId);
 
