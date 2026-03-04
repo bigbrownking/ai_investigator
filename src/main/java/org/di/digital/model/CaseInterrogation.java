@@ -26,6 +26,19 @@ public class CaseInterrogation {
     private String fio;
     private String role;
     private LocalDate date;
+    private String room;
+    private String notificationNumber;
+    private String notificationDate;
+    private String involved;
+    private String confession;
+    private String language;
+    private String translator;
+    private String defender;
+    private String familiarization;
+    private String additionalInfo;
+    private String application;
+    private String investigator;
+    private String investigatorProfession;
 
     @Column(name = "started_at")
     private LocalDateTime startedAt;

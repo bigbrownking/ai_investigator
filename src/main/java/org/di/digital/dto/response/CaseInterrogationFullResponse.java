@@ -14,12 +14,25 @@ import java.util.List;
 @AllArgsConstructor
 public class CaseInterrogationFullResponse {
     private long id;
+    private String room;
+    private String notificationNumber;
+    private String notificationDate;
     private String caseNumber;
     private String documentType;
     private String number;
     private String fio;
     private String role;
     private LocalDate date;
+    private String involved;
+    private String confession;
+    private String language;
+    private String translator;
+    private String defender;
+    private String familiarization;
+    private String additionalInfo;
+    private String application;
+    private String investigator;
+    private String investigatorProfession;
     private CaseInterrogationProtocolResponse protocol;
     private List<CaseInterrogationQAResponse> qaList;
     private LocalDateTime startedAt;

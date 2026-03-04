@@ -44,6 +44,12 @@ public class User {
     @Column(unique = true)
     private String email;
 
+    @Column(name = "profession")
+    private String profession;
+
+    @Column(name = "region")
+    private String region;
+
     @NotBlank
     private String password;
 

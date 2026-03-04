@@ -20,7 +20,7 @@ public interface CaseInterrogationService {
     List<CaseInterrogationResponse> searchInterrogations(Long caseId, String role, String fio, LocalDate date, String email);
 
     void updateProtocolField(Long caseId, Long interrogationId, UpdateProtocolFieldRequest request, String email);
-
+    void updateOtherField(Long caseId, Long interrogationId, UpdateProtocolFieldRequest request,  String email);
     QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question, MultipartFile file, String language, String email);
 
     QAResponse editTranscribedText(Long caseId, Long interrogationId, EditAudioTranscribedTextRequest request, String email);

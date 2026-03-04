@@ -94,6 +94,19 @@ public class CaseInterrogationController {
         return ResponseEntity.noContent().build();
     }
 
+    @PatchMapping("/{caseId}/interrogations/{interrogationId}/other")
+    public ResponseEntity<Void> updateOtherField(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            @RequestBody UpdateProtocolFieldRequest request,
+            Authentication authentication
+    ) {
+        caseInterrogationService.updateOtherField(
+                caseId, interrogationId, request, authentication.getName()
+        );
+        return ResponseEntity.noContent().build();
+    }
+
     @DeleteMapping("/{caseId}/interrogations/{interrogationId}")
     public ResponseEntity<CaseResponse> deleteInterrogation(
             @PathVariable Long caseId,

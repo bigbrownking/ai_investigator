@@ -63,4 +63,32 @@ public class UserServiceImpl implements UserService {
 
         return mapper.mapToUserProfileResponse(user);
     }
+
+    @Override
+    @Transactional
+    public UserProfile updateProfession(String email, String profession) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+
+        user.setProfession(profession);
+        userRepository.save(user);
+
+        log.info("Updated profession for user {}: {}", email, profession);
+
+        return mapper.mapToUserProfileResponse(user);
+    }
+
+    @Override
+    @Transactional
+    public UserProfile updateRegion(String email, String region) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+
+        user.setRegion(region);
+        userRepository.save(user);
+
+        log.info("Updated region for user {}: {}", email, region);
+
+        return mapper.mapToUserProfileResponse(user);
+    }
 }

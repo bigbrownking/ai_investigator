@@ -151,6 +151,29 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             default -> throw new IllegalArgumentException("Unknown field: " + request.getField());
         }
     }
+
+    @Transactional
+    public void updateOtherField(Long caseId, Long interrogationId,
+                                    UpdateProtocolFieldRequest request, String email) {
+        CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
+                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+
+        switch (request.getField()) {
+            case "room"            -> interrogation.setRoom(request.getValue());
+            case "notificationNumber"    -> interrogation.setNotificationNumber(request.getValue());
+            case "notificationDate"     -> interrogation.setNotificationDate(request.getValue());
+            case "involved"    -> interrogation.setInvolved(request.getValue());
+            case "confession"    -> interrogation.setConfession(request.getValue());
+            case "language"      -> interrogation.setLanguage(request.getValue());
+            case "translator"  -> interrogation.setTranslator(request.getValue());
+            case "defender"-> interrogation.setDefender(request.getValue());
+            case "familiarization"       -> interrogation.setFamiliarization(request.getValue());
+            case "additionalInfo"        -> interrogation.setAdditionalInfo(request.getValue());
+            case "application"       -> interrogation.setApplication(request.getValue());
+
+            default -> throw new IllegalArgumentException("Unknown field: " + request.getField());
+        }
+    }
     @Transactional
     public QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question,
                                             MultipartFile file, String language, String email) {
@@ -312,12 +335,25 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
         return CaseInterrogationFullResponse.builder()
                 .id(interrogation.getId())
+                .room(interrogation.getRoom())
+                .notificationNumber(interrogation.getNotificationNumber())
+                .notificationDate(interrogation.getNotificationDate())
                 .caseNumber(interrogation.getCaseEntity().getNumber())
                 .number(interrogation.getNumber())
                 .documentType(interrogation.getDocumentType())
                 .fio(interrogation.getFio())
                 .role(interrogation.getRole())
                 .date(interrogation.getDate())
+                .involved(interrogation.getInvolved())
+                .confession(interrogation.getConfession())
+                .language(interrogation.getLanguage())
+                .translator(interrogation.getTranslator())
+                .defender(interrogation.getDefender())
+                .familiarization(interrogation.getFamiliarization())
+                .additionalInfo(interrogation.getAdditionalInfo())
+                .application(interrogation.getApplication())
+                .investigator(interrogation.getInvestigator())
+                .investigatorProfession(interrogation.getInvestigatorProfession())
                 .status(interrogation.getStatus().name())
                 .protocol(protocolResponse)
                 .startedAt(interrogation.getStartedAt())
