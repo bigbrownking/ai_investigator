@@ -16,6 +16,8 @@ public class UserProfile {
     private String fathername;
     private String email;
     private String role;
+    private String profession;
+    private String region;
     private UserSettingsDto settings;
     private int createdCaseCount;
     private boolean active;

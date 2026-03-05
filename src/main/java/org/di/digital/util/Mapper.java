@@ -131,6 +131,8 @@ public class Mapper {
                 .surname(user.getSurname())
                 .fathername(user.getFathername())
                 .role(roles)
+                .profession(user.getProfession())
+                .region(user.getRegion())
                 .email(user.getEmail())
                 .active(user.isActive())
                 .settings(settingsDto)

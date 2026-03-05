@@ -51,8 +51,8 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         }
 
         return caseEntity.getInterrogations().stream()
-                .filter(i -> role.equals("Все") || i.getRole().equalsIgnoreCase(role))
-                .filter(i -> fio == null || i.getFio().toLowerCase().contains(fio.toLowerCase()))
+                .filter(i -> role.equals("Все") || (i.getRole() != null && i.getRole().equalsIgnoreCase(role)))
+                .filter(i -> fio == null || (i.getFio() != null && i.getFio().toLowerCase().contains(fio.toLowerCase())))
                 .filter(i -> date == null || i.getDate().equals(date))
                 .map(mapper::mapToInterrogationResponse)
                 .collect(Collectors.toList());

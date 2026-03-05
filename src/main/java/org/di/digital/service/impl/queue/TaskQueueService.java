@@ -141,11 +141,9 @@ public class TaskQueueService {
     }
 
     private List<String> getOrderedUsersWithPendingTasks() {
-         Aggregation aggregation = Aggregation.newAggregation(
+        Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.match(Criteria.where("status").is(TaskStatus.PENDING)),
                 Aggregation.group("userEmail")
-                        .min("createdAt").as("firstTaskTime"),
-                Aggregation.sort(Sort.Direction.ASC, "firstTaskTime")
         );
 
         AggregationResults<Document> results =
