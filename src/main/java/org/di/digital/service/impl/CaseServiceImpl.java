@@ -265,6 +265,8 @@ public class CaseServiceImpl implements CaseService {
             minioService.deleteFile(fileToDelete.getFileUrl());
             caseEntity.getFiles().remove(fileToDelete);
 
+            taskQueueService.deleteTask(fileToDelete.getId());
+            
             Case savedCase = caseRepository.save(caseEntity);
             log.info("Deleted file: {} from case: {}", fileName, caseId);
 

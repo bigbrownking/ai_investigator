@@ -28,10 +28,10 @@ public class RoundRobinScheduler {
     @Transactional
     public void processTasksRoundRobin() {
         long processingCount = taskQueueService.getProcessingTasksCount();
-        if (processingCount > 0) {
-            log.debug("Waiting for {} task(s) to finish processing", processingCount);
-            return;
-        }
+//        if (processingCount > 0) {
+//            log.info("Waiting for {} task(s) to finish processing", processingCount);
+//            return;
+//        }
         TaskQueue task = taskQueueService.getNextTaskByRoundRobin();
 
         if (task != null) {

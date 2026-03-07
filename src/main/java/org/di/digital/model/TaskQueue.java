@@ -2,7 +2,9 @@ package org.di.digital.model;
 
 import lombok.*;
 import org.springframework.data.annotation.Id;
+import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
+import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 
@@ -12,6 +14,10 @@ import java.time.LocalDateTime;
 @NoArgsConstructor
 @AllArgsConstructor
 @Document(collection = "task_queue")
+@CompoundIndex(
+        name = "unique_active_task",
+        def = "{'caseFileId': 1, 'status': 1}"
+)
 public class TaskQueue {
     @Id
     private String id;
@@ -29,6 +35,7 @@ public class TaskQueue {
     private LocalDateTime createdAt;
     private LocalDateTime sentToQueueAt;
     private LocalDateTime completedAt;
+    private LocalDateTime lastHeartbeatAt;
 
     private String errorMessage;
 }

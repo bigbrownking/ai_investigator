@@ -5,6 +5,7 @@ import org.apache.poi.xwpf.usermodel.*;
 import org.di.digital.dto.response.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.CaseInterrogationProtocolResponse;
 import org.di.digital.dto.response.CaseInterrogationQAResponse;
+import org.di.digital.model.User;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.*;
 import org.springframework.stereotype.Service;
 
@@ -12,6 +13,8 @@ import java.io.ByteArrayOutputStream;
 import java.math.BigInteger;
 import java.time.format.DateTimeFormatter;
 import java.util.Locale;
+
+import static org.di.digital.util.UserUtil.getCurrentUser;
 
 @Service
 @RequiredArgsConstructor
@@ -22,7 +25,10 @@ public class InterrogationExportService {
     private static final DateTimeFormatter TIME_FMT =
             DateTimeFormatter.ofPattern("HH 'час.' mm 'мин.'");
 
+    private User currentUser;
+
     public byte[] exportToDocx(CaseInterrogationFullResponse data) {
+        currentUser = getCurrentUser();
         try (XWPFDocument doc = new XWPFDocument();
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
@@ -49,6 +55,25 @@ public class InterrogationExportService {
             addPersonDataTable(doc, data);
             addEmptyLine(doc);
 
+            // 4.5. В ходе допроса / порядок производства
+            String involved = safe(data.getInvolved());
+            XWPFParagraph involvedPara = doc.createParagraph();
+            involvedPara.setAlignment(ParagraphAlignment.LEFT);
+            XWPFRun invLabel = involvedPara.createRun();
+            invLabel.setText("В ходе допроса   ");
+            invLabel.setFontFamily("Times New Roman");
+            invLabel.setFontSize(12);
+            XWPFRun invValue = involvedPara.createRun();
+            invValue.setUnderline(UnderlinePatterns.SINGLE);
+            invValue.setText(involved);
+            invValue.setFontFamily("Times New Roman");
+            invValue.setFontSize(12);
+            addEmptyLine(doc);
+
+            addJustifiedParagraph(doc,
+                    "Перед началом следственного действия участникам объявлен порядок производства допроса.");
+            addEmptyLine(doc);
+
             // 5. Уведомление о допросе по делу
             addJustifiedParagraph(doc,
                     getRoleLabel(role) + "у(ей) " + fio + " сообщено, что он(а) будет допрошен(а) " +
@@ -59,11 +84,11 @@ public class InterrogationExportService {
             addRightsSection(doc, role, fio);
 
             // 7. Показания — вопросы и ответы
-            addTestimonyIntro(doc, role, fio);
+            addTestimonyIntro(doc, data, role, fio);
             addQABlock(doc, data, role, fio);
 
             // 8. Закрытие
-            addClosingSection(doc, role, fio);
+            addClosingSection(doc, data, role, fio);
 
             doc.write(out);
             return out.toByteArray();
@@ -83,7 +108,6 @@ public class InterrogationExportService {
         cityRun.setFontFamily("Times New Roman");
         cityRun.setFontSize(12);
 
-        // Большой отступ до даты
         XWPFRun tabRun = p.createRun();
         tabRun.setText("          ");
         tabRun.setFontFamily("Times New Roman");
@@ -97,7 +121,6 @@ public class InterrogationExportService {
 
         addEmptyLine(doc);
 
-        // Время начат / окончен — по правому краю
         XWPFParagraph timePara = doc.createParagraph();
         timePara.setAlignment(ParagraphAlignment.RIGHT);
 
@@ -124,11 +147,12 @@ public class InterrogationExportService {
                                String role, String caseNumber) {
         String roleGenitive = getRoleGenitive(role);
         String text =
-                "Следователь ___________________________ в помещении кабинета №___ " +
+                currentUser.getProfession() + " по " + currentUser.getRegion() + " в помещении кабинета " + data.getRoom() +
                         "_______________________________________________, " +
                         "расположенного по адресу: ___________________________ " +
                         "с соблюдением требований ст.ст." + getRightsArticles(role) + " УПК РК " +
-                        "допросил по уголовному делу №" + caseNumber + " " +
+                        "с участием защитника, представившего уведомление № " + data.getNotificationNumber() + " от " + data.getNotificationDate() +
+                        " допросил по уголовному делу №" + caseNumber + " " +
                         "в качестве " + roleGenitive + "(ей):";
         addJustifiedParagraph(doc, text);
     }
@@ -147,14 +171,16 @@ public class InterrogationExportService {
                 {"Место работы или учебы:", p != null ? safe(p.getWorkOrStudyPlace()) : "—"},
                 {"Род занятий или должность:", p != null ? safe(p.getPosition()) : "—"},
                 {"Место жительства и (или) регистрации:", p != null ? safe(p.getAddress()) : "—"},
-                {"Контактные телефоны:", p != null ? safe(p.getContacts()) : "—"},
-                {"Электронная почта:", "—"},
+                {"Контактные телефоны:", p != null ? safe(p.getContactPhone()) : "—"},
+                {"Электронная почта:", p != null ? safe(p.getContactEmail()) : "—"},
+                {"Иные контактные данные:", p != null ? safe(p.getOther()) : "—"},
+                {"Отношение к подозреваемому, обвиняемому, подсудимому:", p != null ? safe(p.getRelation()) : "—"},
+                {"Технические средства, используемые при производстве следственного действия:", p != null ? safe(p.getTechnical()) : "—"},
                 {"Отношение к воинской обязанности:", p != null ? safe(p.getMilitary()) : "—"},
                 {"Наличие судимости:", p != null ? safe(p.getCriminalRecord()) : "—"},
                 {"Паспорт или иной документ, удостоверяющий личность:",
-                        safe(data.getDocumentType())+ " "+ safe(data.getNumber()) +
+                        safe(data.getDocumentType()) + " " + safe(data.getNumber()) +
                                 (p != null && p.getIinOrPassport() != null ? "\n" + p.getIinOrPassport() : "")},
-                {"Иные данные о личности:", "—"},
         };
 
         XWPFTable table = doc.createTable(rows.length, 2);
@@ -184,51 +210,54 @@ public class InterrogationExportService {
     }
 
     private void addRightsSection(XWPFDocument doc, String role, String fio) {
-        // Вводная строка
         addJustifiedParagraph(doc,
                 getRoleLabel(role) + "у(ей) " + fio +
                         " разъяснены права и обязанности, предусмотренные " +
                         getRightsArticle(role) + " УПК РК, а именно:");
         addEmptyLine(doc);
 
-        // Текст прав
         addJustifiedParagraph(doc, getFullRightsText(role));
         addEmptyLine(doc);
 
-        // Подтверждение прочтения
         addJustifiedItalicParagraph(doc,
                 "Права и обязанности, предусмотренные " + getRightsArticle(role) +
                         " УПК РК, мне разъяснены. Сущность прав ясна.");
         addEmptyLine(doc);
         addInlineSignatureLine(doc, getRoleLabel(role), fio);
         addEmptyLine(doc);
-
-        // Язык показаний
-        addJustifiedItalicParagraph(doc,
-                "Я, " + fio + ", показания желаю давать на русском языке, " +
-                        "в помощи переводчика не нуждаюсь.");
-        addEmptyLine(doc);
-        addInlineSignatureLine(doc, getRoleLabel(role), fio);
-        addEmptyLine(doc);
-
-        // Предупреждение об ответственности
-        addJustifiedParagraph(doc, getResponsibilityWarning(role, fio));
-        addEmptyLine(doc);
-        addInlineSignatureLine(doc, getRoleLabel(role), fio);
-        addEmptyLine(doc);
     }
 
-    private void addTestimonyIntro(XWPFDocument doc, String role, String fio) {
+    private void addTestimonyIntro(XWPFDocument doc, CaseInterrogationFullResponse data,
+                                   String role, String fio) {
+        // Признание вины (только для подозреваемого)
+        boolean isSuspect = role.toLowerCase().contains("подозреваемый") ||
+                role.toLowerCase().contains("подозреваемая");
+
+        if (isSuspect) {
+            addJustifiedParagraph(doc,
+                    "На вопрос, признает ли " + getRoleGenitive(role) + " себя виновным полностью или частично, " +
+                            "либо отрицает свою вину в совершении уголовного правонарушения " +
+                            fio + " пояснил(а):   " + safe(data.getConfession()));
+            addEmptyLine(doc);
+            addInlineSignatureLine(doc, getRoleLabel(role), fio);
+            addEmptyLine(doc);
+        }
+
         addJustifiedParagraph(doc,
                 getRoleLabel(role) + "у(ей) предложено рассказать об известных обстоятельствах, " +
                         "имеющих значение для дела, на что " + getRoleLabel(role).toLowerCase() +
                         " " + fio + " дал(а) следующие показания:");
         addEmptyLine(doc);
 
-        // Заявление о языке показаний — курсив
+        // Язык показаний из полей data
+        String language = safe(data.getLanguage());
+        String translator = safe(data.getTranslator());
+        String defender = safe(data.getDefender());
+
         addJustifiedItalicParagraph(doc,
-                "Я, " + fio + ", показания желаю давать на русском языке, " +
-                        "в помощи переводчика не нуждаюсь.");
+                "Я, " + fio + ", показания желаю давать на " + language + " языке, " +
+                        "в помощи переводчика " + translator + ", " +
+                        defender + " защитника.");
         addEmptyLine(doc);
         addInlineSignatureLine(doc, getRoleLabel(role), fio);
         addEmptyLine(doc);
@@ -239,7 +268,6 @@ public class InterrogationExportService {
         if (data.getQaList() == null || data.getQaList().isEmpty()) return;
 
         for (CaseInterrogationQAResponse qa : data.getQaList()) {
-            // Вопрос — жирный
             XWPFParagraph qPara = doc.createParagraph();
             qPara.setAlignment(ParagraphAlignment.BOTH);
             qPara.setIndentationFirstLine(720);
@@ -249,7 +277,6 @@ public class InterrogationExportService {
             qRun.setFontFamily("Times New Roman");
             qRun.setFontSize(12);
 
-            // Ответ — обычный с отступом
             XWPFParagraph aPara = doc.createParagraph();
             aPara.setAlignment(ParagraphAlignment.BOTH);
             aPara.setIndentationFirstLine(720);
@@ -266,7 +293,8 @@ public class InterrogationExportService {
         }
     }
 
-    private void addClosingSection(XWPFDocument doc, String role, String fio) {
+    private void addClosingSection(XWPFDocument doc, CaseInterrogationFullResponse data,
+                                   String role, String fio) {
         addJustifiedParagraph(doc,
                 "На этом допрос " + getRoleGenitive(role) + " окончен. " +
                         "Участникам допроса разъяснено право ознакомиться с результатами допроса, " +
@@ -276,18 +304,55 @@ public class InterrogationExportService {
         addInlineSignatureLine(doc, getRoleLabel(role), fio);
         addEmptyLine(doc);
 
+        // Предъявление протокола для ознакомления
         addJustifiedParagraph(doc,
                 "Участникам следственного действия протокол допроса " +
-                        getRoleGenitive(role) + " предъявлен для ознакомления. " +
-                        "С настоящим протоколом допроса ознакомлен(ы) путем личного прочтения. " +
-                        "Заявлений, замечаний, дополнений, уточнений и исправлений, " +
-                        "подлежащих внесению в протокол не имею(ем).");
+                        getRoleGenitive(role) + " предъявлен для ознакомления.");
         addEmptyLine(doc);
+
+        // Способ ознакомления из data.familiarization
+        XWPFParagraph famPara = doc.createParagraph();
+        famPara.setAlignment(ParagraphAlignment.BOTH);
+        famPara.setIndentationFirstLine(720);
+        XWPFRun famLabel = famPara.createRun();
+        famLabel.setText("С настоящим протоколом допроса ознакомлен(ы) путем   ");
+        famLabel.setFontFamily("Times New Roman");
+        famLabel.setFontSize(12);
+        XWPFRun famValue = famPara.createRun();
+        famValue.setUnderline(UnderlinePatterns.SINGLE);
+        famValue.setText(safe(data.getFamiliarization()));
+        famValue.setFontFamily("Times New Roman");
+        famValue.setFontSize(12);
+        addEmptyLine(doc);
+
+        addJustifiedParagraph(doc,
+                "Протокол допроса записан правильно и отражает весь ход допроса и содержит " +
+                        "полностью показания данные в ходе допроса.");
+        addEmptyLine(doc);
+
+        // Заявления / замечания из data.application
+        XWPFParagraph appPara = doc.createParagraph();
+        appPara.setAlignment(ParagraphAlignment.BOTH);
+        appPara.setIndentationFirstLine(720);
+        XWPFRun appLabel = appPara.createRun();
+        appLabel.setText("Заявлений, замечаний, дополнений, уточнений и исправлений, подлежащих внесению в протокол   ");
+        appLabel.setFontFamily("Times New Roman");
+        appLabel.setFontSize(12);
+        XWPFRun appValue = appPara.createRun();
+        appValue.setUnderline(UnderlinePatterns.SINGLE);
+        appValue.setText(safe(data.getApplication()));
+        appValue.setFontFamily("Times New Roman");
+        appValue.setFontSize(12);
+        addEmptyLine(doc);
+
         addInlineSignatureLine(doc, getRoleLabel(role), fio);
         addEmptyLine(doc);
         addEmptyLine(doc);
 
-        // Блок следователя
+        // Блок следователя — берём investigatorProfession и investigator из data
+        String investigatorProfession = safe(data.getInvestigatorProfession());
+        String investigatorName = safe(data.getInvestigator());
+
         XWPFParagraph investigatorLabel = doc.createParagraph();
         XWPFRun ilRun = investigatorLabel.createRun();
         ilRun.setBold(true);
@@ -297,16 +362,26 @@ public class InterrogationExportService {
 
         addEmptyLine(doc);
 
+        XWPFParagraph investigatorProfPara = doc.createParagraph();
+        investigatorProfPara.setAlignment(ParagraphAlignment.LEFT);
+        XWPFRun profRun = investigatorProfPara.createRun();
+        profRun.setBold(true);
+        profRun.setText(investigatorProfession);
+        profRun.setFontFamily("Times New Roman");
+        profRun.setFontSize(12);
+
+        addEmptyLine(doc);
+
         XWPFParagraph investigatorSig = doc.createParagraph();
         XWPFRun isRun = investigatorSig.createRun();
-        isRun.setText("___________________________                    ___________________________");
+        isRun.setText("___________________________                    " + investigatorName);
         isRun.setFontFamily("Times New Roman");
         isRun.setFontSize(12);
 
         XWPFParagraph investigatorNote = doc.createParagraph();
         investigatorNote.setAlignment(ParagraphAlignment.LEFT);
         XWPFRun inRun = investigatorNote.createRun();
-        inRun.setText("(должность, звание, ФИО)                       (подпись)");
+        inRun.setText("(подпись)");
         inRun.setFontFamily("Times New Roman");
         inRun.setFontSize(10);
         inRun.setColor("888888");
@@ -557,10 +632,10 @@ public class InterrogationExportService {
     private void setPageMargins(XWPFDocument doc) {
         CTSectPr sectPr = doc.getDocument().getBody().addNewSectPr();
         CTPageMar pageMar = sectPr.addNewPgMar();
-        pageMar.setTop(BigInteger.valueOf(1440));    // 1"
-        pageMar.setBottom(BigInteger.valueOf(1440)); // 1"
-        pageMar.setLeft(BigInteger.valueOf(1800));   // 1.25" — поля как в образцах
-        pageMar.setRight(BigInteger.valueOf(1080));  // 0.75"
+        pageMar.setTop(BigInteger.valueOf(1440));
+        pageMar.setBottom(BigInteger.valueOf(1440));
+        pageMar.setLeft(BigInteger.valueOf(1800));
+        pageMar.setRight(BigInteger.valueOf(1080));
     }
 
     private void setCellWidth(XWPFTableCell cell, int widthDxa) {

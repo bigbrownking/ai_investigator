@@ -144,10 +144,14 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             case "workOrStudyPlace"-> protocol.setWorkOrStudyPlace(request.getValue());
             case "position"       -> protocol.setPosition(request.getValue());
             case "address"        -> protocol.setAddress(request.getValue());
-            case "contacts"       -> protocol.setContacts(request.getValue());
+            case "contactPhone"       -> protocol.setContactPhone(request.getValue());
+            case "contactEmail"       -> protocol.setContactEmail(request.getValue());
             case "military"       -> protocol.setMilitary(request.getValue());
             case "criminalRecord" -> protocol.setCriminalRecord(request.getValue());
             case "iinOrPassport"  -> protocol.setIinOrPassport(request.getValue());
+            case "other"           -> protocol.setOther(request.getValue());
+            case "relation"        -> protocol.setRelation(request.getValue());
+            case "technical"        -> protocol.setTechnical(request.getValue());
             default -> throw new IllegalArgumentException("Unknown field: " + request.getField());
         }
     }

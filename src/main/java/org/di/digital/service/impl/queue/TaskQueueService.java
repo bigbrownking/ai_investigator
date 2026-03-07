@@ -55,6 +55,17 @@ public class TaskQueueService {
 
     public void addTaskToQueue(String userEmail, Long caseId, String caseNumber,
                                String fileName, String fileUrl, Long caseFileId) {
+        boolean exists = taskQueueRepository
+                .existsByCaseFileIdAndStatusIn(
+                        caseFileId,
+                        List.of(TaskStatus.PENDING, TaskStatus.PROCESSING)
+                );
+
+        if (exists) {
+            log.warn("Task for caseFileId {} already exists, skipping", caseFileId);
+            return;
+        }
+
         TaskQueue task = TaskQueue.builder()
                 .userEmail(userEmail)
                 .caseFileId(caseFileId)
@@ -72,13 +83,11 @@ public class TaskQueueService {
     }
 
     public TaskQueue getNextTaskByRoundRobin() {
-        Query query = new Query();
-        query.addCriteria(Criteria.where("status").is(TaskStatus.PENDING));
-
         List<String> users = getOrderedUsersWithPendingTasks();
+        log.info("DEBUG: Found {} users with pending tasks: {}", users.size(), users);
 
         if (users.isEmpty()) {
-            log.info("No pending tasks found");
+            log.info("DEBUG: No pending tasks found in DB");
             return null;
         }
 
@@ -87,6 +96,8 @@ public class TaskQueueService {
                         .id(ROUND_ROBIN_STATE_ID)
                         .lastSelectedUser(null)
                         .build());
+
+        log.info("DEBUG: Last selected user: {}", state.getLastSelectedUser());
 
         String lastSelectedUser = state.getLastSelectedUser();
 
@@ -105,7 +116,7 @@ public class TaskQueueService {
 
             List<TaskQueue> userTasks = taskQueueRepository
                     .findByUserEmailAndStatus(candidate, TaskStatus.PENDING);
-
+            log.info("DEBUG: User {} has {} pending tasks", candidate, userTasks.size());
             if (!userTasks.isEmpty()) {
                 TaskQueue task = userTasks.get(0);
                 task.setStatus(TaskStatus.PROCESSING);
@@ -126,17 +137,17 @@ public class TaskQueueService {
     }
 
     public void completeTask(Long caseFileId) {
-        List<TaskQueue> tasks = taskQueueRepository.findByCaseFileId(caseFileId);
+        List<TaskQueue> tasks = taskQueueRepository
+                .findByCaseFileIdAndStatus(caseFileId, TaskStatus.PROCESSING); // ← фильтр по статусу
 
         if (!tasks.isEmpty()) {
             TaskQueue task = tasks.get(0);
             task.setStatus(TaskStatus.COMPLETED);
             task.setCompletedAt(LocalDateTime.now());
             taskQueueRepository.save(task);
-
             log.info("Task {} completed for caseFile {}", task.getId(), caseFileId);
         } else {
-            log.warn("No task found for caseFileId {}", caseFileId);
+            log.warn("No PROCESSING task found for caseFileId {}", caseFileId);
         }
     }
 
@@ -155,7 +166,8 @@ public class TaskQueueService {
                 .toList();
     }
     public void failTask(Long caseFileId, String errorMessage) {
-        List<TaskQueue> tasks = taskQueueRepository.findByCaseFileId(caseFileId);
+        List<TaskQueue> tasks = taskQueueRepository
+                .findByCaseFileIdAndStatus(caseFileId, TaskStatus.PROCESSING); // ← фильтр по статусу
 
         if (!tasks.isEmpty()) {
             TaskQueue task = tasks.get(0);
@@ -163,11 +175,9 @@ public class TaskQueueService {
             task.setErrorMessage(errorMessage);
             task.setCompletedAt(LocalDateTime.now());
             taskQueueRepository.save(task);
-
-            log.error("Task {} failed for caseFile {}: {}",
-                    task.getId(), caseFileId, errorMessage);
+            log.error("Task {} failed for caseFile {}: {}", task.getId(), caseFileId, errorMessage);
         } else {
-            log.warn("No task found for caseFileId {}", caseFileId);
+            log.warn("No PROCESSING task found for caseFileId {}", caseFileId);
         }
     }
 

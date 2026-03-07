@@ -9,6 +9,7 @@ import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.service.CaseFileService;
 import org.di.digital.service.impl.NotificationService;
+import org.di.digital.service.impl.queue.TaskQueueService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
@@ -20,6 +21,8 @@ public class ProcessingResultConsumer {
     private final CaseFileService caseFileService;
     private final NotificationService notificationService;
     private final CaseFileRepository caseFileRepository;
+
+    private final TaskQueueService taskQueueService;
 
     @RabbitListener(queues = RabbitMQConfig.RESULT_QUEUE)
     public void handleProcessingResult(ProcessingResultMessage message) {
@@ -61,6 +64,8 @@ public class ProcessingResultConsumer {
     private void handleCompletion(ProcessingResultMessage message) {
         CaseFile caseFile = caseFileService.markAsCompleted(message.getCaseFileId(), message.getResult());
 
+        taskQueueService.completeTask(message.getCaseFileId());
+
         // Send case-level notification
         notificationService.notifyFileProcessingCompleted(
                 message.getCaseNumber(),
@@ -74,6 +79,9 @@ public class ProcessingResultConsumer {
 
     private void handleFailure(ProcessingResultMessage message) {
         CaseFile caseFile = caseFileService.markAsFailed(message.getCaseFileId(), message.getErrorMessage());
+
+        taskQueueService.failTask(message.getCaseFileId(), message.getErrorMessage());
+
 
         // Send case-level notification
         notificationService.notifyFileProcessingFailed(

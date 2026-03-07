@@ -19,7 +19,11 @@ public class CaseInterrogationProtocolResponse {
     private String workOrStudyPlace;
     private String position;
     private String address;
-    private String contacts;
+    private String contactPhone;
+    private String contactEmail;
+    private String other;
+    private String relation;
+    private String technical;
     private String military;
     private String criminalRecord;
     private String iinOrPassport;
