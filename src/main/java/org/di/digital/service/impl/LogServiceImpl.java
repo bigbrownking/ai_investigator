@@ -6,12 +6,14 @@ import org.di.digital.model.Case;
 import org.di.digital.model.Log;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
+import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.LogRepository;
 import org.di.digital.service.LogService;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Propagation;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
@@ -23,11 +25,16 @@ import static org.di.digital.util.UserUtil.*;
 @RequiredArgsConstructor
 public class LogServiceImpl implements LogService {
     private final LogRepository logRepository;
+    private final CaseRepository caseRepository;
 
     @Override
-    @Transactional
-    public void log(String description, LogLevel level, LogAction action, Case caseEntity) {
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void log(String description, LogLevel level, LogAction action, Long caseId) {
         try {
+            Case caseEntity = caseId != null
+                    ? caseRepository.findById(caseId).orElse(null)
+                    : null;
+
             Log logEntry = Log.builder()
                     .description(description)
                     .level(level)

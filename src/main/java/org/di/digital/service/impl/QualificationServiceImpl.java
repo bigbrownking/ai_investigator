@@ -6,10 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.Case;
 import org.di.digital.model.enums.CaseActivityType;
 import org.di.digital.repository.CaseRepository;
-import org.di.digital.service.CaseService;
-import org.di.digital.service.QualificationService;
-import org.di.digital.service.StreamingService;
-import org.di.digital.service.WordDocumentService;
+import org.di.digital.service.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -34,6 +31,7 @@ public class QualificationServiceImpl implements QualificationService {
     private final WordDocumentService wordDocumentService;
     private final CaseService caseService;
     private final StreamingService streamingService;
+    private final LogService logService;
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
 

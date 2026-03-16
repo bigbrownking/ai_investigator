@@ -20,4 +20,5 @@ public class InterrogationNotification {
     private String transcribedText;  // заполняется только при COMPLETED
     private String errorMessage;     // заполняется только при FAILED
     private LocalDateTime timestamp;
+    private String fieldName; // для уведомлений, связанных с обновлением конкретного поля
 }

@@ -5,11 +5,12 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.Case;
 import org.di.digital.model.enums.CaseActivityType;
+import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.enums.LogAction;
+import org.di.digital.model.enums.LogLevel;
+import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.repository.CaseRepository;
-import org.di.digital.service.CaseService;
-import org.di.digital.service.IndictmentService;
-import org.di.digital.service.StreamingService;
-import org.di.digital.service.WordDocumentService;
+import org.di.digital.service.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -17,6 +18,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
@@ -29,10 +31,12 @@ import static org.di.digital.util.UrlBuilder.indictmentUrl;
 public class IndictmentServiceImpl implements IndictmentService {
 
     private final CaseRepository caseRepository;
+    private final CaseFileRepository caseFileRepository;
     private final ObjectMapper mapper;
     private final WordDocumentService wordDocumentService;
     private final CaseService caseService;
     private final StreamingService streamingService;
+    private final LogService logService;
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -55,6 +59,16 @@ public class IndictmentServiceImpl implements IndictmentService {
 
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = "Qualification must be uploaded before generating indictment for case: " + caseNumber;
+            log.warn(message);
+            emitter.completeWithError(new IllegalStateException(message));
+            return;
+        }
+        boolean isAllProcessed = !caseFileRepository.existsByCaseEntityIdAndStatusNotIn(
+                entity.getId(),
+                List.of(CaseFileStatusEnum.COMPLETED, CaseFileStatusEnum.FAILED)
+        );
+        if (!isAllProcessed) {
+            String message = "All files must be processed before generating indictment for case: " + caseNumber;
             log.warn(message);
             emitter.completeWithError(new IllegalStateException(message));
             return;

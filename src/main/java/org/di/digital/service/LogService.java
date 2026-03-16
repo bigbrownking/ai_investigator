@@ -9,7 +9,7 @@ import org.springframework.data.domain.Page;
 import java.time.LocalDateTime;
 
 public interface LogService {
-    void log(String description, LogLevel level, LogAction action, Case caseEntity);
+    void log(String description, LogLevel level, LogAction action, Long id);
     Page<Log> allLogs(int page, int size);
     Page<Log> searchLogs(LogLevel level, LogAction action,
                          LocalDateTime startDate, LocalDateTime endDate,

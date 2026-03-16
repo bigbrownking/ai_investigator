@@ -10,6 +10,7 @@ import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -20,6 +21,11 @@ public class AudioQueueService {
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
 
+    @Value("${spring.rabbitmq.inter.exchange}")
+    public  String INTERROGATION_EXCHANGE;
+
+    @Value("${spring.rabbitmq.inter.routing-key}")
+    public  String INTERROGATION_ROUTING_KEY;
     public void sendAudioForProcessing(AudioProcessingMessage payload) {
         try {
             byte[] body = objectMapper.writeValueAsBytes(payload);
@@ -31,8 +37,8 @@ public class AudioQueueService {
                     .build();
 
             rabbitTemplate.send(
-                    RabbitMQConfig.INTERROGATION_EXCHANGE,
-                    RabbitMQConfig.INTERROGATION_ROUTING_KEY,
+                    INTERROGATION_EXCHANGE,
+                    INTERROGATION_ROUTING_KEY,
                     message
             );
 

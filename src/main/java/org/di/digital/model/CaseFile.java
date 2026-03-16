@@ -26,6 +26,7 @@ public class CaseFile {
     private LocalDateTime uploadedAt;
     private LocalDateTime completedAt;
     private boolean isQualification;
+    //private int tom;
 
     @Enumerated(EnumType.STRING)
     private CaseFileStatusEnum status;
@@ -33,4 +34,12 @@ public class CaseFile {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "case_id", nullable = false)
     private Case caseEntity;
+
+
+    public void addCaseEntity(Case caseEntity) {
+        this.caseEntity = caseEntity;
+        if (!caseEntity.getFiles().contains(this)) {
+            caseEntity.getFiles().add(this);
+        }
+    }
 }

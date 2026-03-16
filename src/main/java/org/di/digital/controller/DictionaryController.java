@@ -49,12 +49,23 @@ public class DictionaryController {
     @GetMapping("/interrogationRoles")
     public ResponseEntity<List<String>> getInterrogationRoles() {
         return ResponseEntity.ok(
-                List.of("Свидетель", "Подозреваемый", "Потерпевший"));
+                List.of("Свидетель", "Подозреваемый", "Потерпевший", "Свидетель, имеющий право на защиту", "Специалист", "Эксперт"));
     }
 
     @GetMapping("interrogationDocumentType")
     public ResponseEntity<List<String>> getInterrogationDocumentTypes(){
         return ResponseEntity.ok(
                 List.of("ИИН", "Паспорт"));
+    }
+    @GetMapping("professions")
+    public ResponseEntity<List<String>> getProfessions(){
+        return ResponseEntity.ok(
+                List.of("Заместитель руководителя",
+                        "Руководитель управления",
+                        "Заместитель руководителя управления",
+                        "Следователь",
+                        "Старший следователь",
+                        "Следователь по особо важным делам",
+                        "Дознаватель"));
     }
 }

@@ -8,11 +8,14 @@ import org.di.digital.dto.request.ChatRequest;
 import org.di.digital.dto.response.CaseChatHistoryResponse;
 import org.di.digital.dto.response.CaseChatMessageDto;
 import org.di.digital.model.*;
+import org.di.digital.model.enums.LogAction;
+import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.CaseChatMessageRepository;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.InterrogationChatRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseInterrogationChatService;
+import org.di.digital.service.LogService;
 import org.di.digital.service.StreamingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -37,6 +40,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     private final CaseChatMessageRepository chatMessageRepository;
     private final ObjectMapper objectMapper;
     private final StreamingService streamingService;
+    private final LogService logService;
 
     @Value("${interrogation.model.host}")
     private String pythonHost;
@@ -64,16 +68,24 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
 
         CaseChatMessage userMessage = CaseChatMessage.builder()
                 .interrogationChat(chat).role(MessageRole.USER)
+                .freeStory(request.getFreeStory())
                 .content(request.getQuestion()).complete(true).build();
         chat.addMessage(userMessage);
         chatMessageRepository.save(userMessage);
 
         CaseChatMessage assistantMessage = CaseChatMessage.builder()
                 .interrogationChat(chat).role(MessageRole.ASSISTANT)
+                .freeStory(request.getFreeStory())
                 .content("").complete(false).build();
         chat.addMessage(assistantMessage);
         final Long messageId = chatMessageRepository.save(assistantMessage).getId();
 
+        logService.log(
+                String.format("New interrogation chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.CHAT_MESSAGE,
+                caseId
+        );
         streamingService.stream(
                 interrogationQuestionsUrl(pythonHost, interrogationChatPort, caseEntity.getNumber()),
                 interrogationBody(interrogation.getFio(), interrogation.getRole(),
@@ -130,6 +142,13 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         chatMessageRepository.deleteAllByInterrogationChatId(chat.getId());
         chat.getMessages().clear();
         interrogationChatRepository.save(chat);
+
+        logService.log(
+                String.format("Cleared interrogation chat by %s user to case %s", userEmail, caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.CHAT_CLEAR,
+                caseId
+        );
         log.info("Cleared chat history for interrogation {}", interrogationId);
     }
 

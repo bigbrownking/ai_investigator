@@ -5,6 +5,7 @@ import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.amqp.support.converter.Jackson2JsonMessageConverter;
 import org.springframework.amqp.support.converter.MessageConverter;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 
@@ -12,31 +13,62 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMQConfig {
 
     // Outgoing - для отправки задач в mediator
-    public static final String DOCUMENT_QUEUE = "document.processing.queue";
-    public static final String DOCUMENT_EXCHANGE = "document.exchange";
-    public static final String DOCUMENT_ROUTING_KEY = "document.process";
+
+    @Value("${spring.rabbitmq.mediator.queue}")
+    public String DOCUMENT_QUEUE;
+
+    @Value("${spring.rabbitmq.mediator.exchange}")
+    public  String DOCUMENT_EXCHANGE;
+
+    @Value("${spring.rabbitmq.mediator.routing-key}")
+    public  String DOCUMENT_ROUTING_KEY;
 
     // DLQ
-    public static final String DLQ_QUEUE = "document.dlq";
-    public static final String DLQ_EXCHANGE = "document.dlq.exchange";
-    public static final String DLQ_ROUTING_KEY = "document.dlq";
+    @Value("${spring.rabbitmq.dlq.queue}")
+    public  String DLQ_QUEUE;
+    @Value("${spring.rabbitmq.dlq.exchange}")
+    public  String DLQ_EXCHANGE;
+
+    @Value("${spring.rabbitmq.dlq.routing-key}")
+    public  String DLQ_ROUTING_KEY;
 
     // Incoming - для получения результатов от mediator
-    public static final String RESULT_QUEUE = "document.result.queue";
-    public static final String RESULT_EXCHANGE = "document.result.exchange";
-    public static final String RESULT_PROCESSING_ROUTING_KEY = "document.result.processing";
-    public static final String RESULT_SUCCESS_ROUTING_KEY = "document.result.success";
-    public static final String RESULT_FAILURE_ROUTING_KEY = "document.result.failure";
+
+    @Value("${spring.rabbitmq.mediator.result.queue}")
+    public  String RESULT_QUEUE;
+
+    @Value("${spring.rabbitmq.mediator.result.exchange}")
+    public  String RESULT_EXCHANGE;
+
+    @Value("${spring.rabbitmq.mediator.result.routing-key}")
+    public  String RESULT_PROCESSING_ROUTING_KEY;
+
+    @Value("${spring.rabbitmq.mediator.result.success.routing-key}")
+    public  String RESULT_SUCCESS_ROUTING_KEY;
+
+    @Value("${spring.rabbitmq.mediator.result.failure.routing-key}")
+    public  String RESULT_FAILURE_ROUTING_KEY;
 
     // Outgoing - отправка аудио в interrogation сервис
-    public static final String INTERROGATION_QUEUE = "interrogation.processing.queue";
-    public static final String INTERROGATION_EXCHANGE = "interrogation.exchange";
-    public static final String INTERROGATION_ROUTING_KEY = "interrogation.process";
+
+    @Value("${spring.rabbitmq.inter.queue}")
+    public  String INTERROGATION_QUEUE;
+
+    @Value("${spring.rabbitmq.inter.exchange}")
+    public  String INTERROGATION_EXCHANGE;
+
+    @Value("${spring.rabbitmq.inter.routing-key}")
+    public  String INTERROGATION_ROUTING_KEY;
 
     // Incoming - получение результата транскрипции от interrogation сервиса
-    public static final String INTERROGATION_RESULT_QUEUE = "interrogation.result.queue";
-    public static final String INTERROGATION_RESULT_EXCHANGE = "interrogation.result.exchange";
-    public static final String INTERROGATION_RESULT_ROUTING_KEY = "interrogation.result.transcribed";
+    @Value("${spring.rabbitmq.inter.result.queue}")
+    public  String INTERROGATION_RESULT_QUEUE;
+
+    @Value("${spring.rabbitmq.inter.result.exchange}")
+    public  String INTERROGATION_RESULT_EXCHANGE;
+
+    @Value("${spring.rabbitmq.inter.result.routing-key}")
+    public  String INTERROGATION_RESULT_ROUTING_KEY;
 
 
     // ==================== Outgoing Configuration ====================
@@ -153,6 +185,7 @@ public class RabbitMQConfig {
                 .to(interrogationResultExchange)
                 .with(INTERROGATION_RESULT_ROUTING_KEY);
     }
+
     @Bean
     public RabbitAdmin rabbitAdmin(
             org.springframework.amqp.rabbit.connection.ConnectionFactory connectionFactory) {

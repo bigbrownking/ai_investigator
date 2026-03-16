@@ -16,6 +16,7 @@ import java.time.LocalDateTime;
 public class CaseChatMessageDto {
     private Long id;
     private MessageRole role;
+    private Boolean freeStory;
     private String content;
     private LocalDateTime createdDate;
     private boolean complete;
@@ -25,6 +26,7 @@ public class CaseChatMessageDto {
                 .id(message.getId())
                 .role(message.getRole())
                 .content(message.getContent())
+                .freeStory(message.getFreeStory())
                 .createdDate(message.getCreatedDate())
                 .complete(message.isComplete())
                 .build();

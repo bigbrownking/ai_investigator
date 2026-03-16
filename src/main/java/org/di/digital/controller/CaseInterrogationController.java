@@ -71,13 +71,13 @@ public class CaseInterrogationController {
     }
 
     @PostMapping("/{caseId}/interrogations")
-    public ResponseEntity<CaseResponse> addInterrogation(
+    public ResponseEntity<CaseInterrogationFullResponse> addInterrogation(
             @PathVariable Long caseId,
             @RequestBody AddInterrogationRequest request,
             Authentication authentication
     ) {
         log.info("Adding interrogation to case: {} for user: {}", caseId, authentication.getName());
-        CaseResponse response = caseInterrogationService.addInterrogation(caseId, request, authentication.getName());
+        CaseInterrogationFullResponse response = caseInterrogationService.addInterrogation(caseId, request, authentication.getName());
         return ResponseEntity.ok(response);
     }
 
@@ -108,14 +108,14 @@ public class CaseInterrogationController {
     }
 
     @DeleteMapping("/{caseId}/interrogations/{interrogationId}")
-    public ResponseEntity<CaseResponse> deleteInterrogation(
+    public ResponseEntity<Void> deleteInterrogation(
             @PathVariable Long caseId,
             @PathVariable Long interrogationId,
             Authentication authentication
     ) {
         log.info("Deleting interrogation from case: {} for user: {}", caseId, authentication.getName());
-        CaseResponse response = caseInterrogationService.deleteInterrogation(caseId, interrogationId, authentication.getName());
-        return ResponseEntity.ok(response);
+        caseInterrogationService.deleteInterrogation(caseId, interrogationId, authentication.getName());
+        return ResponseEntity.ok().build();
     }
 
     @PostMapping(value = "/{caseId}/interrogations/{interrogationId}/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
@@ -123,13 +123,30 @@ public class CaseInterrogationController {
             @PathVariable Long caseId,
             @PathVariable Long interrogationId,
             @RequestParam String question,
+            @RequestParam(required = false) Boolean freeStory,
             @RequestParam("file") MultipartFile file,
             @RequestParam(defaultValue = "ru") String language,
             Authentication authentication
     ) {
         log.info("Uploading audio for interrogation: {}, case: {}", interrogationId, caseId);
         QAResponse response = caseInterrogationService.uploadAudioAndEnqueue(
-                caseId, interrogationId, question, file, language, authentication.getName()
+                caseId, interrogationId, question, freeStory, file, language, authentication.getName()
+        );
+        return ResponseEntity.accepted().body(response);
+    }
+
+    @PostMapping(value = "/{caseId}/interrogations/{interrogationId}/otherAudio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<OtherAudioResponse> uploadOtherAudio(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            @RequestParam String fieldName,
+            @RequestParam("file") MultipartFile file,
+            @RequestParam(defaultValue = "ru") String language,
+            Authentication authentication
+    ) {
+        log.info("Uploading audio for interrogation: {}, case: {}", interrogationId, caseId);
+        OtherAudioResponse response = caseInterrogationService.uploadOtherAudioAndEnqueue(
+                caseId, interrogationId, fieldName, file, language, authentication.getName()
         );
         return ResponseEntity.accepted().body(response);
     }
@@ -189,5 +206,30 @@ public class CaseInterrogationController {
                 .contentType(MediaType.parseMediaType(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
                 .body(docx);
+    }
+
+    @PostMapping(value = "/{caseId}/interrogations/{interrogationId}/application-files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    public ResponseEntity<List<CaseInterrogationApplicationFileResponse>> uploadApplicationFiles(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            @RequestParam("files") List<MultipartFile> files,
+            Authentication authentication
+    ) {
+        log.info("Uploading application files for interrogation: {}, case: {}", interrogationId, caseId);
+        List<CaseInterrogationApplicationFileResponse> response = caseInterrogationService
+                .uploadApplicationFiles(caseId, interrogationId, files, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
+    @DeleteMapping("/{caseId}/interrogations/{interrogationId}/application-files/{fileId}")
+    public ResponseEntity<Void> deleteApplicationFile(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            @PathVariable Long fileId,
+            Authentication authentication
+    ) {
+        log.info("Deleting application file {} for interrogation: {}, case: {}", fileId, interrogationId, caseId);
+        caseInterrogationService.deleteApplicationFile(caseId, interrogationId, fileId, authentication.getName());
+        return ResponseEntity.noContent().build();
     }
 }

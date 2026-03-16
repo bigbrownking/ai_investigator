@@ -199,8 +199,80 @@ public class NotificationService {
         log.info("Interrogation notification sent to {} users for interrogation: {} qa: {} ({})",
                 userEmails.size(), interrogation.getId(), qaId, status);
     }
+
+    @Transactional(readOnly = true)
+    public void notifyOtherInterrogationProcessing(String caseNumber, CaseInterrogation interrogation,
+                                                   Long qaId, String fieldName) {
+        sendOtherInterrogationNotificationToAllUsers(
+                caseNumber, interrogation, qaId,
+                "Транскрипция начата для: " + interrogation.getFio(),
+                InterrogationNotificationStatus.PROCESSING, null, null, fieldName
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public void notifyOtherInterrogationCompleted(String caseNumber, CaseInterrogation interrogation,
+                                             Long qaId, String transcribedText, String fieldName) {
+        sendOtherInterrogationNotificationToAllUsers(
+                caseNumber, interrogation, qaId,
+                "Транскрипция завершена для: " + interrogation.getFio(),
+                InterrogationNotificationStatus.COMPLETED, transcribedText, null, fieldName
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public void notifyOtherInterrogationFailed(String caseNumber, CaseInterrogation interrogation,
+                                          Long qaId, String errorMessage, String fieldName) {
+        sendOtherInterrogationNotificationToAllUsers(
+                caseNumber, interrogation, qaId,
+                "Ошибка транскрипции для: " + interrogation.getFio(),
+                InterrogationNotificationStatus.FAILED, null, errorMessage, fieldName
+        );
+    }
+
+    private void sendOtherInterrogationNotificationToAllUsers(String caseNumber,
+                                                         CaseInterrogation interrogation,
+                                                         Long qaId,
+                                                         String activity,
+                                                         InterrogationNotificationStatus status,
+                                                         String transcribedText,
+                                                         String errorMessage, String fieldName) {
+        Set<String> userEmails = caseRepository.findAllAccessibleUserEmailsByCaseNumber(caseNumber);
+        if (userEmails.isEmpty()) {
+            log.warn("No users found with access to case: {}", caseNumber);
+            return;
+        }
+
+        InterrogationNotification notification = InterrogationNotification.builder()
+                .caseNumber(caseNumber)
+                .interrogationId(interrogation.getId())
+                .qaId(qaId)
+                .fio(interrogation.getFio())
+                .role(interrogation.getRole())
+                .status(status)
+                .activity(activity)
+                .transcribedText(transcribedText)
+                .errorMessage(errorMessage)
+                .timestamp(LocalDateTime.now())
+                .fieldName(fieldName)
+                .build();
+
+        String destination = buildOtherInterrogationDestination(caseNumber, interrogation.getId());
+
+        for (String userEmail : userEmails) {
+            messagingTemplate.convertAndSendToUser(userEmail, destination, notification);
+            log.debug("Interrogation notification sent to user: {}", userEmail);
+        }
+
+        log.info("Interrogation notification sent to {} users for interrogation: {} qa: {} ({})",
+                userEmails.size(), interrogation.getId(), qaId, status);
+    }
+
     private String buildInterrogationDestination(String caseNumber, Long interrogationId) {
         return String.format("/queue/case/%s/interrogation/%d/status", caseNumber, interrogationId);
+    }
+    private String buildOtherInterrogationDestination(String caseNumber, Long interrogationId) {
+        return String.format("/queue/case/%s/interrogation/%d/other/status", caseNumber, interrogationId);
     }
     private String buildCaseDestination(String caseNumber) {
         return String.format("/queue/case/%s/status", caseNumber);

@@ -22,9 +22,7 @@ public class ProcessingResultConsumer {
     private final NotificationService notificationService;
     private final CaseFileRepository caseFileRepository;
 
-    private final TaskQueueService taskQueueService;
-
-    @RabbitListener(queues = RabbitMQConfig.RESULT_QUEUE)
+    @RabbitListener(queues = "${spring.rabbitmq.mediator.result.queue}")
     public void handleProcessingResult(ProcessingResultMessage message) {
         log.info("Received {} notification for file {} in case {}",
                 message.getStatus(), message.getCaseFileId(), message.getCaseNumber());
@@ -64,8 +62,6 @@ public class ProcessingResultConsumer {
     private void handleCompletion(ProcessingResultMessage message) {
         CaseFile caseFile = caseFileService.markAsCompleted(message.getCaseFileId(), message.getResult());
 
-        taskQueueService.completeTask(message.getCaseFileId());
-
         // Send case-level notification
         notificationService.notifyFileProcessingCompleted(
                 message.getCaseNumber(),
@@ -79,9 +75,6 @@ public class ProcessingResultConsumer {
 
     private void handleFailure(ProcessingResultMessage message) {
         CaseFile caseFile = caseFileService.markAsFailed(message.getCaseFileId(), message.getErrorMessage());
-
-        taskQueueService.failTask(message.getCaseFileId(), message.getErrorMessage());
-
 
         // Send case-level notification
         notificationService.notifyFileProcessingFailed(

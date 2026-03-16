@@ -12,22 +12,17 @@ import java.time.LocalDateTime;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "case_interrogation_qa")
-public class CaseInterrogationQA {
+@Table(name = "case_interrogation_other_audios")
+public class CaseInterrogationOtherAudio {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
     @Column(columnDefinition = "TEXT")
-    private String question;
-
-    @Column(columnDefinition = "TEXT")
-    private String answer;
+    private String text;
 
     @Column(columnDefinition = "TEXT")
     private String audioFileUrl;
-
-    private Boolean freeStory;
 
     @Enumerated(EnumType.STRING)
     private QAStatusEnum status;

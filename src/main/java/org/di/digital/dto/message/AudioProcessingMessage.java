@@ -15,4 +15,5 @@ public class AudioProcessingMessage {
     private String originalFileName;
     private String language;
     private String email;
+    private String fieldName;
 }

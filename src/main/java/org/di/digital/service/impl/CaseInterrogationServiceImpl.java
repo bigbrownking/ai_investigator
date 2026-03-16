@@ -9,11 +9,14 @@ import org.di.digital.dto.request.UpdateProtocolFieldRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.model.*;
 import org.di.digital.model.enums.CaseInterrogationStatusEnum;
+import org.di.digital.model.enums.LogAction;
+import org.di.digital.model.enums.LogLevel;
 import org.di.digital.model.enums.QAStatusEnum;
 import org.di.digital.repository.CaseInterrogationRepository;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseInterrogationService;
+import org.di.digital.service.LogService;
 import org.di.digital.service.impl.queue.AudioQueueService;
 import org.di.digital.util.Mapper;
 import org.springframework.security.access.AccessDeniedException;
@@ -36,6 +39,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final UserRepository userRepository;
     private final MinioService minioService;
     private final AudioQueueService audioQueueService;
+    private final LogService logService;
     private final Mapper mapper;
 
     @Transactional(readOnly = true)
@@ -59,7 +63,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     }
 
     @Transactional
-    public CaseResponse addInterrogation(Long caseId, AddInterrogationRequest request, String email) {
+    public CaseInterrogationFullResponse addInterrogation(Long caseId, AddInterrogationRequest request, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
@@ -91,14 +95,26 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         session.setInterrogation(interrogation);
 
         caseEntity.getInterrogations().add(interrogation);
-        caseRepository.save(caseEntity);
+        Case savedCase = caseRepository.save(caseEntity);
 
+        CaseInterrogation saved = savedCase.getInterrogations().stream()
+                .filter(i -> request.getFio().equals(i.getFio()) && now.equals(i.getStartedAt()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Failed to retrieve saved interrogation"));
         log.info("Interrogation added to case: {}", caseId);
-        return mapper.mapToCaseResponse(caseEntity);
+
+
+        logService.log(
+                String.format("Interrogation %s to %s added by user %s", saved.getId(), savedCase.getNumber(), email),
+                LogLevel.INFO,
+                LogAction.INTERROGATION_ADDED,
+                caseId
+        );
+        return mapper.mapToInterrogationFullResponse(saved, user);
     }
 
     @Override
-    public CaseResponse deleteInterrogation(Long caseId, Long interrogationId, String email) {
+    public void deleteInterrogation(Long caseId, Long interrogationId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
@@ -116,8 +132,6 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         caseEntity.removeInterrogation(interrogation);
         caseRepository.save(caseEntity);
         log.info("Interrogation removed from case: {}", caseId);
-
-        return mapper.mapToCaseResponse(caseEntity);
     }
 
     @Transactional
@@ -163,23 +177,32 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
 
         switch (request.getField()) {
+            case "city"             -> interrogation.setCity(request.getValue());
+            case "state"            -> interrogation.setState(request.getValue());
+            case "investigatorProfession" -> interrogation.setInvestigatorProfession(request.getValue());
+            case "investigatorRegion" -> interrogation.setInvestigatorRegion(request.getValue());
+            case "caseNumberState"       -> interrogation.setCaseNumberState(request.getValue());
             case "room"            -> interrogation.setRoom(request.getValue());
+            case "addrezz"          -> interrogation.setAddrezz(request.getValue());
             case "notificationNumber"    -> interrogation.setNotificationNumber(request.getValue());
             case "notificationDate"     -> interrogation.setNotificationDate(request.getValue());
             case "involved"    -> interrogation.setInvolved(request.getValue());
+            case "involvedPersons" -> interrogation.setInvolvedPersons(request.getValue());
             case "confession"    -> interrogation.setConfession(request.getValue());
+            case "confessionText" -> interrogation.setConfessionText(request.getValue());
             case "language"      -> interrogation.setLanguage(request.getValue());
             case "translator"  -> interrogation.setTranslator(request.getValue());
             case "defender"-> interrogation.setDefender(request.getValue());
             case "familiarization"       -> interrogation.setFamiliarization(request.getValue());
             case "additionalInfo"        -> interrogation.setAdditionalInfo(request.getValue());
+            case "additionalText"       -> interrogation.setAdditionalText(request.getValue());
             case "application"       -> interrogation.setApplication(request.getValue());
 
             default -> throw new IllegalArgumentException("Unknown field: " + request.getField());
         }
     }
     @Transactional
-    public QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question,
+    public QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question, Boolean freeStory,
                                             MultipartFile file, String language, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
@@ -205,6 +228,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .audioFileUrl(audioUrl)
                 .status(QAStatusEnum.TRANSCRIBING)
                 .orderIndex(orderIndex)
+                .freeStory(freeStory)
                 .createdAt(LocalDateTime.now())
                 .interrogation(interrogation)
                 .build();
@@ -226,6 +250,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .originalFileName(file.getOriginalFilename())
                 .language(language)
                 .email(email)
+                .fieldName(null)
                 .build());
 
         return QAResponse.builder()
@@ -233,6 +258,68 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .question(question)
                 .answer(null)
                 .orderIndex(orderIndex)
+                .freeStory(freeStory)
+                .status(QAStatusEnum.TRANSCRIBING)
+                .build();
+    }
+
+
+    @Override
+    @Transactional
+    public OtherAudioResponse uploadOtherAudioAndEnqueue(Long caseId, Long interrogationId, String fieldName,
+                                            MultipartFile file, String language, String email) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
+            throw new AccessDeniedException("Access denied to case: " + caseId);
+        }
+
+        CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
+                .filter(i -> i.getId().equals(interrogationId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+
+        String audioUrl = minioService.uploadAudio(file, caseEntity.getNumber(), interrogation.getFio());
+
+        int orderIndex = interrogation.getOtherAudios().size();
+
+        CaseInterrogationOtherAudio text = CaseInterrogationOtherAudio.builder()
+                .text(null)
+                .audioFileUrl(audioUrl)
+                .status(QAStatusEnum.TRANSCRIBING)
+                .orderIndex(orderIndex)
+                .createdAt(LocalDateTime.now())
+                .interrogation(interrogation)
+                .build();
+
+        interrogation.getOtherAudios().add(text);
+        CaseInterrogation savedInterrogation = caseInterrogationRepository.save(interrogation);
+
+        Long otherId = savedInterrogation.getOtherAudios().stream()
+                .filter(q -> q.getOrderIndex() == orderIndex)
+                .findFirst()
+                .orElseThrow()
+                .getId();
+
+        audioQueueService.sendAudioForProcessing(AudioProcessingMessage.builder()
+                .interrogationId(interrogationId)
+                .qaId(otherId)
+                .caseNumber(caseEntity.getNumber())
+                .audioFileUrl(audioUrl)
+                .originalFileName(file.getOriginalFilename())
+                .language(language)
+                .email(email)
+                .fieldName(fieldName)
+                .build());
+
+        return OtherAudioResponse.builder()
+                .id(otherId)
+                .fieldName(fieldName)
+                .text(null)
                 .status(QAStatusEnum.TRANSCRIBING)
                 .build();
     }
@@ -269,6 +356,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .answer(qa.getAnswer())
                 .orderIndex(qa.getOrderIndex())
                 .status(qa.getStatus())
+                .freeStory(false)
                 .build();
     }
 
@@ -317,55 +405,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             throw new RuntimeException("Interrogation does not belong to case: " + caseId);
         }
 
-        CaseInterrogationProtocolResponse protocolResponse = null;
-        if (interrogation.getProtocol() != null) {
-            CaseInterrogationProtocol p = interrogation.getProtocol();
-            protocolResponse = mapper.mapToInterrogationProtocolResponse(p);
-        }
-
-        List<CaseInterrogationQAResponse> qaList = null;
-        if(!interrogation.getQaList().isEmpty()){
-            List<CaseInterrogationQA> qas = interrogation.getQaList();
-            qaList = qas.stream()
-                    .map(mapper::mapToInterrogationQAResponse).toList();
-        }
-
-        List<InterrogationTimerSessionResponse> timerSessions = interrogation.getTimerSessions().stream()
-                .map(s -> InterrogationTimerSessionResponse.builder()
-                        .startedAt(s.getStartedAt())
-                        .pausedAt(s.getPausedAt())
-                        .build())
-                .toList();
-
-        return CaseInterrogationFullResponse.builder()
-                .id(interrogation.getId())
-                .room(interrogation.getRoom())
-                .notificationNumber(interrogation.getNotificationNumber())
-                .notificationDate(interrogation.getNotificationDate())
-                .caseNumber(interrogation.getCaseEntity().getNumber())
-                .number(interrogation.getNumber())
-                .documentType(interrogation.getDocumentType())
-                .fio(interrogation.getFio())
-                .role(interrogation.getRole())
-                .date(interrogation.getDate())
-                .involved(interrogation.getInvolved())
-                .confession(interrogation.getConfession())
-                .language(interrogation.getLanguage())
-                .translator(interrogation.getTranslator())
-                .defender(interrogation.getDefender())
-                .familiarization(interrogation.getFamiliarization())
-                .additionalInfo(interrogation.getAdditionalInfo())
-                .application(interrogation.getApplication())
-                .investigator(interrogation.getInvestigator())
-                .investigatorProfession(interrogation.getInvestigatorProfession())
-                .status(interrogation.getStatus().name())
-                .protocol(protocolResponse)
-                .startedAt(interrogation.getStartedAt())
-                .finishedAt(interrogation.getFinishedAt())
-                .durationSeconds(interrogation.getDurationSeconds())
-                .timerSessions(timerSessions)
-                .qaList(qaList)
-                .build();
+        return mapper.mapToInterrogationFullResponse(interrogation, user);
     }
 
     @Override
@@ -448,6 +488,63 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             lastSession.setPausedAt(now);
         }
 
+        caseInterrogationRepository.save(interrogation);
+    }
+    @Transactional
+    public List<CaseInterrogationApplicationFileResponse> uploadApplicationFiles(
+            Long caseId, Long interrogationId, List<MultipartFile> files, String email) {
+        CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
+                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        if (!interrogation.getCaseEntity().isOwner(user) && !interrogation.getCaseEntity().hasUser(user)) {
+            throw new AccessDeniedException("Access denied to case: " + caseId);
+        }
+
+        List<CaseInterrogationApplicationFile> uploaded = new ArrayList<>();
+        for (MultipartFile file : files) {
+            if (!file.isEmpty()) {
+                CaseInterrogationApplicationFile appFile = minioService.uploadApplicationFile(file,
+                        interrogation.getCaseEntity().getNumber(), interrogation.getFio());
+
+                appFile.addInterrogation(interrogation);
+                uploaded.add(appFile);
+            }
+        }
+
+        List<String> uploadedStoredNames = uploaded.stream()
+                .map(CaseInterrogationApplicationFile::getStoredFileName)
+                .toList();
+
+        CaseInterrogation saved = caseInterrogationRepository.save(interrogation);
+
+        return saved.getApplicationFiles().stream()
+                .filter(f -> uploadedStoredNames.contains(f.getStoredFileName()))
+                .map(mapper::mapToApplicationFileResponse)
+                .toList();
+    }
+
+    @Transactional
+    public void deleteApplicationFile(Long caseId, Long interrogationId, Long fileId, String email) {
+        CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
+                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        if (!interrogation.getCaseEntity().isOwner(user) && !interrogation.getCaseEntity().hasUser(user)) {
+            throw new AccessDeniedException("Access denied to case: " + caseId);
+        }
+
+        CaseInterrogationApplicationFile file = interrogation.getApplicationFiles().stream()
+                .filter(f -> f.getId().equals(fileId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("File not found: " + fileId));
+
+        minioService.deleteFile(file.getFileUrl());
+        interrogation.getApplicationFiles().remove(file);
         caseInterrogationRepository.save(interrogation);
     }
 }

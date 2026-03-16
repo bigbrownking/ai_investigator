@@ -56,7 +56,7 @@ public class InterrogationExportService {
             addEmptyLine(doc);
 
             // 4.5. В ходе допроса / порядок производства
-            String involved = safe(data.getInvolved());
+            String involved = safe(data.getInvolved()).equals("—") ? "иные лица не привлекались" : data.getInvolved();
             XWPFParagraph involvedPara = doc.createParagraph();
             involvedPara.setAlignment(ParagraphAlignment.LEFT);
             XWPFRun invLabel = involvedPara.createRun();
@@ -149,14 +149,13 @@ public class InterrogationExportService {
         String text =
                 currentUser.getProfession() + " по " + currentUser.getRegion() + " в помещении кабинета " + data.getRoom() +
                         "_______________________________________________, " +
-                        "расположенного по адресу: ___________________________ " +
-                        "с соблюдением требований ст.ст." + getRightsArticles(role) + " УПК РК " +
+                        "расположенного по адресу: " + data.getAddrezz() +
+                        " с соблюдением требований ст.ст." + getRightsArticles(role) + " УПК РК " +
                         "с участием защитника, представившего уведомление № " + data.getNotificationNumber() + " от " + data.getNotificationDate() +
                         " допросил по уголовному делу №" + caseNumber + " " +
                         "в качестве " + roleGenitive + "(ей):";
         addJustifiedParagraph(doc, text);
     }
-
     private void addPersonDataTable(XWPFDocument doc, CaseInterrogationFullResponse data) {
         CaseInterrogationProtocolResponse p = data.getProtocol();
 
@@ -181,6 +180,8 @@ public class InterrogationExportService {
                 {"Паспорт или иной документ, удостоверяющий личность:",
                         safe(data.getDocumentType()) + " " + safe(data.getNumber()) +
                                 (p != null && p.getIinOrPassport() != null ? "\n" + p.getIinOrPassport() : "")},
+                {"Применение технических средств аудио/видео фиксации:",
+                        p != null ? safe(p.getTechnical()) : "Не применяются"}
         };
 
         XWPFTable table = doc.createTable(rows.length, 2);
@@ -250,9 +251,9 @@ public class InterrogationExportService {
         addEmptyLine(doc);
 
         // Язык показаний из полей data
-        String language = safe(data.getLanguage());
-        String translator = safe(data.getTranslator());
-        String defender = safe(data.getDefender());
+        String language = safe(data.getLanguage()).equals("—") ? "русском" : data.getLanguage();
+        String translator = safe(data.getTranslator()).equals("—") ? "не нуждаюсь" : data.getTranslator();
+        String defender = safe(data.getDefender()).equals("—") ? "без участия" : data.getDefender();
 
         addJustifiedItalicParagraph(doc,
                 "Я, " + fio + ", показания желаю давать на " + language + " языке, " +
@@ -320,7 +321,7 @@ public class InterrogationExportService {
         famLabel.setFontSize(12);
         XWPFRun famValue = famPara.createRun();
         famValue.setUnderline(UnderlinePatterns.SINGLE);
-        famValue.setText(safe(data.getFamiliarization()));
+        famValue.setText(safe(data.getFamiliarization()).equals("—") ? "путем оглашения" : data.getFamiliarization());
         famValue.setFontFamily("Times New Roman");
         famValue.setFontSize(12);
         addEmptyLine(doc);
@@ -340,7 +341,7 @@ public class InterrogationExportService {
         appLabel.setFontSize(12);
         XWPFRun appValue = appPara.createRun();
         appValue.setUnderline(UnderlinePatterns.SINGLE);
-        appValue.setText(safe(data.getApplication()));
+        appValue.setText(safe(data.getApplication()).equals("—") ? "не имею" : data.getApplication());
         appValue.setFontFamily("Times New Roman");
         appValue.setFontSize(12);
         addEmptyLine(doc);
@@ -391,9 +392,10 @@ public class InterrogationExportService {
 
     private String getFullRightsText(String role) {
         return switch (role.toLowerCase()) {
-            case "потерпевший", "потерпевшая" -> RIGHTS_ST71;
-            case "подозреваемый", "подозреваемая" -> RIGHTS_ST64;
-            default -> RIGHTS_ST78;
+            case "victim" -> RIGHTS_ST71;
+            case "suspect" -> RIGHTS_ST64;
+            case "witness" -> RIGHTS_ST78;
+            default -> throw new IllegalStateException("Unexpected value: " + role.toLowerCase());
         };
     }
 
@@ -532,41 +534,46 @@ public class InterrogationExportService {
 
     private String getRoleTitle(String role) {
         return switch (role.toLowerCase()) {
-            case "потерпевший", "потерпевшая" -> "допроса потерпевшего";
-            case "подозреваемый", "подозреваемая" -> "допроса подозреваемого";
-            default -> "допроса свидетеля";
+            case "victim" -> "допроса потерпевшего";
+            case "suspect" -> "допроса подозреваемого";
+            case "witness" -> "допроса свидетеля";
+            default -> throw new IllegalStateException("Unexpected value: " + role.toLowerCase());
         };
     }
 
     private String getRoleLabel(String role) {
         return switch (role.toLowerCase()) {
-            case "потерпевший", "потерпевшая" -> "Потерпевший(ая)";
-            case "подозреваемый", "подозреваемая" -> "Подозреваемый(ая)";
-            default -> "Свидетель";
+            case "victim" -> "Потерпевший(ая)";
+            case "suspect" -> "Подозреваемый(ая)";
+            case "witness" -> "Свидетель";
+            default -> throw new IllegalStateException("Unexpected value: " + role.toLowerCase());
         };
     }
 
     private String getRoleGenitive(String role) {
         return switch (role.toLowerCase()) {
-            case "потерпевший", "потерпевшая" -> "потерпевшего";
-            case "подозреваемый", "подозреваемая" -> "подозреваемого";
-            default -> "свидетеля";
+            case "victim" -> "потерпевшего";
+            case "suspect" -> "подозреваемого";
+            case "witness" -> "свидетеля";
+            default -> throw new IllegalStateException("Unexpected value: " + role.toLowerCase());
         };
     }
 
     private String getRightsArticle(String role) {
         return switch (role.toLowerCase()) {
-            case "потерпевший", "потерпевшая" -> "ст. 71";
-            case "подозреваемый", "подозреваемая" -> "ст. 64";
-            default -> "ст. 78";
+            case "victim" -> "ст. 71";
+            case "suspect" -> "ст. 64";
+            case "witness" -> "ст. 78";
+            default -> throw new IllegalStateException("Unexpected value: " + role.toLowerCase());
         };
     }
 
     private String getRightsArticles(String role) {
         return switch (role.toLowerCase()) {
-            case "потерпевший", "потерпевшая" -> "71, 80, 81, 110, 115, 197, 199, 208–210, 212, 214";
-            case "подозреваемый", "подозреваемая" -> "64, 80, 81, 110, 114 ч.5, 115, 197, 199, 208–210, 212, 216";
-            default -> "60, 78, 110, 115, 197, 199 ч.3, 208, 209, 210, 212, 214";
+            case "victim" -> "71, 80, 81, 110, 115, 197, 199, 208–210, 212, 214";
+            case "suspect" -> "64, 80, 81, 110, 114 ч.5, 115, 197, 199, 208–210, 212, 216";
+            case "witness" -> "60, 78, 110, 115, 197, 199 ч.3, 208, 209, 210, 212, 214";
+            default -> throw new IllegalStateException("Unexpected value: " + role.toLowerCase());
         };
     }
 

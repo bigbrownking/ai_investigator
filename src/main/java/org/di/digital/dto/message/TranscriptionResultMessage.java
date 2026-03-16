@@ -18,4 +18,5 @@ public class TranscriptionResultMessage {
     private String errorMessage;
     private String email;
     private LocalDateTime timestamp;
+    private String fieldName;
 }

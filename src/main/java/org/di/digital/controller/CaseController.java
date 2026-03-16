@@ -3,11 +3,15 @@ package org.di.digital.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.AddFigurantToCaseRequest;
 import org.di.digital.dto.request.AddUserToCaseRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
 import org.di.digital.dto.request.FileType;
+import org.di.digital.dto.response.CaseFileResponse;
 import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.CaseUserResponse;
+import org.di.digital.dto.response.FigurantResponse;
+import org.di.digital.model.CaseFile;
 import org.di.digital.service.CaseService;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
@@ -70,7 +74,7 @@ public class CaseController {
     }
 
     @PostMapping(value = "/{caseId}/files", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<CaseResponse> addFilesToCase(
+    public ResponseEntity<List<CaseFileResponse>> addFilesToCase(
             @PathVariable Long caseId,
             @RequestParam("files") List<MultipartFile> files,
             @RequestParam("type") String type,
@@ -91,7 +95,7 @@ public class CaseController {
             return ResponseEntity.badRequest().build();
         }
 
-        CaseResponse response = caseService.addFilesToCase(caseId, files, fileType, authentication.getName());
+        List<CaseFileResponse> response = caseService.addFilesToCase(caseId, files, fileType, authentication.getName());
         return ResponseEntity.ok(response);
     }
 
@@ -104,12 +108,12 @@ public class CaseController {
         log.info("Updating case {} status to {} by user: {}",
                 caseId, status, authentication.getName());
 
-        CaseResponse response = caseService.updateCaseStatus(caseId, status, authentication.getName());
-        return ResponseEntity.ok(response);
+        caseService.updateCaseStatus(caseId, status, authentication.getName());
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{caseId}/files")
-    public ResponseEntity<CaseResponse> deleteFileFromCase(
+    public ResponseEntity<Void> deleteFileFromCase(
             @PathVariable Long caseId,
             @RequestParam String fileName,
             Authentication authentication
@@ -117,8 +121,8 @@ public class CaseController {
         log.info("Deleting file {} from case: {} for user: {}",
                 fileName, caseId, authentication.getName());
 
-        CaseResponse response = caseService.deleteFileFromCase(caseId, fileName, authentication.getName());
-        return ResponseEntity.ok(response);
+        caseService.deleteFileFromCase(caseId, fileName, authentication.getName());
+        return ResponseEntity.ok().build();
     }
     @GetMapping("/{caseId}/files/download")
     public ResponseEntity<InputStreamResource> downloadFile(
@@ -141,7 +145,7 @@ public class CaseController {
     }
 
     @PostMapping("/{caseId}/users")
-    public ResponseEntity<CaseResponse> addUserToCase(
+    public ResponseEntity<CaseUserResponse> addUserToCase(
             @PathVariable Long caseId,
             @Valid @RequestBody AddUserToCaseRequest request,
             Authentication authentication
@@ -149,12 +153,25 @@ public class CaseController {
         log.info("Adding user {} to case: {} by user: {}",
                 request.getEmail(), caseId, authentication.getName());
 
-        CaseResponse response = caseService.addUserToCase(caseId, request.getEmail(), authentication.getName());
+        CaseUserResponse response = caseService.addUserToCase(caseId, request.getEmail(), authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{caseId}/figurants")
+    public ResponseEntity<FigurantResponse> addFigurantToCase(
+            @PathVariable Long caseId,
+            @Valid @RequestBody AddFigurantToCaseRequest request,
+            Authentication authentication
+    ){
+        log.info("Adding figurant {} to case: {} by user: {}",
+                request.getFio(), caseId, authentication.getName());
+
+        FigurantResponse response = caseService.addFigurantToCase(caseId, request, authentication.getName());
         return ResponseEntity.ok(response);
     }
 
     @DeleteMapping("/{caseId}/users/{userId}")
-    public ResponseEntity<CaseResponse> removeUserFromCase(
+    public ResponseEntity<Void> removeUserFromCase(
             @PathVariable Long caseId,
             @PathVariable Long userId,
             Authentication authentication
@@ -162,8 +179,21 @@ public class CaseController {
         log.info("Removing user {} from case: {} by user: {}",
                 userId, caseId, authentication.getName());
 
-        CaseResponse response = caseService.removeUserFromCase(caseId, userId, authentication.getName());
-        return ResponseEntity.ok(response);
+        caseService.removeUserFromCase(caseId, userId, authentication.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{caseId}/figurants/{figurantId}")
+    public ResponseEntity<CaseResponse> removeFigurantFromCase(
+            @PathVariable Long caseId,
+            @PathVariable Long figurantId,
+            Authentication authentication
+    ) {
+        log.info("Removing figurant {} from case: {} by user: {}",
+                figurantId, caseId, authentication.getName());
+
+        caseService.removeFigurantFromCase(caseId, figurantId, authentication.getName());
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/{caseId}/users")
@@ -176,6 +206,18 @@ public class CaseController {
         List<CaseUserResponse> users = caseService.getCaseUsers(caseId, authentication.getName());
         return ResponseEntity.ok(users);
     }
+
+    @GetMapping("/{caseId}/figurants")
+    public ResponseEntity<List<FigurantResponse>> getCaseFigurants(
+            @PathVariable Long caseId,
+            Authentication authentication
+    ) {
+        log.info("Getting figurants for case: {} by user: {}", caseId, authentication.getName());
+
+        List<FigurantResponse> users = caseService.getCaseFigurants(caseId, authentication.getName());
+        return ResponseEntity.ok(users);
+    }
+
 
     @GetMapping("/recent")
     public ResponseEntity<Page<CaseResponse>> getRecentCases(
@@ -211,5 +253,17 @@ public class CaseController {
         );
 
         return ResponseEntity.ok(cases);
+    }
+
+    @GetMapping("/{caseId}/figurants/search")
+    public ResponseEntity<FigurantResponse> findFigurantByNumber(
+            @PathVariable Long caseId,
+            @RequestParam String documentType,
+            @RequestParam String number,
+            Authentication authentication
+    ) {
+        return caseService.findFigurantByNumber(caseId, documentType, number, authentication.getName())
+                .map(ResponseEntity::ok)
+                .orElse(ResponseEntity.notFound().build());
     }
 }

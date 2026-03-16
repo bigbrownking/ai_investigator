@@ -10,6 +10,7 @@ import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageDeliveryMode;
 import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 @Service
@@ -19,6 +20,12 @@ public class DocumentQueueService {
 
     private final RabbitTemplate rabbitTemplate;
     private final ObjectMapper objectMapper;
+
+    @Value("${spring.rabbitmq.mediator.exchange}")
+    public  String DOCUMENT_EXCHANGE;
+
+    @Value("${spring.rabbitmq.mediator.routing-key}")
+    public  String DOCUMENT_ROUTING_KEY;
 
     public void sendDocumentForProcessing(DocumentProcessingMessage payload) {
         try {
@@ -31,8 +38,8 @@ public class DocumentQueueService {
                     .build();
 
             rabbitTemplate.send(
-                    RabbitMQConfig.DOCUMENT_EXCHANGE,
-                    RabbitMQConfig.DOCUMENT_ROUTING_KEY,
+                    DOCUMENT_EXCHANGE,
+                    DOCUMENT_ROUTING_KEY,
                     message
             );
 

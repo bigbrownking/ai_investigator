@@ -24,7 +24,7 @@ public class RoundRobinScheduler {
     private final CaseFileRepository caseFileRepository;
     private final NotificationService notificationService;
 
-    @Scheduled(fixedDelay = 5000)
+    @Scheduled(fixedDelay = 1, timeUnit = java.util.concurrent.TimeUnit.MINUTES)
     @Transactional
     public void processTasksRoundRobin() {
         long processingCount = taskQueueService.getProcessingTasksCount();

@@ -38,6 +38,8 @@ public class CaseChatMessage {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
+    private Boolean freeStory;
+
     @CreatedDate
     @Column(name = "created_date", updatable = false)
     private LocalDateTime createdDate;

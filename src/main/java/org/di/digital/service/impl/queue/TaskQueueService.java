@@ -11,6 +11,7 @@ import org.di.digital.model.TaskStatus;
 import org.di.digital.repository.QueueStateRepository;
 import org.di.digital.repository.TaskQueueRepository;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -32,12 +33,15 @@ public class TaskQueueService {
     private final MongoTemplate mongoTemplate;
     private final RabbitAdmin rabbitAdmin;
 
+    @Value("${spring.rabbitmq.mediator.queue}")
+    public String DOCUMENT_QUEUE;
     private static final String ROUND_ROBIN_STATE_ID = "round_robin_state";
 
     @PostConstruct
     public void resetStuckTasks() {
         Query query = new Query();
-        query.addCriteria(Criteria.where("status").is(TaskStatus.PROCESSING));
+        query.addCriteria(Criteria.where("status").is(TaskStatus.PROCESSING)
+                .and("sentToQueueAt").lt(LocalDateTime.now().minusMinutes(5)));
         List<TaskQueue> stuckTasks = mongoTemplate.find(query, TaskQueue.class);
 
         if (!stuckTasks.isEmpty()) {
@@ -49,7 +53,7 @@ public class TaskQueueService {
             log.info("Reset {} stuck PROCESSING tasks to PENDING", stuckTasks.size());
         }
 
-        rabbitAdmin.purgeQueue(RabbitMQConfig.DOCUMENT_QUEUE, false);
+        rabbitAdmin.purgeQueue(DOCUMENT_QUEUE, false);
         log.info("Purged RabbitMQ queue on startup");
     }
 
@@ -155,6 +159,8 @@ public class TaskQueueService {
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.match(Criteria.where("status").is(TaskStatus.PENDING)),
                 Aggregation.group("userEmail")
+                        .min("createdAt").as("firstTaskTime"),
+                Aggregation.sort(Sort.by(Sort.Direction.ASC, "firstTaskTime"))
         );
 
         AggregationResults<Document> results =

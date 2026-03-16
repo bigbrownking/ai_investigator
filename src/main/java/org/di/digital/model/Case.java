@@ -44,6 +44,10 @@ public class Case {
     @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CaseInterrogation> interrogations = new ArrayList<>();
 
+    @Builder.Default
+    @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<Figurant> figurants = new ArrayList<>();
+
     @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CaseChat> chats = new ArrayList<>();
 
@@ -124,5 +128,14 @@ public class Case {
         this.interrogations.remove(interrogation);
         interrogation.setCaseEntity(null);
         log.debug("Removed interrogation {} from case {}", interrogation.getId(), this.number);
+    }
+    public void addFigurant(Figurant figurant) {
+        this.figurants.add(figurant);
+        figurant.setCaseEntity(this);
+    }
+
+    public void removeFigurant(Figurant figurant) {
+        this.figurants.remove(figurant);
+        figurant.setCaseEntity(null);
     }
 }

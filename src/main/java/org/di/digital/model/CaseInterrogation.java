@@ -23,22 +23,34 @@ public class CaseInterrogation {
 
     private String documentType;
     private String number;
+    private String caseNumberState;
     private String fio;
     private String role;
     private LocalDate date;
+    private String city;
     private String room;
+    @Column(columnDefinition = "TEXT")
+    private String addrezz;
     private String notificationNumber;
     private String notificationDate;
+    private String state;
     private String involved;
+    @Column(columnDefinition = "TEXT")
+    private String involvedPersons;
     private String confession;
+    @Column(columnDefinition = "TEXT")
+    private String confessionText;
     private String language;
     private String translator;
     private String defender;
     private String familiarization;
     private String additionalInfo;
+    @Column(columnDefinition = "TEXT")
+    private String additionalText;
     private String application;
     private String investigator;
     private String investigatorProfession;
+    private String investigatorRegion;
 
     @Column(name = "started_at")
     private LocalDateTime startedAt;
@@ -65,9 +77,17 @@ public class CaseInterrogation {
     @Enumerated(EnumType.STRING)
     private CaseInterrogationStatusEnum status;
 
+    @Builder.Default
+    @OneToMany(mappedBy = "interrogation", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CaseInterrogationApplicationFile> applicationFiles = new ArrayList<>();
+
     @OneToMany(mappedBy = "interrogation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orderIndex ASC")
     private List<CaseInterrogationQA> qaList = new ArrayList<>();
+
+    @OneToMany(mappedBy = "interrogation", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OrderBy("orderIndex ASC")
+    private List<CaseInterrogationOtherAudio> otherAudios = new ArrayList<>();
 
     @OneToOne(mappedBy = "interrogation", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
     private CaseInterrogationChat chat;

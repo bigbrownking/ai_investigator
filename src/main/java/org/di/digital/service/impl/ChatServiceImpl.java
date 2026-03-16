@@ -7,12 +7,15 @@ import org.di.digital.dto.response.CaseChatHistoryResponse;
 import org.di.digital.dto.response.CaseChatMessageDto;
 import org.di.digital.model.*;
 import org.di.digital.model.enums.CaseActivityType;
+import org.di.digital.model.enums.LogAction;
+import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.CaseChatMessageRepository;
 import org.di.digital.repository.CaseChatRepository;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseService;
 import org.di.digital.service.ChatService;
+import org.di.digital.service.LogService;
 import org.di.digital.service.StreamingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -39,6 +42,7 @@ public class ChatServiceImpl implements ChatService {
     private final UserRepository userRepository;
     private final CaseService caseService;
     private final StreamingService streamingService;
+    private final LogService logService;
 
     @Value("${qualification.model.host}")
     private String pythonHost;
@@ -107,6 +111,12 @@ public class ChatServiceImpl implements ChatService {
 
         ChatRequest enhancedRequest = buildRequestWithHistory(chat, request);
 
+        logService.log(
+                String.format("New chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.CHAT_MESSAGE,
+                caseEntity.getId()
+        );
         streamingService.streamRaw(
                 qualificationChatUrl(pythonHost, qualificationPort, caseNumber),
                 enhancedRequest,
@@ -155,6 +165,12 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
         validateUserAccess(caseEntity, user);
         clearChatHistory(caseEntity.getId(), user.getId());
+        logService.log(
+                String.format("Cleared chat by %s user to case %s", userEmail, caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.CHAT_CLEAR,
+                caseEntity.getId()
+        );
     }
 
     @Transactional

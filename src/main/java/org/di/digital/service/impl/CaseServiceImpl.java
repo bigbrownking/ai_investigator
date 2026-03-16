@@ -2,16 +2,20 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.AddFigurantToCaseRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
 import org.di.digital.dto.request.FileType;
+import org.di.digital.dto.response.CaseFileResponse;
 import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.CaseUserResponse;
+import org.di.digital.dto.response.FigurantResponse;
 import org.di.digital.model.*;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.repository.CaseRepository;
+import org.di.digital.repository.FigurantRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseService;
 import org.di.digital.service.LogService;
@@ -29,10 +33,7 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 
 import java.io.InputStream;
-import java.util.ArrayList;
-import java.util.Comparator;
-import java.util.HashSet;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -42,7 +43,6 @@ public class CaseServiceImpl implements CaseService {
 
     private final WebClient.Builder webClientBuilder;
     private final CaseRepository caseRepository;
-    private final CaseFileRepository caseFileRepository;
     private final UserRepository userRepository;
     private final MinioService minioService;
     private final TaskQueueService taskQueueService;
@@ -82,8 +82,7 @@ public class CaseServiceImpl implements CaseService {
             for (MultipartFile file : request.getFiles()) {
                 if (!file.isEmpty()) {
                     CaseFile caseFile = minioService.uploadFile(file, request.getNumber());
-                    caseFile.setCaseEntity(savedCase);
-                    savedCase.getFiles().add(caseFile);
+                    caseFile.addCaseEntity(savedCase);
                 }
             }
         }
@@ -104,12 +103,12 @@ public class CaseServiceImpl implements CaseService {
 
         log.info("Case created with id: {} for user: {}", savedCase.getId(), email);
 
-        logService.log(
-                String.format("Case %s created by user %s", savedCase.getNumber(), email),
-                LogLevel.INFO,
-                LogAction.CASE_CREATED,
-                savedCase
-        );
+//        logService.log(
+//                String.format("Case %s created by user %s", savedCase.getNumber(), email),
+//                LogLevel.INFO,
+//                LogAction.CASE_CREATED,
+//                savedCase
+//        );
 
         return mapper.mapToCaseResponse(savedCase);
     }
@@ -146,7 +145,7 @@ public class CaseServiceImpl implements CaseService {
 
     @Override
     @Transactional
-    public CaseResponse updateCaseStatus(Long caseId, boolean status, String email) {
+    public void updateCaseStatus(Long caseId, boolean status, String email) {
         log.info("Updating status for case: {} to {} by user: {}", caseId, status, email);
 
         User user = userRepository.findByEmail(email)
@@ -164,20 +163,19 @@ public class CaseServiceImpl implements CaseService {
         }
 
         caseEntity.setStatus(status);
-        Case savedCase = caseRepository.save(caseEntity);
+        caseRepository.save(caseEntity);
 
         log.info("Case {} status updated to {}", caseId, status);
         logService.log(
                 String.format("Case %s status updated to %s by user %s", caseEntity.getNumber(), status, email),
                 LogLevel.INFO,
                 LogAction.CASE_STATUS_CHANGED,
-                caseEntity
+                caseId
         );
-        return mapper.mapToCaseResponse(savedCase);
     }
 
     @Transactional
-    public CaseResponse addFilesToCase(Long caseId, List<MultipartFile> files, FileType type, String email) {
+    public List<CaseFileResponse> addFilesToCase(Long caseId, List<MultipartFile> files, FileType type, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
@@ -188,7 +186,7 @@ public class CaseServiceImpl implements CaseService {
             throw new AccessDeniedException("Access denied to case: " + caseId);
         }
 
-        List<CaseFile> newlyUploadedFiles = new ArrayList<>();
+        List<String> uploadedStoredNames = new ArrayList<>();
         int addedFilesCount = 0;
         boolean isQualification = type == FileType.QUALIFICATION;
 
@@ -204,11 +202,10 @@ public class CaseServiceImpl implements CaseService {
                     }
 
                     CaseFile caseFile = minioService.uploadFile(file, caseEntity.getNumber());
-                    caseFile.setCaseEntity(caseEntity);
+                    caseFile.addCaseEntity(caseEntity);
                     caseFile.setQualification(isQualification);
-                    caseEntity.getFiles().add(caseFile);
 
-                    newlyUploadedFiles.add(caseFile);
+                    uploadedStoredNames.add(caseFile.getStoredFileName());
                     addedFilesCount++;
 
                 } catch (Exception e) {
@@ -219,6 +216,11 @@ public class CaseServiceImpl implements CaseService {
         }
 
         caseRepository.flush();
+
+        List<CaseFile> newlyUploadedFiles = caseEntity.getFiles().stream()
+                .filter(f -> uploadedStoredNames.contains(f.getStoredFileName()))
+                .toList();
+
         for (CaseFile caseFile : newlyUploadedFiles) {
             taskQueueService.addTaskToQueue(
                     email,
@@ -232,17 +234,13 @@ public class CaseServiceImpl implements CaseService {
         }
 
         log.info("Added {} files to case: {}", addedFilesCount, caseId);
-        logService.log(
-                String.format("Added %d file(s) to case %s", addedFilesCount, caseEntity.getNumber()),
-                LogLevel.INFO,
-                LogAction.FILE_UPLOAD,
-                caseEntity
-        );
-        return mapper.mapToCaseResponse(caseEntity);
-    }
 
+        return newlyUploadedFiles.stream()
+                .map(mapper::mapToCaseFileResponse)
+                .toList();
+    }
     @Transactional
-        public CaseResponse deleteFileFromCase(Long caseId, String fileName, String email) {
+        public void deleteFileFromCase(Long caseId, String fileName, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
@@ -267,10 +265,15 @@ public class CaseServiceImpl implements CaseService {
 
             taskQueueService.deleteTask(fileToDelete.getId());
             
-            Case savedCase = caseRepository.save(caseEntity);
+            caseRepository.save(caseEntity);
             log.info("Deleted file: {} from case: {}", fileName, caseId);
 
-            return mapper.mapToCaseResponse(savedCase);
+            logService.log(
+                    String.format("Deleted %d file from case %s", fileToDelete.getId(), caseEntity.getNumber()),
+                    LogLevel.INFO,
+                    LogAction.FILE_DELETE,
+                    caseId
+            );
 
         } catch (Exception e) {
             log.error("Failed to delete file: {} from case: {}", fileName, caseId, e);
@@ -314,13 +317,19 @@ public class CaseServiceImpl implements CaseService {
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("File not found: " + originalFileName));
 
+        logService.log(
+                String.format("Downloaded %d file from case %s", caseFile.getId(), caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.FILE_DOWNLOAD,
+                caseId
+        );
         InputStream inputStream = minioService.downloadFile(caseFile.getFileUrl());
         return new InputStreamResource(inputStream);
     }
 
     @Override
     @Transactional
-    public CaseResponse addUserToCase(Long caseId, String userEmailToAdd, String currentUserEmail) {
+    public CaseUserResponse addUserToCase(Long caseId, String userEmailToAdd, String currentUserEmail) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
 
@@ -343,12 +352,59 @@ public class CaseServiceImpl implements CaseService {
 
         log.info("User {} added to case {} by {}", userEmailToAdd, caseId, currentUserEmail);
 
-        return mapper.mapToCaseResponse(savedCase);
+        logService.log(
+                String.format("Added %s user to case %s", userEmailToAdd, caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.USER_ADD,
+                caseId
+        );
+        return mapper.mapToCaseUserResponse(userToAdd, savedCase);
     }
 
     @Override
     @Transactional
-    public CaseResponse removeUserFromCase(Long caseId, Long userId, String currentUserEmail) {
+    public FigurantResponse addFigurantToCase(Long caseId, AddFigurantToCaseRequest request, String currentUserEmail) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+
+        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
+            throw new AccessDeniedException("You don't have permission to add users to this case");
+        }
+
+        boolean alreadyExists = caseEntity.getFigurants().stream()
+                .anyMatch(f -> f.getFio().equals(request.getFio())
+                        && f.getNumber().equals(request.getNumber()));
+
+        if (alreadyExists) {
+            throw new IllegalStateException("Figurant already exists in this case");
+        }
+
+        Figurant figurant = Figurant.builder()
+                .documentType(request.getDocumentType())
+                .number(request.getNumber())
+                .fio(request.getFio())
+                .role(request.getRole())
+                .caseEntity(caseEntity)
+                .build();
+
+        caseEntity.addFigurant(figurant);
+        Case savedCase = caseRepository.save(caseEntity);
+
+        Figurant saved = savedCase.getFigurants().stream()
+                .filter(f -> f.getFio().equals(request.getFio()) && f.getNumber().equals(request.getNumber()))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Failed to retrieve saved figurant"));
+
+        log.info("Figurant {} added to case {} by {}", request.getFio(), caseId, currentUserEmail);
+        return mapper.mapToFigurantResponse(saved);
+    }
+
+    @Override
+    @Transactional
+    public void removeUserFromCase(Long caseId, Long userId, String currentUserEmail) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
 
@@ -371,11 +427,39 @@ public class CaseServiceImpl implements CaseService {
         }
 
         caseEntity.removeUser(userToRemove);
-        Case savedCase = caseRepository.save(caseEntity);
+        caseRepository.save(caseEntity);
 
+        logService.log(
+                String.format("Removed %s user to case %s", userToRemove, caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.USER_DELETE,
+                caseId
+        );
         log.info("User {} removed from case {} by {}", userToRemove.getEmail(), caseId, currentUserEmail);
+    }
 
-        return mapper.mapToCaseResponse(savedCase);
+    @Override
+    @Transactional
+    public void removeFigurantFromCase(Long caseId, Long figurantId, String currentUserEmail) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+
+        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
+            throw new AccessDeniedException("You don't have permission to remove figurants from this case");
+        }
+
+        Figurant figurant = caseEntity.getFigurants().stream()
+                .filter(f -> f.getId().equals(figurantId))
+                .findFirst()
+                .orElseThrow(() -> new RuntimeException("Figurant not found with id: " + figurantId));
+
+        caseEntity.removeFigurant(figurant);
+        caseRepository.save(caseEntity);
+
+        log.info("Figurant {} removed from case {} by {}", figurantId, caseId, currentUserEmail);
     }
 
     @Override
@@ -392,26 +476,24 @@ public class CaseServiceImpl implements CaseService {
         }
 
         return caseEntity.getUsers().stream()
-                .map(user -> CaseUserResponse.builder()
-                        .id(user.getId())
-                        .email(user.getEmail())
-                        .name(user.getName())
-                        .surname(user.getSurname())
-                        .fathername(user.getFathername())
-                        .isOwner(caseEntity.isOwner(user))
-                        .build())
+                .map(user -> mapper.mapToCaseUserResponse(user, caseEntity))
                 .collect(Collectors.toList());
     }
 
-    @Transactional
-    public void updateCaseActivity(Long caseId, String activityType) {
+    @Override
+    public List<FigurantResponse> getCaseFigurants(Long caseId, String currentUserEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
 
-        caseEntity.updateActivity(activityType);
-        caseRepository.save(caseEntity);
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        log.debug("Updated activity for case {}: {}", caseId, activityType);
+        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
+            throw new AccessDeniedException("You don't have permission to view users of this case");
+        }
+        return caseEntity.getFigurants().stream()
+                .map(mapper::mapToFigurantResponse)
+                .collect(Collectors.toList());
     }
 
     @Transactional
@@ -441,5 +523,16 @@ public class CaseServiceImpl implements CaseService {
         Page<Case> cases = caseRepository.findCasesByActivityType(userEmail, activityType, pageable);
 
         return cases.map(mapper::mapToCaseResponse);
+    }
+
+    @Transactional(readOnly = true)
+    public Optional<FigurantResponse> findFigurantByNumber(Long caseId, String documentType, String number, String email) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found"));
+
+        return caseEntity.getFigurants().stream()
+                .filter(f -> number.equals(f.getNumber()) && documentType.equals(f.getDocumentType()))
+                .findFirst()
+                .map(mapper::mapToFigurantResponse);
     }
 }

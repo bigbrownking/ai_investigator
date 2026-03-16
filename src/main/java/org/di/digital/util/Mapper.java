@@ -6,6 +6,7 @@ import org.di.digital.model.*;
 import org.di.digital.service.impl.MinioService;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.stream.Collectors;
 
 @Component
@@ -66,41 +67,13 @@ public class Mapper {
                 .description(caseEntity.getDescription())
                 .status(caseEntity.isStatus())
                 .files(caseEntity.getFiles().stream()
-                        .map(f -> CaseFileResponse.builder()
-                                .id(f.getId())
-                                .originalFileName(f.getOriginalFileName())
-                                .contentType(f.getContentType())
-                                .fileSize(f.getFileSize())
-                                .status(f.getStatus().getLabel())
-                                .previewUrl(minioService.generatePresignedUrlForPreview(f.getFileUrl()))
-                                .downloadUrl(minioService.generatePresignedUrlForDownload(
-                                        f.getFileUrl(),
-                                        f.getOriginalFileName()
-                                ))
-                                .uploadedAt(String.valueOf(f.getUploadedAt()))
-                                .isQualification(f.isQualification())
-                                .build())
+                        .map(this::mapToCaseFileResponse)
                         .collect(Collectors.toList()))
                 .interrogations(caseEntity.getInterrogations().stream()
-                        .map(f -> CaseInterrogationResponse.builder()
-                                .id(f.getId())
-                                .number(f.getNumber())
-                                .documentType(f.getDocumentType())
-                                .fio(f.getFio())
-                                .role(f.getRole())
-                                .date(String.valueOf(f.getDate()))
-                                .status(f.getStatus().getLabel())
-                                .build())
+                        .map(this::mapToInterrogationResponse)
                         .collect(Collectors.toList()))
                 .users(caseEntity.getUsers().stream()
-                        .map(user -> CaseUserResponse.builder()
-                                .id(user.getId())
-                                .email(user.getEmail())
-                                .name(user.getName())
-                                .surname(user.getSurname())
-                                .fathername(user.getFathername())
-                                .isOwner(caseEntity.isOwner(user))
-                                .build())
+                        .map(user -> mapToCaseUserResponse(user, caseEntity))
                         .collect(Collectors.toList()))
                 .createdDate(caseEntity.getCreatedDate())
                 .ownerEmail(caseEntity.getOwner() != null ? caseEntity.getOwner().getEmail() : null)
@@ -109,6 +82,16 @@ public class Mapper {
                 .qualificationGeneratedAt(caseEntity.getQualificationGeneratedAt())
                 .indictmentGeneratedAt(caseEntity.getIndictmentGeneratedAt())
                 .updatedDate(caseEntity.getUpdatedDate())
+                .build();
+    }
+    public CaseUserResponse mapToCaseUserResponse(User user, Case caseEntity) {
+        return CaseUserResponse.builder()
+                .id(user.getId())
+                .email(user.getEmail())
+                .name(user.getName())
+                .surname(user.getSurname())
+                .fathername(user.getFathername())
+                .isOwner(caseEntity.isOwner(user))
                 .build();
     }
 
@@ -141,6 +124,117 @@ public class Mapper {
                 .active(user.isActive())
                 .settings(settingsDto)
                 .createdCaseCount(user.getCases() != null ? user.getCases().size() : 0)
+                .build();
+    }
+
+    public FigurantResponse mapToFigurantResponse(Figurant figurant) {
+        return FigurantResponse.builder()
+                .id(figurant.getId())
+                .documentType(figurant.getDocumentType())
+                .number(figurant.getNumber())
+                .fio(figurant.getFio())
+                .role(figurant.getRole())
+                .build();
+    }
+
+    public CaseInterrogationFullResponse mapToInterrogationFullResponse(CaseInterrogation interrogation, User user) {
+        String profession = interrogation.getInvestigatorProfession() != null
+                ? interrogation.getInvestigatorProfession()
+                : user.getProfession();
+
+        String region = interrogation.getInvestigatorRegion() != null
+                ? interrogation.getInvestigatorRegion()
+                : user.getRegion();
+        CaseInterrogationProtocolResponse protocolResponse = null;
+        if (interrogation.getProtocol() != null) {
+            protocolResponse = mapToInterrogationProtocolResponse(interrogation.getProtocol());
+        }
+
+        List<CaseInterrogationQAResponse> qaList = null;
+        if (interrogation.getQaList() != null && !interrogation.getQaList().isEmpty()) {
+            qaList = interrogation.getQaList().stream()
+                    .map(this::mapToInterrogationQAResponse)
+                    .toList();
+        }
+
+        List<InterrogationTimerSessionResponse> timerSessions = null;
+        if (interrogation.getTimerSessions() != null) {
+            timerSessions = interrogation.getTimerSessions().stream()
+                    .map(s -> InterrogationTimerSessionResponse.builder()
+                            .startedAt(s.getStartedAt())
+                            .pausedAt(s.getPausedAt())
+                            .build())
+                    .toList();
+        }
+
+        List<CaseInterrogationApplicationFileResponse> applicationFiles = null;
+        if (interrogation.getApplicationFiles() != null && !interrogation.getApplicationFiles().isEmpty()) {
+            applicationFiles = interrogation.getApplicationFiles().stream()
+                    .map(this::mapToApplicationFileResponse)
+                    .toList();
+        }
+        return CaseInterrogationFullResponse.builder()
+                .id(interrogation.getId())
+                .room(interrogation.getRoom())
+                .addrezz(interrogation.getAddrezz())
+                .notificationNumber(interrogation.getNotificationNumber())
+                .notificationDate(interrogation.getNotificationDate())
+                .state(interrogation.getState())
+                .caseNumberState(interrogation.getCaseNumberState())
+                .number(interrogation.getNumber())
+                .documentType(interrogation.getDocumentType())
+                .fio(interrogation.getFio())
+                .role(interrogation.getRole())
+                .date(interrogation.getDate())
+                .involved(interrogation.getInvolved())
+                .involvedPersons(interrogation.getInvolvedPersons())
+                .confession(interrogation.getConfession())
+                .confessionText(interrogation.getConfessionText())
+                .language(interrogation.getLanguage())
+                .translator(interrogation.getTranslator())
+                .defender(interrogation.getDefender())
+                .familiarization(interrogation.getFamiliarization())
+                .additionalInfo(interrogation.getAdditionalInfo())
+                .additionalText(interrogation.getAdditionalText())
+                .application(interrogation.getApplication())
+                .investigator(interrogation.getInvestigator())
+                .investigatorProfession(profession)
+                .investigatorRegion(region)
+                .status(interrogation.getStatus().name())
+                .protocol(protocolResponse)
+                .startedAt(interrogation.getStartedAt())
+                .finishedAt(interrogation.getFinishedAt())
+                .durationSeconds(interrogation.getDurationSeconds())
+                .timerSessions(timerSessions)
+                .qaList(qaList)
+                .applications(applicationFiles)
+                .build();
+    }
+
+    public CaseFileResponse mapToCaseFileResponse(CaseFile f) {
+        return CaseFileResponse.builder()
+                .id(f.getId())
+                .originalFileName(f.getOriginalFileName())
+                .contentType(f.getContentType())
+                .fileSize(f.getFileSize())
+                .status(f.getStatus().getLabel())
+                .previewUrl(minioService.generatePresignedUrlForPreview(f.getFileUrl()))
+                .downloadUrl(minioService.generatePresignedUrlForDownload(f.getFileUrl(), f.getOriginalFileName()))
+                .uploadedAt(String.valueOf(f.getUploadedAt()))
+                .isQualification(f.isQualification())
+                .build();
+    }
+
+    public CaseInterrogationApplicationFileResponse mapToApplicationFileResponse(CaseInterrogationApplicationFile file) {
+        return CaseInterrogationApplicationFileResponse.builder()
+                .id(file.getId())
+                .originalFileName(file.getOriginalFileName())
+                .storedFileName(file.getStoredFileName())
+                .previewUrl(minioService.generatePresignedUrlForPreview(file.getFileUrl()))
+                .downloadUrl(minioService.generatePresignedUrlForDownload(file.getFileUrl(), file.getOriginalFileName()))
+                .contentType(file.getContentType())
+                .fileSize(file.getFileSize())
+                .uploadedAt(String.valueOf(file.getUploadedAt()))
                 .build();
     }
 }

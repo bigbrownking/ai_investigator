@@ -10,11 +10,9 @@ import org.di.digital.model.enums.QAStatusEnum;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class QAResponse {
+public class OtherAudioResponse {
     private Long id;
-    private String question;
-    private String answer;
-    private int orderIndex;
-    private Boolean freeStory;
+    private String fieldName;
+    private String text;
     private QAStatusEnum status;
 }

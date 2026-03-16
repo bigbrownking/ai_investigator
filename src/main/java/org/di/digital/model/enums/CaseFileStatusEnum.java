@@ -1,5 +1,6 @@
 package org.di.digital.model.enums;
 
+import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Getter;
 
 @Getter
@@ -14,5 +15,9 @@ public enum CaseFileStatusEnum {
     private final String label;
     CaseFileStatusEnum(String s) {
         this.label = s;
+    }
+    @JsonValue
+    public String getLabel() {
+        return label;
     }
 }

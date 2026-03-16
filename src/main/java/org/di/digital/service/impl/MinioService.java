@@ -5,6 +5,7 @@ import io.minio.http.Method;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.CaseFile;
+import org.di.digital.model.CaseInterrogationApplicationFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -29,6 +30,9 @@ public class MinioService {
 
     @Value("${minio.url}")
     private String minioUrl;
+
+    @Value("${minio.public.url}")
+    private String minioPublicUrl;
 
     @Value("${minio.presigned.url.expiry.hours:24}")
     private int presignedUrlExpiryHours;
@@ -69,6 +73,41 @@ public class MinioService {
             throw new RuntimeException("Failed to upload file", e);
         }
     }
+    public CaseInterrogationApplicationFile uploadApplicationFile(MultipartFile file, String folder, String fio) {
+        try {
+            ensureBucketExists();
+
+            String storedFileName = generateFileName(file.getOriginalFilename());
+            String objectName = folder + "/application/" + fio + "/" + storedFileName;
+
+            try (InputStream inputStream = file.getInputStream()) {
+                minioClient.putObject(
+                        PutObjectArgs.builder()
+                                .bucket(bucketName)
+                                .object(objectName)
+                                .stream(inputStream, file.getSize(), -1)
+                                .contentType(file.getContentType())
+                                .build()
+                );
+            }
+
+            // Store the object path instead of direct URL
+            String objectPath = bucketName + "/" + objectName;
+
+            return CaseInterrogationApplicationFile.builder()
+                    .originalFileName(file.getOriginalFilename())
+                    .storedFileName(storedFileName)
+                    .fileUrl(objectPath)
+                    .contentType(file.getContentType())
+                    .fileSize(file.getSize())
+                    .uploadedAt(LocalDateTime.now())
+                    .build();
+
+        } catch (Exception e) {
+            log.error("Error uploading file: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload file", e);
+        }
+    }
     public String uploadAudio(MultipartFile file, String folder, String fio) {
         try {
             ensureBucketExists();
@@ -101,28 +140,6 @@ public class MinioService {
         }
     }
 
-    public String generatePresignedUrlForAudio(String objectPath) {
-        try {
-            String objectName = extractObjectNameFromPath(objectPath);
-
-            String presignedUrl = minioClient.getPresignedObjectUrl(
-                    GetPresignedObjectUrlArgs.builder()
-                            .method(Method.GET)
-                            .bucket(bucketName)
-                            .object(objectName)
-                            .expiry(presignedUrlExpiryHours, TimeUnit.HOURS)
-                            .build()
-            );
-
-            log.debug("Generated presigned audio URL for: {}", objectName);
-            return presignedUrl;
-
-        } catch (Exception e) {
-            log.error("Error generating presigned audio URL for: {}", objectPath, e);
-            throw new RuntimeException("Failed to generate presigned audio URL", e);
-        }
-    }
-
     public String generatePresignedUrlForPreview(String objectPath) {
         try {
             String objectName = extractObjectNameFromPath(objectPath);
@@ -141,7 +158,7 @@ public class MinioService {
             );
 
             log.debug("Generated presigned preview URL for: {}", objectName);
-            return presignedUrl;
+            return toPublicUrl(presignedUrl);
 
         } catch (Exception e) {
             log.error("Error generating presigned preview URL for: {}", objectPath, e);
@@ -156,14 +173,14 @@ public class MinioService {
             Map<String, String> responseHeaders = new HashMap<>();
             responseHeaders.put("response-content-disposition", "attachment; filename=\"" + fileName + "\"");
 
-            return minioClient.getPresignedObjectUrl(
+            return toPublicUrl(minioClient.getPresignedObjectUrl(
                     GetPresignedObjectUrlArgs.builder()
                             .method(Method.GET)
                             .bucket(bucketName)
                             .object(objectName)
                             .expiry(presignedUrlExpiryHours, TimeUnit.HOURS)
                             .extraQueryParams(responseHeaders)
-                            .build()
+                            .build())
             );
 
         } catch (Exception e) {
@@ -247,5 +264,12 @@ public class MinioService {
             log.error("Error downloading file from Minio: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to download file", e);
         }
+    }
+
+    private String toPublicUrl(String presignedUrl) {
+        if (minioPublicUrl != null && !minioPublicUrl.isBlank()) {
+            return presignedUrl.replace(minioUrl, minioPublicUrl);
+        }
+        return presignedUrl;
     }
 }
