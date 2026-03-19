@@ -15,6 +15,9 @@ import java.util.List;
 public class CaseInterrogationFullResponse {
     private long id;
     private String city;
+    private String personYear;
+    private String personTranslator;
+    private String personSpecialist;
     private String room;
     private String addrezz;
     private String notificationNumber;
@@ -49,5 +52,5 @@ public class CaseInterrogationFullResponse {
     private Long durationSeconds;
     private List<InterrogationTimerSessionResponse> timerSessions;
     private String status;
-
+    private Boolean isDop;
 }

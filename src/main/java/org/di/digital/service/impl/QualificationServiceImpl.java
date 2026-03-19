@@ -5,6 +5,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.Case;
 import org.di.digital.model.enums.CaseActivityType;
+import org.di.digital.model.enums.LogAction;
+import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.service.*;
 import org.springframework.beans.factory.annotation.Value;
@@ -42,13 +44,13 @@ public class QualificationServiceImpl implements QualificationService {
     private String pythonPort;
 
     @Override
-    public SseEmitter generateQualification(String caseNumber) {
+    public SseEmitter generateQualification(String caseNumber, String email) {
         SseEmitter emitter = new SseEmitter(0L);
-        executor.execute(() -> streamQualification(caseNumber, emitter));
+        executor.execute(() -> streamQualification(caseNumber, emitter, email));
         return emitter;
     }
 
-    private void streamQualification(String caseNumber, SseEmitter emitter) {
+    private void streamQualification(String caseNumber, SseEmitter emitter, String userEmail) {
         streamingService.stream(
                 qualificationUrl(pythonHost, pythonPort, caseNumber),
                 List.of(),
@@ -60,6 +62,13 @@ public class QualificationServiceImpl implements QualificationService {
                     log.info("Qualification streaming completed for case {}", caseNumber);
                 },
                 error -> log.error("Qualification streaming error for case {}", caseNumber, error)
+        );
+        logService.log(
+                String.format("Getting case qualification by %s user in case %s", userEmail, caseNumber),
+                LogLevel.INFO,
+                LogAction.QUALIFICATION,
+                caseNumber,
+                userEmail
         );
     }
 
@@ -80,8 +89,15 @@ public class QualificationServiceImpl implements QualificationService {
     }
 
     @Override
-    public Resource downloadQualificationAsWord(String caseNumber) {
+    public Resource downloadQualificationAsWord(String caseNumber, String userEmail) {
         try {
+            logService.log(
+                    String.format("Downloading qualification by %s user in case %s", userEmail, caseNumber),
+                    LogLevel.INFO,
+                    LogAction.QUALIFICATION_DOWNLOAD,
+                    caseNumber,
+                    userEmail
+            );
             return new ByteArrayResource(
                     wordDocumentService.generateQualificationDocument(getQualification(caseNumber))
             );

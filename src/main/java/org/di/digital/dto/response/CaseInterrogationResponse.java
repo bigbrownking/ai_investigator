@@ -15,4 +15,5 @@ public class CaseInterrogationResponse {
     private String role;
     private String date;
     private String status;
+    private Boolean isDop;
 }

@@ -18,4 +18,5 @@ public class CaseFileResponse {
     private String uploadedAt;
     private String status;
     private boolean isQualification;
+    private Integer tom;
 }

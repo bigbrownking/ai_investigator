@@ -8,16 +8,17 @@ import org.di.digital.dto.request.EditAudioTranscribedTextRequest;
 import org.di.digital.dto.request.UpdateProtocolFieldRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.model.*;
-import org.di.digital.model.enums.CaseInterrogationStatusEnum;
-import org.di.digital.model.enums.LogAction;
-import org.di.digital.model.enums.LogLevel;
-import org.di.digital.model.enums.QAStatusEnum;
+import org.di.digital.model.enums.*;
+import org.di.digital.model.fl.FLAddress;
+import org.di.digital.model.fl.FLRecord;
 import org.di.digital.repository.CaseInterrogationRepository;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseInterrogationService;
+import org.di.digital.service.FLService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.impl.queue.AudioQueueService;
+import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -27,8 +28,7 @@ import org.springframework.web.multipart.MultipartFile;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.ArrayList;
-import java.util.List;
+import java.util.*;
 import java.util.stream.Collectors;
 @Slf4j
 @Service
@@ -40,10 +40,12 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final MinioService minioService;
     private final AudioQueueService audioQueueService;
     private final LogService logService;
+    private final TaskQueueService taskQueueService;
+    private final FLService flService;
     private final Mapper mapper;
 
     @Transactional(readOnly = true)
-    public List<CaseInterrogationResponse> searchInterrogations(Long caseId, String role, String fio, LocalDate date, String email) {
+    public List<CaseInterrogationResponse> searchInterrogations(Long caseId, String role, String fio, Boolean isDop, LocalDate date, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
@@ -57,6 +59,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         return caseEntity.getInterrogations().stream()
                 .filter(i -> role.equals("Все") || (i.getRole() != null && i.getRole().equalsIgnoreCase(role)))
                 .filter(i -> fio == null || (i.getFio() != null && i.getFio().toLowerCase().contains(fio.toLowerCase())))
+                .filter(i -> isDop == null || Objects.equals(i.getIsDop(), isDop))
                 .filter(i -> date == null || i.getDate().equals(date))
                 .map(mapper::mapToInterrogationResponse)
                 .collect(Collectors.toList());
@@ -74,11 +77,36 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             throw new AccessDeniedException("Access denied to case: " + caseId);
         }
 
+        String caseNumber = caseEntity.getNumber();
         LocalDateTime now = LocalDateTime.now();
 
         InterrogationTimerSession session = InterrogationTimerSession.builder()
                 .startedAt(now)
                 .build();
+
+        FLRecord flRecord = null;
+        FLAddress flAddress = null;
+        try {
+            flRecord = flService.getInfoByDocument(request.getDocumentType(), request.getNumber());
+            flAddress = flService.getRegAddressAbout(flRecord.getIin());
+        } catch (Exception e) {
+            log.warn("Could not fetch FL data for document {}: {}", request.getNumber(), e.getMessage());
+        }
+
+        CaseInterrogationProtocol protocol = CaseInterrogationProtocol.builder()
+                .fio(flRecord != null ? flRecord.getFio() : request.getFio())
+                .dateOfBirth(flRecord != null && flRecord.getBirthDate() != null
+                        ? flRecord.getBirthDate().toString() : null)
+                .birthPlace(flRecord != null ? flRecord.getBirthRegion() : null)
+                .citizenship(flRecord != null ? flRecord.getCitizenship() : null)
+                .nationality(flRecord != null ? flRecord.getNationality() : null)
+                .address(flAddress != null ? flAddress.getAddress() : null)
+                .iinOrPassport(request.getNumber())
+                .build();
+
+        boolean isDop = caseEntity.getInterrogations().stream()
+                .anyMatch(i -> request.getNumber().equals(i.getNumber())
+                        && request.getRole().equals(i.getRole()));
 
         CaseInterrogation interrogation = CaseInterrogation.builder()
                 .number(request.getNumber())
@@ -87,6 +115,8 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .role(request.getRole())
                 .date(LocalDate.now())
                 .caseEntity(caseEntity)
+                .isDop(isDop)
+                .protocol(protocol)
                 .status(CaseInterrogationStatusEnum.IN_PROGRESS)
                 .startedAt(now)
                 .timerSessions(new ArrayList<>(List.of(session)))
@@ -105,10 +135,11 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
 
         logService.log(
-                String.format("Interrogation %s to %s added by user %s", saved.getId(), savedCase.getNumber(), email),
+                String.format("Interrogation %s to %s added by user %s", saved.getId(),caseNumber, email),
                 LogLevel.INFO,
                 LogAction.INTERROGATION_ADDED,
-                caseId
+                caseNumber,
+                user.getEmail()
         );
         return mapper.mapToInterrogationFullResponse(saved, user);
     }
@@ -125,6 +156,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             throw new AccessDeniedException("Access denied to case: " + caseId);
         }
 
+        String caseNumber = caseEntity.getNumber();
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
                 .findFirst()
@@ -132,6 +164,14 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         caseEntity.removeInterrogation(interrogation);
         caseRepository.save(caseEntity);
         log.info("Interrogation removed from case: {}", caseId);
+
+        logService.log(
+                String.format("Deleting interrogation %s by %s user in case %s", interrogationId, email, caseNumber),
+                LogLevel.INFO,
+                LogAction.INTERROGATION_DELETED,
+                caseNumber,
+                email
+        );
     }
 
     @Transactional
@@ -178,6 +218,9 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
         switch (request.getField()) {
             case "city"             -> interrogation.setCity(request.getValue());
+            case "personTranslator" -> interrogation.setPersonTranslator(request.getValue());
+            case "personSpecialist" -> interrogation.setPersonSpecialist(request.getValue());
+            case "personYear"       -> interrogation.setPersonYear(request.getValue());
             case "state"            -> interrogation.setState(request.getValue());
             case "investigatorProfession" -> interrogation.setInvestigatorProfession(request.getValue());
             case "investigatorRegion" -> interrogation.setInvestigatorRegion(request.getValue());
@@ -423,21 +466,58 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new RuntimeException("Interrogation does not belong to case: " + caseId);
         }
-        if (interrogation.getStartedAt() != null && interrogation.getFinishedAt() == null) {
-            LocalDateTime now = LocalDateTime.now();
+
+        String caseNumber = interrogation.getCaseEntity().getNumber();
+        LocalDateTime now = LocalDateTime.now();
+
+        if (interrogation.getStartedAt() != null) {
+            // Если таймер был запущен (не на паузе) — закрываем активную сессию
+            if (!Boolean.TRUE.equals(interrogation.getIsPaused())) {
+                InterrogationTimerSession lastSession = interrogation.getTimerSessions().stream()
+                        .filter(s -> s.getPausedAt() == null)
+                        .max(Comparator.comparing(InterrogationTimerSession::getStartedAt))
+                        .orElse(null);
+
+                if (lastSession != null) {
+                    lastSession.setPausedAt(now);
+                    long sessionSeconds = ChronoUnit.SECONDS.between(lastSession.getStartedAt(), now);
+                    long accumulated = interrogation.getAccumulatedSeconds() == null
+                            ? 0 : interrogation.getAccumulatedSeconds();
+                    interrogation.setAccumulatedSeconds(accumulated + sessionSeconds);
+                    interrogation.setDurationSeconds(interrogation.getAccumulatedSeconds());
+                }
+            }
+
+            // finishedAt ставим только здесь — при реальном завершении
             interrogation.setFinishedAt(now);
-            long seconds = ChronoUnit.SECONDS.between(interrogation.getStartedAt(), now);
-            interrogation.setDurationSeconds(seconds);
+            interrogation.setIsPaused(false);
         }
 
         interrogation.setStatus(CaseInterrogationStatusEnum.COMPLETED);
         caseInterrogationRepository.save(interrogation);
-    }
 
+        logService.log(
+                String.format("Completing interrogation %s by %s user in case %s", interrogationId, email, caseNumber),
+                LogLevel.INFO,
+                LogAction.INTERROGATION_COMPLETED,
+                caseNumber,
+                email
+        );
+    }
     @Transactional
     public void controlTimer(Long caseId, Long interrogationId, String action, String email) {
+        log.info("controlTimer called: caseId={}, interrogationId={}, action={}, email={}",
+                caseId, interrogationId, action, email);
+
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
                 .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+
+        log.info("Interrogation loaded: id={}, startedAt={}, finishedAt={}, accumulatedSeconds={}, timerSessionsSize={}",
+                interrogation.getId(),
+                interrogation.getStartedAt(),
+                interrogation.getFinishedAt(),
+                interrogation.getAccumulatedSeconds(),
+                interrogation.getTimerSessions() == null ? "NULL" : interrogation.getTimerSessions().size());
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
@@ -450,18 +530,23 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             throw new RuntimeException("Interrogation does not belong to case: " + caseId);
         }
 
+        LocalDateTime now = LocalDateTime.now();
+
         if ("start".equals(action)) {
-            if (interrogation.getStartedAt() != null && interrogation.getFinishedAt() == null) {
+            boolean isRunning = interrogation.getStartedAt() != null
+                    && !Boolean.TRUE.equals(interrogation.getIsPaused())
+                    && interrogation.getStatus() != CaseInterrogationStatusEnum.COMPLETED;
+
+            if (isRunning) {
                 throw new IllegalStateException("Timer is already running");
             }
-
-            LocalDateTime now = LocalDateTime.now();
 
             if (interrogation.getStartedAt() == null) {
                 interrogation.setStartedAt(now);
             }
 
-            interrogation.setFinishedAt(null);
+            interrogation.setIsPaused(false);
+
             InterrogationTimerSession session = InterrogationTimerSession.builder()
                     .interrogation(interrogation)
                     .startedAt(now)
@@ -469,63 +554,144 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             interrogation.getTimerSessions().add(session);
 
         } else if ("pause".equals(action)) {
-            if (interrogation.getStartedAt() == null || interrogation.getFinishedAt() != null) {
+            boolean isNotRunning = interrogation.getStartedAt() == null
+                    || Boolean.TRUE.equals(interrogation.getIsPaused())
+                    || interrogation.getStatus() == CaseInterrogationStatusEnum.COMPLETED;
+
+            if (isNotRunning) {
                 throw new IllegalStateException("Timer is not running");
             }
-            LocalDateTime now = LocalDateTime.now();
-            interrogation.setFinishedAt(now);
 
-            long seconds = ChronoUnit.SECONDS.between(
-                    interrogation.getTimerSessions().get(interrogation.getTimerSessions().size() - 1).getStartedAt(),
-                    now
-            );
-            long accumulated = interrogation.getAccumulatedSeconds() == null ? 0 : interrogation.getAccumulatedSeconds();
-            interrogation.setAccumulatedSeconds(accumulated + seconds);
+            InterrogationTimerSession lastSession = interrogation.getTimerSessions().stream()
+                    .filter(s -> s.getPausedAt() == null)
+                    .max(Comparator.comparing(InterrogationTimerSession::getStartedAt))
+                    .orElseThrow(() -> new IllegalStateException("No active timer session found"));
+
+            lastSession.setPausedAt(now);
+
+            long sessionSeconds = ChronoUnit.SECONDS.between(lastSession.getStartedAt(), now);
+            long accumulated = interrogation.getAccumulatedSeconds() == null
+                    ? 0 : interrogation.getAccumulatedSeconds();
+            interrogation.setAccumulatedSeconds(accumulated + sessionSeconds);
             interrogation.setDurationSeconds(interrogation.getAccumulatedSeconds());
 
-            InterrogationTimerSession lastSession = interrogation.getTimerSessions()
-                    .get(interrogation.getTimerSessions().size() - 1);
-            lastSession.setPausedAt(now);
+            interrogation.setIsPaused(true);
+        } else {
+            log.warn("Unknown action: {}", action);
+            throw new IllegalArgumentException("Unknown action: " + action);
         }
 
-        caseInterrogationRepository.save(interrogation);
+        CaseInterrogation saved = caseInterrogationRepository.save(interrogation);
+        log.info("Saved interrogation: id={}, timerSessionsSize={}, startedAt={}, finishedAt={}, durationSeconds={}",
+                saved.getId(),
+                saved.getTimerSessions().size(),
+                saved.getStartedAt(),
+                saved.getFinishedAt(),
+                saved.getDurationSeconds());
     }
     @Transactional
     public List<CaseInterrogationApplicationFileResponse> uploadApplicationFiles(
             Long caseId, Long interrogationId, List<MultipartFile> files, String email) {
+
+        if (files == null || files.isEmpty()) {
+            return Collections.emptyList();
+        }
+
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
                 .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!interrogation.getCaseEntity().isOwner(user) && !interrogation.getCaseEntity().hasUser(user)) {
+        Case caseEntity = interrogation.getCaseEntity();
+
+        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
             throw new AccessDeniedException("Access denied to case: " + caseId);
         }
 
-        List<CaseInterrogationApplicationFile> uploaded = new ArrayList<>();
-        for (MultipartFile file : files) {
-            if (!file.isEmpty()) {
-                CaseInterrogationApplicationFile appFile = minioService.uploadApplicationFile(file,
-                        interrogation.getCaseEntity().getNumber(), interrogation.getFio());
+        String caseNumber = caseEntity.getNumber();
 
+        Set<String> existingInInterrogation = interrogation.getApplicationFiles().stream()
+                .map(CaseInterrogationApplicationFile::getOriginalFileName)
+                .collect(Collectors.toSet());
+
+        Set<String> existingInCase = caseEntity.getFiles().stream()
+                .map(CaseFile::getOriginalFileName)
+                .collect(Collectors.toSet());
+
+        List<CaseInterrogationApplicationFile> uploadedFiles = new ArrayList<>();
+        List<CaseFile> uploadedCaseFiles = new ArrayList<>();
+
+        for (MultipartFile file : files) {
+            if (file.isEmpty()) continue;
+
+            String originalName = file.getOriginalFilename();
+
+            if (existingInInterrogation.contains(originalName)) {
+                log.warn("File already exists in interrogation {}: {}", interrogationId, originalName);
+                continue;
+            }
+
+            try {
+                CaseInterrogationApplicationFile appFile = minioService.uploadApplicationFile(
+                        file,
+                        caseEntity.getNumber(),
+                        interrogation.getFio()
+                );
                 appFile.addInterrogation(interrogation);
-                uploaded.add(appFile);
+                uploadedFiles.add(appFile);
+                existingInInterrogation.add(originalName);
+
+                if (!existingInCase.contains(originalName)) {
+                    CaseFile caseFile = CaseFile.builder()
+                            .originalFileName(appFile.getOriginalFileName())
+                            .storedFileName(appFile.getStoredFileName())
+                            .fileUrl(appFile.getFileUrl())
+                            .contentType(appFile.getContentType())
+                            .fileSize(appFile.getFileSize())
+                            .uploadedAt(appFile.getUploadedAt())
+                            .status(CaseFileStatusEnum.QUEUED)
+                            .isQualification(false)
+                            .build();
+                    caseFile.addCaseEntity(caseEntity);
+                    uploadedCaseFiles.add(caseFile);
+                    existingInCase.add(originalName);
+                }
+
+            } catch (Exception e) {
+                log.error("Failed to upload application file: {} for interrogation: {}",
+                        originalName, interrogationId, e);
             }
         }
 
-        List<String> uploadedStoredNames = uploaded.stream()
-                .map(CaseInterrogationApplicationFile::getStoredFileName)
-                .toList();
+        caseInterrogationRepository.saveAndFlush(interrogation);
 
-        CaseInterrogation saved = caseInterrogationRepository.save(interrogation);
+        for (CaseFile caseFile : uploadedCaseFiles) {
+            taskQueueService.addTaskToQueue(
+                    email,
+                    caseEntity.getId(),
+                    caseEntity.getNumber(),
+                    caseFile.getOriginalFileName(),
+                    caseFile.getFileUrl(),
+                    caseFile.getId()
+            );
+        }
 
-        return saved.getApplicationFiles().stream()
-                .filter(f -> uploadedStoredNames.contains(f.getStoredFileName()))
+        log.info("Uploaded {}/{} application files for interrogation: {}",
+                uploadedFiles.size(), files.size(), interrogationId);
+
+
+        logService.log(
+                String.format("Adding new file to interrogation by %s user in case %s", email, caseNumber),
+                LogLevel.INFO,
+                LogAction.FILE_UPLOAD,
+                caseNumber,
+                email
+        );
+        return uploadedFiles.stream()
                 .map(mapper::mapToApplicationFileResponse)
                 .toList();
     }
-
     @Transactional
     public void deleteApplicationFile(Long caseId, Long interrogationId, Long fileId, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)

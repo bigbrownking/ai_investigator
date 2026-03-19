@@ -20,7 +20,7 @@ public interface CaseService {
     CaseResponse createCase(CreateCaseRequest request, String username);
     void updateCaseStatus(Long caseId, boolean status, String email);
     InputStreamResource downloadFile(Long caseId, String fileUrl, String email);
-    List<CaseFileResponse> addFilesToCase(Long caseId, List<MultipartFile> files, FileType type, String email);
+    List<CaseFileResponse> addFilesToCase(Long caseId, List<MultipartFile> files, FileType type, int tom, String email);
     void deleteFileFromCase(Long caseId, String fileName, String email);
     CaseUserResponse addUserToCase(Long caseId, String userEmailToAdd, String currentUserEmail);
     FigurantResponse addFigurantToCase(Long caseId, AddFigurantToCaseRequest request, String currentUserEmail);
@@ -37,4 +37,6 @@ public interface CaseService {
     Page<CaseResponse> getRecentCases(String userEmail, int page, int size);
     Page<CaseResponse> getCasesByActivityType(String userEmail, String activityType, int page, int size);
     void updateCaseActivity(String caseNumber, String activityType);
+    void deleteAllFiles(Long caseId, String currentEmail);
+    void deleteCaseById(Long id, String currentEmail);
 }

@@ -25,22 +25,17 @@ import static org.di.digital.util.UserUtil.*;
 @RequiredArgsConstructor
 public class LogServiceImpl implements LogService {
     private final LogRepository logRepository;
-    private final CaseRepository caseRepository;
 
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void log(String description, LogLevel level, LogAction action, Long caseId) {
+    public void log(String description, LogLevel level, LogAction action, String caseNumber, String email) {
         try {
-            Case caseEntity = caseId != null
-                    ? caseRepository.findById(caseId).orElse(null)
-                    : null;
-
             Log logEntry = Log.builder()
                     .description(description)
                     .level(level)
                     .action(action)
-                    .caseEntity(caseEntity)
-                    .user(getCurrentUser())
+                    .caseNumber(caseNumber)
+                    .email(email)
                     .ipAddress(getClientIpAddress(getCurrentHttpRequest()))
                     .build();
 
@@ -64,15 +59,16 @@ public class LogServiceImpl implements LogService {
         try {
             Pageable pageable = PageRequest.of(page, size);
 
-            return logRepository.searchLogs(
-                    level,
-                    action,
-                    startDate,
-                    endDate,
-                    caseNumber,
-                    username,
-                    pageable
-            );
+//            return logRepository.searchLogs(
+//                    level,
+//                    action,
+//                    startDate,
+//                    endDate,
+//                    caseNumber,
+//                    username,
+//                    pageable
+//            );
+            return null;
         } catch (Exception e) {
             log.error("Failed to search logs: {}", e.getMessage(), e);
             throw new RuntimeException("Failed to search logs", e);

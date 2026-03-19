@@ -138,4 +138,21 @@ public class Case {
         this.figurants.remove(figurant);
         figurant.setCaseEntity(null);
     }
+
+    public void removeAllAttachedFiles() {
+        this.files.clear();
+
+        for (CaseInterrogation interrogation : this.interrogations) {
+
+            if (interrogation.getApplicationFiles() != null) {
+                interrogation.getApplicationFiles().clear();
+            }
+
+            if (interrogation.getOtherAudios() != null) {
+                interrogation.getOtherAudios().clear();
+            }
+        }
+
+        log.debug("Removed all attached files from case {}", this.number);
+    }
 }

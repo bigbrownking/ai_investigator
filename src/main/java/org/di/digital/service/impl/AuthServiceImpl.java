@@ -75,7 +75,7 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(request.getEmail())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-      String rawPassword = rsaDecryptor.decrypt(request.getPassword());
+        String rawPassword = rsaDecryptor.decrypt(request.getPassword());
 
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new RuntimeException("Invalid credentials");
@@ -84,6 +84,13 @@ public class AuthServiceImpl implements AuthService {
         String token = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
         String refreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());
 
+        logService.log(
+                String.format("User logged in %s user", request.getEmail()),
+                LogLevel.INFO,
+                LogAction.LOGIN,
+                null,
+                user.getEmail()
+        );
         return JwtResponse.builder()
                 .token(token)
                 .refreshToken(refreshToken)

@@ -50,6 +50,9 @@ public class User {
     @Column(name = "region")
     private String region;
 
+    @Column(name = "street")
+    private String street;
+
     @NotBlank
     private String password;
 

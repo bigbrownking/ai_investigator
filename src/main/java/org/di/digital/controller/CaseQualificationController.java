@@ -49,7 +49,7 @@ public class CaseQualificationController {
 
         log.info("Streaming qualification for workspace: {} by user: {}",
                 caseNumber, authentication.getName());
-        return qualificationService.generateQualification(caseNumber);
+        return qualificationService.generateQualification(caseNumber, authentication.getName());
     }
 
 
@@ -76,7 +76,7 @@ public class CaseQualificationController {
         log.info("Downloading qualification for case: {} by user: {}",
                 caseNumber, authentication.getName());
 
-        Resource resource = qualificationService.downloadQualificationAsWord(caseNumber);
+        Resource resource = qualificationService.downloadQualificationAsWord(caseNumber, authentication.getName());
 
         String filename = String.format("Qualification_%s.docx", caseNumber.replace("/", "-"));
 

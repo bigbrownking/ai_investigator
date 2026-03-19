@@ -36,6 +36,7 @@ public class CaseInterrogationController {
             @PathVariable Long caseId,
             @RequestParam(required = false, defaultValue = "Все") String role,
             @RequestParam(required = false) String fio,
+            @RequestParam(required = false) Boolean isDop,
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
             Authentication authentication
     ) {
@@ -43,7 +44,7 @@ public class CaseInterrogationController {
                 caseId, role, fio, date);
 
         List<CaseInterrogationResponse> interrogations = caseInterrogationService.searchInterrogations(
-                caseId, role, fio, date, authentication.getName()
+                caseId, role, fio, isDop, date, authentication.getName()
         );
 
         return ResponseEntity.ok(interrogations);
@@ -179,11 +180,11 @@ public class CaseInterrogationController {
     public ResponseEntity<Void> controlTimer(
             @PathVariable Long caseId,
             @PathVariable Long interrogationId,
-            @RequestBody TimerActionRequest request,
+            @RequestParam String action,
             Authentication authentication
     ) {
 
-        caseInterrogationService.controlTimer(caseId, interrogationId, request.getAction(), authentication.getName());
+        caseInterrogationService.controlTimer(caseId, interrogationId, action, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 

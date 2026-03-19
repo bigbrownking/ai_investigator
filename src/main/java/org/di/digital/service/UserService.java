@@ -8,4 +8,5 @@ public interface UserService {
     UserProfile updateUserSettings(String email, UserSettingsRequest request);
     UserProfile updateProfession(String email, String profession);
     UserProfile updateRegion(String email, String region);
+    UserProfile updateStreet(String email, String region);
 }

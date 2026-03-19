@@ -26,7 +26,7 @@ public class CaseFile {
     private LocalDateTime uploadedAt;
     private LocalDateTime completedAt;
     private boolean isQualification;
-    //private int tom;
+    private Integer tom;
 
     @Enumerated(EnumType.STRING)
     private CaseFileStatusEnum status;

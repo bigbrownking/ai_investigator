@@ -59,6 +59,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
         validateAccess(caseEntity, user);
 
+        String caseNumber = caseEntity.getNumber();
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
                 .findFirst()
@@ -81,10 +82,11 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         final Long messageId = chatMessageRepository.save(assistantMessage).getId();
 
         logService.log(
-                String.format("New interrogation chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseEntity.getNumber()),
+                String.format("New interrogation chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseNumber),
                 LogLevel.INFO,
                 LogAction.CHAT_MESSAGE,
-                caseId
+                caseNumber,
+                userEmail
         );
         streamingService.stream(
                 interrogationQuestionsUrl(pythonHost, interrogationChatPort, caseEntity.getNumber()),
@@ -136,6 +138,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
         validateAccess(caseEntity, user);
 
+        String caseNumber = caseEntity.getNumber();
         CaseInterrogationChat chat = interrogationChatRepository.findByInterrogationId(interrogationId)
                 .orElseThrow(() -> new RuntimeException("Chat not found for interrogation: " + interrogationId));
 
@@ -144,10 +147,11 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         interrogationChatRepository.save(chat);
 
         logService.log(
-                String.format("Cleared interrogation chat by %s user to case %s", userEmail, caseEntity.getNumber()),
+                String.format("Cleared interrogation chat by %s user to case %s", userEmail, caseNumber),
                 LogLevel.INFO,
                 LogAction.CHAT_CLEAR,
-                caseId
+                caseNumber,
+                userEmail
         );
         log.info("Cleared chat history for interrogation {}", interrogationId);
     }

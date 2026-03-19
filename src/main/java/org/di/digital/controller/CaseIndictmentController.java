@@ -49,7 +49,7 @@ public class CaseIndictmentController {
 
         log.info("Streaming qualification for workspace: {} by user: {}",
                 caseNumber, authentication.getName());
-        return indictmentService.generateIndictment(caseNumber);
+        return indictmentService.generateIndictment(caseNumber, authentication.getName());
     }
 
 
@@ -76,7 +76,7 @@ public class CaseIndictmentController {
         log.info("Downloading qualification for case: {} by user: {}",
                 caseNumber, authentication.getName());
 
-        Resource resource = indictmentService.downloadIndictmentAsWord(caseNumber);
+        Resource resource = indictmentService.downloadIndictmentAsWord(caseNumber, authentication.getName());
 
         String filename = String.format("Indictment_%s.docx", caseNumber.replace("/", "-"));
 

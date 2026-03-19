@@ -4,12 +4,14 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.Case;
+import org.di.digital.model.User;
 import org.di.digital.model.enums.CaseActivityType;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.repository.CaseRepository;
+import org.di.digital.repository.UserRepository;
 import org.di.digital.service.*;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -37,6 +39,7 @@ public class IndictmentServiceImpl implements IndictmentService {
     private final CaseService caseService;
     private final StreamingService streamingService;
     private final LogService logService;
+    private final UserRepository userRepository;
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -47,15 +50,18 @@ public class IndictmentServiceImpl implements IndictmentService {
     private String pythonPort;
 
     @Override
-    public SseEmitter generateIndictment(String caseNumber) {
+    public SseEmitter generateIndictment(String caseNumber, String email) {
         SseEmitter emitter = new SseEmitter(0L);
-        executor.execute(() -> streamIndictment(caseNumber, emitter));
+        executor.execute(() -> streamIndictment(caseNumber, emitter, email));
         return emitter;
     }
 
-    private void streamIndictment(String caseNumber, SseEmitter emitter) {
+    private void streamIndictment(String caseNumber, SseEmitter emitter, String email) {
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = "Qualification must be uploaded before generating indictment for case: " + caseNumber;
@@ -75,7 +81,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         }
         streamingService.stream(
                 indictmentUrl(pythonHost, pythonPort),
-                indictmentBody(caseNumber, entity.getQualificationsUploaded()),
+                indictmentBody(caseNumber, entity.getQualificationsUploaded(), user.getId()),
                 emitter,
                 this::extractChunk,
                 fullText -> {
@@ -84,6 +90,13 @@ public class IndictmentServiceImpl implements IndictmentService {
                     log.info("Indictment streaming completed for case {}", caseNumber);
                 },
                 error -> log.error("Indictment streaming error for case {}", caseNumber, error)
+        );
+        logService.log(
+                String.format("Getting case indictment by %s user in case %s", email, caseNumber),
+                LogLevel.INFO,
+                LogAction.INDICTMENT,
+                caseNumber,
+                email
         );
     }
 
@@ -105,8 +118,15 @@ public class IndictmentServiceImpl implements IndictmentService {
     }
 
     @Override
-    public Resource downloadIndictmentAsWord(String caseNumber) {
+    public Resource downloadIndictmentAsWord(String caseNumber, String userEmail) {
         try {
+            logService.log(
+                    String.format("Downloading indictment by %s user in case %s", userEmail, caseNumber),
+                    LogLevel.INFO,
+                    LogAction.INDICTMENT_DOWNLOAD,
+                    caseNumber,
+                    userEmail
+            );
             return new ByteArrayResource(
                     wordDocumentService.generateIndictmentDocument(getIndictment(caseNumber))
             );

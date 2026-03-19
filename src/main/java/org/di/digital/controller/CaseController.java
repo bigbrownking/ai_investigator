@@ -36,6 +36,7 @@ public class CaseController {
             @RequestParam("number") String number,
             @RequestParam(value = "description", required = false) String description,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
+            @RequestParam("tom") int tom,
             Authentication authentication
     ) {
         log.info("Creating case with title: {} and number: {} for user: {}",
@@ -46,6 +47,7 @@ public class CaseController {
                 .number(number)
                 .description(description)
                 .files(files)
+                .tom(tom)
                 .build();
 
         CaseResponse response = caseService.createCase(request, authentication.getName());
@@ -78,6 +80,7 @@ public class CaseController {
             @PathVariable Long caseId,
             @RequestParam("files") List<MultipartFile> files,
             @RequestParam("type") String type,
+            @RequestParam("tom") int tom,
             Authentication authentication
     ) {
         FileType fileType;
@@ -95,7 +98,8 @@ public class CaseController {
             return ResponseEntity.badRequest().build();
         }
 
-        List<CaseFileResponse> response = caseService.addFilesToCase(caseId, files, fileType, authentication.getName());
+        List<CaseFileResponse> response = caseService.addFilesToCase(caseId, files,
+                fileType, tom, authentication.getName());
         return ResponseEntity.ok(response);
     }
 
@@ -124,6 +128,25 @@ public class CaseController {
         caseService.deleteFileFromCase(caseId, fileName, authentication.getName());
         return ResponseEntity.ok().build();
     }
+
+    @DeleteMapping("/{caseId}/files/all")
+    public ResponseEntity<Void> deleteAllFilesFromCase(
+            @PathVariable Long caseId,
+            Authentication authentication
+    ) {
+        caseService.deleteAllFiles(caseId, authentication.getName());
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/{caseId}")
+    public ResponseEntity<Void> deleteCase(
+            @PathVariable Long caseId,
+            Authentication authentication
+    ) {
+        caseService.deleteCaseById(caseId, authentication.getName());
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/{caseId}/files/download")
     public ResponseEntity<InputStreamResource> downloadFile(
             @PathVariable Long caseId,

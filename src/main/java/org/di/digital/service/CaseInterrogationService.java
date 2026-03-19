@@ -14,7 +14,7 @@ public interface CaseInterrogationService {
 
     void deleteInterrogation(Long caseId, Long interrogationId, String email);
 
-    List<CaseInterrogationResponse> searchInterrogations(Long caseId, String role, String fio, LocalDate date, String email);
+    List<CaseInterrogationResponse> searchInterrogations(Long caseId, String role, String fio, Boolean isDop, LocalDate date, String email);
 
     void updateProtocolField(Long caseId, Long interrogationId, UpdateProtocolFieldRequest request, String email);
     void updateOtherField(Long caseId, Long interrogationId, UpdateProtocolFieldRequest request,  String email);

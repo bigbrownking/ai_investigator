@@ -2,6 +2,9 @@ package org.di.digital.service.impl;
 
 import io.minio.*;
 import io.minio.http.Method;
+import io.minio.messages.DeleteError;
+import io.minio.messages.DeleteObject;
+import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.CaseFile;
@@ -13,9 +16,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.io.InputStream;
 import java.time.LocalDateTime;
-import java.util.HashMap;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.TimeUnit;
 
 @Slf4j
@@ -224,7 +225,46 @@ public class MinioService {
             log.error("Error deleting file from Minio: {}", e.getMessage(), e);
         }
     }
+    public void deleteAllFilesFromCase(String caseNumber) {
+        try {
+            String basePrefix = caseNumber + "/";
 
+            Iterable<Result<Item>> results = minioClient.listObjects(
+                    ListObjectsArgs.builder()
+                            .bucket(bucketName)
+                            .prefix(basePrefix)
+                            .recursive(true)
+                            .build()
+            );
+
+            List<DeleteObject> objectsToDelete = new ArrayList<>();
+
+            for (Result<Item> result : results) {
+                Item item = result.get();
+                String objectName = item.objectName();
+
+                objectsToDelete.add(new DeleteObject(objectName));
+            }
+
+            if (!objectsToDelete.isEmpty()) {
+                Iterable<Result<DeleteError>> errors = minioClient.removeObjects(
+                        RemoveObjectsArgs.builder()
+                                .bucket(bucketName)
+                                .objects(objectsToDelete)
+                                .build()
+                );
+
+                for (Result<DeleteError> error : errors) {
+                    log.warn("Delete error: {}", error.get().message());
+                }
+            }
+
+            log.info("✅ Deleted ALL {} files for case: {}", objectsToDelete.size(), caseNumber);
+        } catch (Exception e) {
+            log.error("❌ Error deleting files for case: {}", caseNumber, e);
+            throw new RuntimeException("Failed to delete files", e);
+        }
+    }
     private String extractObjectNameFromUrl(String fileUrl) {
         return fileUrl.substring(fileUrl.indexOf(bucketName) + bucketName.length() + 1);
     }

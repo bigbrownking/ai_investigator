@@ -191,6 +191,7 @@ public class TaskQueueService {
         taskQueueRepository.deleteByCaseFileId(caseFileId);
     }
 
+    public void deleteTasksByCaseId(Long caseId){ taskQueueRepository.deleteByCaseId(caseId);}
     public List<TaskQueue> getUserTasks(String userEmail) {
         return taskQueueRepository.findByUserEmailAndStatus(userEmail, TaskStatus.PENDING);
     }

@@ -112,10 +112,11 @@ public class ChatServiceImpl implements ChatService {
         ChatRequest enhancedRequest = buildRequestWithHistory(chat, request);
 
         logService.log(
-                String.format("New chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseEntity.getNumber()),
+                String.format("New chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseNumber),
                 LogLevel.INFO,
                 LogAction.CHAT_MESSAGE,
-                caseEntity.getId()
+                caseNumber,
+                userEmail
         );
         streamingService.streamRaw(
                 qualificationChatUrl(pythonHost, qualificationPort, caseNumber),
@@ -166,10 +167,11 @@ public class ChatServiceImpl implements ChatService {
         validateUserAccess(caseEntity, user);
         clearChatHistory(caseEntity.getId(), user.getId());
         logService.log(
-                String.format("Cleared chat by %s user to case %s", userEmail, caseEntity.getNumber()),
+                String.format("Cleared chat by %s user to case %s", userEmail, caseNumber),
                 LogLevel.INFO,
                 LogAction.CHAT_CLEAR,
-                caseEntity.getId()
+                caseNumber,
+                userEmail
         );
     }
 

@@ -48,6 +48,7 @@ public class CaseServiceImpl implements CaseService {
     private final TaskQueueService taskQueueService;
     private final LogService logService;
     private final Mapper mapper;
+    private final CaseFileRepository caseFileRepository;
 
     @Value("${qualification.model.host}")
     private String pythonHost;
@@ -65,6 +66,8 @@ public class CaseServiceImpl implements CaseService {
             throw new RuntimeException("Case already exists, please inform the case creator.");
         }
 
+        int tom = request.getTom();
+        String caseNumber = request.getNumber();
         Case newCase = Case.builder()
                 .title(request.getTitle())
                 .number(request.getNumber())
@@ -83,6 +86,7 @@ public class CaseServiceImpl implements CaseService {
                 if (!file.isEmpty()) {
                     CaseFile caseFile = minioService.uploadFile(file, request.getNumber());
                     caseFile.addCaseEntity(savedCase);
+                    caseFile.setTom(tom);
                 }
             }
         }
@@ -103,12 +107,13 @@ public class CaseServiceImpl implements CaseService {
 
         log.info("Case created with id: {} for user: {}", savedCase.getId(), email);
 
-//        logService.log(
-//                String.format("Case %s created by user %s", savedCase.getNumber(), email),
-//                LogLevel.INFO,
-//                LogAction.CASE_CREATED,
-//                savedCase
-//        );
+        logService.log(
+                String.format("Case %s created by user %s",caseNumber, email),
+                LogLevel.INFO,
+                LogAction.CASE_CREATED,
+                caseNumber,
+                email
+        );
 
         return mapper.mapToCaseResponse(savedCase);
     }
@@ -154,6 +159,7 @@ public class CaseServiceImpl implements CaseService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found"));
 
+        String caseNumber = caseEntity.getNumber();
         if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
             throw new RuntimeException("Access denied: User doesn't have access to this case");
         }
@@ -167,61 +173,65 @@ public class CaseServiceImpl implements CaseService {
 
         log.info("Case {} status updated to {}", caseId, status);
         logService.log(
-                String.format("Case %s status updated to %s by user %s", caseEntity.getNumber(), status, email),
+                String.format("Case %s status updated to %s by user %s", caseNumber, status, email),
                 LogLevel.INFO,
                 LogAction.CASE_STATUS_CHANGED,
-                caseId
+                caseNumber,
+                email
         );
     }
 
     @Transactional
-    public List<CaseFileResponse> addFilesToCase(Long caseId, List<MultipartFile> files, FileType type, String email) {
+    public List<CaseFileResponse> addFilesToCase(Long caseId, List<MultipartFile> files,
+                                                 FileType type, int tom, String email) {
+        if (files == null || files.isEmpty()) {
+            return Collections.emptyList();
+        }
+
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("user not found: " + email));
 
         if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
             throw new AccessDeniedException("Access denied to case: " + caseId);
         }
 
-        List<String> uploadedStoredNames = new ArrayList<>();
-        int addedFilesCount = 0;
+
+        String caseNumber = caseEntity.getNumber();
         boolean isQualification = type == FileType.QUALIFICATION;
 
+        Set<String> existingFileNames = caseEntity.getFiles().stream()
+                .map(CaseFile::getOriginalFileName)
+                .collect(Collectors.toSet());
+
+        List<CaseFile> uploadedFiles = new ArrayList<>();
+
         for (MultipartFile file : files) {
-            if (!file.isEmpty()) {
-                try {
-                    boolean fileExists = caseEntity.getFiles().stream()
-                            .anyMatch(f -> f.getOriginalFileName().equals(file.getOriginalFilename()));
+            if (file.isEmpty()) continue;
 
-                    if (fileExists) {
-                        log.warn("File already exists: {} in case: {}", file.getOriginalFilename(), caseId);
-                        continue;
-                    }
+            String originalName = file.getOriginalFilename();
 
-                    CaseFile caseFile = minioService.uploadFile(file, caseEntity.getNumber());
-                    caseFile.addCaseEntity(caseEntity);
-                    caseFile.setQualification(isQualification);
+            if (existingFileNames.contains(originalName)) {
+                log.warn("File already exists: {} in case: {}", originalName, caseId);
+                continue;
+            }
 
-                    uploadedStoredNames.add(caseFile.getStoredFileName());
-                    addedFilesCount++;
-
-                } catch (Exception e) {
-                    log.error("Failed to upload file: {} to case: {}", file.getOriginalFilename(), caseId, e);
-                    throw new RuntimeException("Failed to upload file: " + file.getOriginalFilename(), e);
-                }
+            try {
+                CaseFile caseFile = minioService.uploadFile(file, caseEntity.getNumber());
+                caseFile.addCaseEntity(caseEntity);
+                caseFile.setQualification(isQualification);
+                caseFile.setTom(tom);
+                caseFile.setStatus(CaseFileStatusEnum.QUEUED);
+                uploadedFiles.add(caseFile);
+            } catch (Exception e) {
+                log.error("Failed to upload file: {} to case: {}", originalName, caseId, e);
             }
         }
+        List<CaseFile> savedFiles = caseFileRepository.saveAllAndFlush(uploadedFiles);
 
-        caseRepository.flush();
-
-        List<CaseFile> newlyUploadedFiles = caseEntity.getFiles().stream()
-                .filter(f -> uploadedStoredNames.contains(f.getStoredFileName()))
-                .toList();
-
-        for (CaseFile caseFile : newlyUploadedFiles) {
+        savedFiles.forEach(caseFile -> {
             taskQueueService.addTaskToQueue(
                     email,
                     caseEntity.getId(),
@@ -230,17 +240,23 @@ public class CaseServiceImpl implements CaseService {
                     caseFile.getFileUrl(),
                     caseFile.getId()
             );
-            caseFile.setStatus(CaseFileStatusEnum.QUEUED);
-        }
+        });
 
-        log.info("Added {} files to case: {}", addedFilesCount, caseId);
+        log.info("Added {}/{} files to case: {}", uploadedFiles.size(), files.size(), caseId);
 
-        return newlyUploadedFiles.stream()
+        logService.log(
+                String.format("Uploading files by %s user in case %s", email, caseNumber),
+                LogLevel.INFO,
+                LogAction.FILE_UPLOAD,
+                caseNumber,
+                email
+        );
+        return savedFiles.stream()
                 .map(mapper::mapToCaseFileResponse)
                 .toList();
     }
     @Transactional
-        public void deleteFileFromCase(Long caseId, String fileName, String email) {
+    public void deleteFileFromCase(Long caseId, String fileName, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
@@ -248,6 +264,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
+        String caseNumber = caseEntity.getNumber();
         if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
             throw new AccessDeniedException("Access denied to case: " + caseId);
         }
@@ -261,18 +278,19 @@ public class CaseServiceImpl implements CaseService {
             deleteFileFromWorkspace(caseEntity.getNumber(), fileName);
 
             minioService.deleteFile(fileToDelete.getFileUrl());
-            caseEntity.getFiles().remove(fileToDelete);
 
             taskQueueService.deleteTask(fileToDelete.getId());
-            
+
+            caseEntity.getFiles().remove(fileToDelete);
             caseRepository.save(caseEntity);
             log.info("Deleted file: {} from case: {}", fileName, caseId);
 
             logService.log(
-                    String.format("Deleted %d file from case %s", fileToDelete.getId(), caseEntity.getNumber()),
+                    String.format("Deleted %d file from case %s", fileToDelete.getId(), caseNumber),
                     LogLevel.INFO,
                     LogAction.FILE_DELETE,
-                    caseId
+                    caseNumber,
+                    email
             );
 
         } catch (Exception e) {
@@ -300,6 +318,26 @@ public class CaseServiceImpl implements CaseService {
             log.warn("⚠️ Failed to delete file from workspace (continuing anyway): {}", e.getMessage());
         }
     }
+    private void deleteAllFilesFromWorkspace(String caseNumber) {
+        String url = String.format("http://%s:%s/workspaces/%s",
+                pythonHost, pythonPort, caseNumber);
+
+        log.info("🗑️ Deleting all files from workspace: {}", url);
+
+        try {
+            webClientBuilder.build()
+                    .delete()
+                    .uri(url)
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            log.info("✅ Files deleted from workspace");
+
+        } catch (Exception e) {
+            log.warn("⚠️ Failed to delete file from workspace (continuing anyway): {}", e.getMessage());
+        }
+    }
     @Transactional(readOnly = true)
     public InputStreamResource downloadFile(Long caseId, String originalFileName, String email) {
         Case caseEntity = caseRepository.findById(caseId)
@@ -312,16 +350,18 @@ public class CaseServiceImpl implements CaseService {
             throw new AccessDeniedException("Access denied");
         }
 
+        String caseNumber = caseEntity.getNumber();
         CaseFile caseFile = caseEntity.getFiles().stream()
                 .filter(f -> f.getOriginalFileName().equals(originalFileName))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("File not found: " + originalFileName));
 
         logService.log(
-                String.format("Downloaded %d file from case %s", caseFile.getId(), caseEntity.getNumber()),
+                String.format("Downloaded %d file from case %s", caseFile.getId(), caseNumber),
                 LogLevel.INFO,
                 LogAction.FILE_DOWNLOAD,
-                caseId
+                caseNumber,
+                email
         );
         InputStream inputStream = minioService.downloadFile(caseFile.getFileUrl());
         return new InputStreamResource(inputStream);
@@ -347,16 +387,18 @@ public class CaseServiceImpl implements CaseService {
             throw new IllegalStateException("User is already added to this case");
         }
 
+        String caseNumber = caseEntity.getNumber();
         caseEntity.addUser(userToAdd);
         Case savedCase = caseRepository.save(caseEntity);
 
         log.info("User {} added to case {} by {}", userEmailToAdd, caseId, currentUserEmail);
 
         logService.log(
-                String.format("Added %s user to case %s", userEmailToAdd, caseEntity.getNumber()),
+                String.format("Added %s user to case %s", userEmailToAdd, caseNumber),
                 LogLevel.INFO,
                 LogAction.USER_ADD,
-                caseId
+                caseNumber,
+                currentUserEmail
         );
         return mapper.mapToCaseUserResponse(userToAdd, savedCase);
     }
@@ -425,15 +467,17 @@ public class CaseServiceImpl implements CaseService {
         if (!caseEntity.hasUser(userToRemove)) {
             throw new IllegalStateException("User is not a member of this case");
         }
+        String caseNumber = caseEntity.getNumber();
 
         caseEntity.removeUser(userToRemove);
         caseRepository.save(caseEntity);
 
         logService.log(
-                String.format("Removed %s user to case %s", userToRemove, caseEntity.getNumber()),
+                String.format("Removed %s user to case %s", userToRemove, caseNumber),
                 LogLevel.INFO,
                 LogAction.USER_DELETE,
-                caseId
+                caseNumber,
+                currentUserEmail
         );
         log.info("User {} removed from case {} by {}", userToRemove.getEmail(), caseId, currentUserEmail);
     }
@@ -534,5 +578,62 @@ public class CaseServiceImpl implements CaseService {
                 .filter(f -> number.equals(f.getNumber()) && documentType.equals(f.getDocumentType()))
                 .findFirst()
                 .map(mapper::mapToFigurantResponse);
+    }
+
+    @Override
+    public void deleteAllFiles(Long caseId, String currentUserEmail) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+
+        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
+            throw new AccessDeniedException("You don't have permission to view users of this case");
+        }
+        String caseNumber = caseEntity.getNumber();
+        try {
+            deleteAllFilesFromWorkspace(caseEntity.getNumber());
+
+            minioService.deleteAllFilesFromCase(caseEntity.getNumber());
+
+            taskQueueService.deleteTasksByCaseId(caseId);
+
+            caseEntity.removeAllAttachedFiles();
+            caseRepository.save(caseEntity);
+            log.info("Deleted all files from case: {}", caseId);
+
+            logService.log(
+                    String.format("Deleted all files from case %s", caseNumber),
+                    LogLevel.INFO,
+                    LogAction.FILE_DELETE,
+                    caseNumber,
+                    currentUserEmail
+            );
+
+        } catch (Exception e) {
+            log.error("Failed to delete all files from case: {}", caseId, e);
+            throw new RuntimeException("Failed to delete all files: ", e);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void deleteCaseById(Long caseId, String currentUserEmail) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found"));
+
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("User not found"));
+
+        if (!caseEntity.isOwner(currentUser)) {
+            throw new AccessDeniedException("Only owner can delete case");
+        }
+
+        deleteAllFiles(caseId, currentUserEmail);
+
+        caseRepository.delete(caseEntity);
+
+        log.info("Case {} deleted", caseId);
     }
 }

@@ -51,6 +51,11 @@ public class CaseInterrogation {
     private String investigator;
     private String investigatorProfession;
     private String investigatorRegion;
+    private String personYear;
+    private String personTranslator;
+    private String personSpecialist;
+
+    private Boolean isDop;
 
     @Column(name = "started_at")
     private LocalDateTime startedAt;
@@ -65,8 +70,11 @@ public class CaseInterrogation {
     @Builder.Default
     private Long accumulatedSeconds = 0L;
 
+    @Column(name = "is_paused")
+    @Builder.Default
+    private Boolean isPaused = false;
+
     @OneToMany(mappedBy = "interrogation", cascade = CascadeType.ALL, orphanRemoval = true)
-    @OrderBy("startedAt ASC")
     @Builder.Default
     private List<InterrogationTimerSession> timerSessions = new ArrayList<>();
 

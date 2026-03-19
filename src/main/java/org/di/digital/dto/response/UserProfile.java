@@ -18,6 +18,7 @@ public class UserProfile {
     private String role;
     private String profession;
     private String region;
+    private String street;
     private UserSettingsDto settings;
     private int createdCaseCount;
     private boolean active;

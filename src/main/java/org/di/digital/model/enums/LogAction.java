@@ -14,10 +14,14 @@ public enum LogAction {
     CHAT_MESSAGE("Chat Message"),
     CHAT_CLEAR("Chat Clear"),
     FILE_DOWNLOAD("File Download"),
+    QUALIFICATION("Qualification"),
+    INDICTMENT("Indictment"),
     QUALIFICATION_DOWNLOAD("Qualification Download"),
     INDICTMENT_DOWNLOAD("Indictment Download"),
     INTERROGATION_DOWNLOAD("Interrogation Download"),
-    INTERROGATION_ADDED("Interrogation Added");
+    INTERROGATION_ADDED("Interrogation Added"),
+    INTERROGATION_DELETED("Interrogation Deleted"),
+    INTERROGATION_COMPLETED("Interrogation Completed");
 
     private final String description;
 

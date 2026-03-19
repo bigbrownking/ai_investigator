@@ -1,4 +1,4 @@
-package org.di.digital.config;
+package org.di.digital.config.websocket;
 
 import lombok.RequiredArgsConstructor;
 import org.di.digital.config.websocket.UserPrincipalHandler;

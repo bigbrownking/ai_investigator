@@ -22,6 +22,7 @@ public class Mapper {
                 .role(interrogation.getRole())
                 .date(String.valueOf(interrogation.getDate()))
                 .status(interrogation.getStatus().name())
+                .isDop(interrogation.getIsDop())
                 .build();
     }
     public CaseInterrogationQAResponse mapToInterrogationQAResponse(CaseInterrogationQA caseInterrogationQA){
@@ -123,6 +124,7 @@ public class Mapper {
                 .email(user.getEmail())
                 .active(user.isActive())
                 .settings(settingsDto)
+                .street(user.getStreet())
                 .createdCaseCount(user.getCases() != null ? user.getCases().size() : 0)
                 .build();
     }
@@ -145,6 +147,14 @@ public class Mapper {
         String region = interrogation.getInvestigatorRegion() != null
                 ? interrogation.getInvestigatorRegion()
                 : user.getRegion();
+
+        String street = interrogation.getAddrezz() != null
+                ? interrogation.getAddrezz()
+                : user.getStreet();
+        String city = interrogation.getCity() != null
+                ? interrogation.getCity()
+                : "г. Астана";
+
         CaseInterrogationProtocolResponse protocolResponse = null;
         if (interrogation.getProtocol() != null) {
             protocolResponse = mapToInterrogationProtocolResponse(interrogation.getProtocol());
@@ -176,7 +186,11 @@ public class Mapper {
         return CaseInterrogationFullResponse.builder()
                 .id(interrogation.getId())
                 .room(interrogation.getRoom())
-                .addrezz(interrogation.getAddrezz())
+                .city(city)
+                .personYear(interrogation.getPersonYear())
+                .personSpecialist(interrogation.getPersonSpecialist())
+                .personTranslator(interrogation.getPersonTranslator())
+                .addrezz(street)
                 .notificationNumber(interrogation.getNotificationNumber())
                 .notificationDate(interrogation.getNotificationDate())
                 .state(interrogation.getState())
@@ -208,6 +222,7 @@ public class Mapper {
                 .timerSessions(timerSessions)
                 .qaList(qaList)
                 .applications(applicationFiles)
+                .isDop(interrogation.getIsDop())
                 .build();
     }
 
@@ -222,6 +237,7 @@ public class Mapper {
                 .downloadUrl(minioService.generatePresignedUrlForDownload(f.getFileUrl(), f.getOriginalFileName()))
                 .uploadedAt(String.valueOf(f.getUploadedAt()))
                 .isQualification(f.isQualification())
+                .tom(f.getTom())
                 .build();
     }
 

@@ -1,4 +1,4 @@
-package org.di.digital.config;
+package org.di.digital.config.db;
 
 import io.minio.MinioClient;
 import org.springframework.beans.factory.annotation.Value;
