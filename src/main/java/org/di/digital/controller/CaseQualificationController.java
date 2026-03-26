@@ -37,7 +37,7 @@ public class CaseQualificationController {
             content = @Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE)
     )
     @GetMapping(value = "/qualification/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    public SseEmitter streamQualification(@RequestParam(defaultValue = "245500121000001-216") String caseNumber,
+    public SseEmitter streamQualification(@RequestParam String caseNumber,
                                           Authentication authentication) {
 
         if (authentication == null || !authentication.isAuthenticated()) {

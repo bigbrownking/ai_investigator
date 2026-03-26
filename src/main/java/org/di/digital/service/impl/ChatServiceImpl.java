@@ -2,6 +2,7 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.constants.MessageConstant;
 import org.di.digital.dto.request.ChatRequest;
 import org.di.digital.dto.response.CaseChatHistoryResponse;
 import org.di.digital.dto.response.CaseChatMessageDto;
@@ -19,17 +20,18 @@ import org.di.digital.service.LogService;
 import org.di.digital.service.StreamingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
 import static org.di.digital.util.RequestBodyBuilder.generalChatBody;
 import static org.di.digital.util.UrlBuilder.generalChatUrl;
 import static org.di.digital.util.UrlBuilder.qualificationChatUrl;
+import static org.di.digital.util.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -95,6 +97,21 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
         validateUserAccess(caseEntity, user);
 
+        if (!caseEntity.isAtLeastOneFileProcessed()) {
+            String message = MessageConstant.NO_FILE_PROCESSED.format(caseNumber);
+            log.warn(message);
+            try {
+                emitter.send(SseEmitter.event()
+                        .name("error")
+                        .data(message));
+                emitter.complete();
+            } catch (IOException e) {
+                log.error("Failed to send error event", e);
+                emitter.completeWithError(e);
+            }
+            return;
+        }
+
         CaseChat chat = getOrCreateChatForCaseAndUser(caseEntity.getId(), user.getId());
 
         CaseChatMessage userMessage = CaseChatMessage.builder()
@@ -111,13 +128,6 @@ public class ChatServiceImpl implements ChatService {
 
         ChatRequest enhancedRequest = buildRequestWithHistory(chat, request);
 
-        logService.log(
-                String.format("New chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseNumber),
-                LogLevel.INFO,
-                LogAction.CHAT_MESSAGE,
-                caseNumber,
-                userEmail
-        );
         streamingService.streamRaw(
                 qualificationChatUrl(pythonHost, qualificationPort, caseNumber),
                 enhancedRequest,
@@ -131,6 +141,13 @@ public class ChatServiceImpl implements ChatService {
                     log.error("Case chat streaming error for case {}: ", caseNumber, error);
                     updateAssistantMessage(messageId, "[Error: " + error.getMessage() + "]");
                 }
+        );
+        logService.log(
+                String.format("New chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseNumber),
+                LogLevel.INFO,
+                LogAction.CHAT_MESSAGE,
+                caseNumber,
+                userEmail
         );
     }
     @Transactional(readOnly = true)
@@ -214,12 +231,5 @@ public class ChatServiceImpl implements ChatService {
                 chat.getId(), PageRequest.of(0, maxContextMessages));
         Collections.reverse(recentMessages);
         return ChatRequest.builder().question(request.getQuestion()).stream(request.getStream()).build();
-    }
-
-    private void validateUserAccess(Case caseEntity, User user) {
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            log.warn("Access denied: User {} tried to access case {} chat", user.getEmail(), caseEntity.getNumber());
-            throw new AccessDeniedException("You don't have permission to access this case's chat");
-        }
     }
 }

@@ -10,6 +10,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.CaseFile;
 import org.di.digital.model.CaseInterrogationApplicationFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.service.MinioService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
@@ -22,7 +23,7 @@ import java.util.concurrent.TimeUnit;
 @Slf4j
 @Service
 @RequiredArgsConstructor
-public class MinioService {
+public class MinioServiceImpl implements MinioService {
 
     private final MinioClient minioClient;
 

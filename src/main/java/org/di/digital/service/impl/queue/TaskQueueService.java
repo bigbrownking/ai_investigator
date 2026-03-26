@@ -140,14 +140,15 @@ public class TaskQueueService {
         return null;
     }
 
-    public void completeTask(Long caseFileId) {
+    public void completeTask(Long caseFileId, Long processingDurationSeconds) {
         List<TaskQueue> tasks = taskQueueRepository
-                .findByCaseFileIdAndStatus(caseFileId, TaskStatus.PROCESSING); // ← фильтр по статусу
+                .findByCaseFileIdAndStatus(caseFileId, TaskStatus.PROCESSING);
 
         if (!tasks.isEmpty()) {
             TaskQueue task = tasks.get(0);
             task.setStatus(TaskStatus.COMPLETED);
             task.setCompletedAt(LocalDateTime.now());
+            task.setProcessingDurationSeconds(processingDurationSeconds);
             taskQueueRepository.save(task);
             log.info("Task {} completed for caseFile {}", task.getId(), caseFileId);
         } else {

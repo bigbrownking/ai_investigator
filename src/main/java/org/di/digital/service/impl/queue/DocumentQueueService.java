@@ -3,7 +3,6 @@ package org.di.digital.service.impl.queue;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.config.RabbitMQConfig;
 import org.di.digital.dto.message.DocumentProcessingMessage;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;

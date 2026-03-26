@@ -16,6 +16,7 @@ public enum LogAction {
     FILE_DOWNLOAD("File Download"),
     QUALIFICATION("Qualification"),
     INDICTMENT("Indictment"),
+    INDICTMENT_FINAL("Indictment Final"),
     QUALIFICATION_DOWNLOAD("Qualification Download"),
     INDICTMENT_DOWNLOAD("Indictment Download"),
     INTERROGATION_DOWNLOAD("Interrogation Download"),

@@ -28,6 +28,7 @@ import java.util.List;
 
 import static org.di.digital.util.RequestBodyBuilder.interrogationBody;
 import static org.di.digital.util.UrlBuilder.interrogationQuestionsUrl;
+import static org.di.digital.util.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -57,7 +58,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
-        validateAccess(caseEntity, user);
+        validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
@@ -80,14 +81,6 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .content("").complete(false).build();
         chat.addMessage(assistantMessage);
         final Long messageId = chatMessageRepository.save(assistantMessage).getId();
-
-        logService.log(
-                String.format("New interrogation chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseNumber),
-                LogLevel.INFO,
-                LogAction.CHAT_MESSAGE,
-                caseNumber,
-                userEmail
-        );
         streamingService.stream(
                 interrogationQuestionsUrl(pythonHost, interrogationChatPort, caseEntity.getNumber()),
                 interrogationBody(interrogation.getFio(), interrogation.getRole(),
@@ -104,6 +97,13 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                     updateAssistantMessage(messageId, "[Error: " + error.getMessage() + "]");
                 }
         );
+        logService.log(
+                String.format("New interrogation chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseNumber),
+                LogLevel.INFO,
+                LogAction.CHAT_MESSAGE,
+                caseNumber,
+                userEmail
+        );
     }
     @Override
     @Transactional(readOnly = true)
@@ -113,7 +113,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
-        validateAccess(caseEntity, user);
+        validateUserAccess(caseEntity, user);
 
         CaseInterrogationChat chat = interrogationChatRepository.findByInterrogationId(interrogationId).orElse(null);
         if (chat == null) return CaseChatHistoryResponse.builder().messages(List.of()).totalMessages(0).build();
@@ -136,7 +136,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
-        validateAccess(caseEntity, user);
+        validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
         CaseInterrogationChat chat = interrogationChatRepository.findByInterrogationId(interrogationId)
@@ -188,11 +188,5 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
             }
         } catch (Exception ignored) {}
         return chunk;
-    }
-
-    private void validateAccess(Case caseEntity, User user) {
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseEntity.getId());
-        }
     }
 }

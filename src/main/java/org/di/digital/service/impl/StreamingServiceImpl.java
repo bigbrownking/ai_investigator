@@ -19,7 +19,7 @@ public class StreamingServiceImpl implements StreamingService {
 
     private final WebClient.Builder webClientBuilder;
 
-    private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(5);
+    private static final Duration DEFAULT_TIMEOUT = Duration.ofMinutes(20);
 
     @Override
     public void stream(

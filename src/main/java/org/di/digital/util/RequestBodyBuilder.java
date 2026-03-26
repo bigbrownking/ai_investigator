@@ -21,13 +21,14 @@ public class RequestBodyBuilder {
         return body;
     }
 
-    public static Map<String, Object> indictmentBody(String caseNumber, List<String> qualoNames, long userId) {
+    public static Map<String, Object> indictmentBody(String caseNumber, List<String> qualoNames, long userId, boolean isDone) {
         Map<String, Object> body = new HashMap<>();
         body.put("working_dir", caseNumber);
         body.put("mode", "hybrid");
         body.put("qual_name", qualoNames);
         body.put("stream", false);
-       // body.put("user_id", userId);
+        body.put("user_id", userId);
+        body.put("is_done", isDone);
         return body;
     }
 

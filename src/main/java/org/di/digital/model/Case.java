@@ -3,6 +3,8 @@ package org.di.digital.model;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.enums.CaseInterrogationStatusEnum;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -57,6 +59,7 @@ public class Case {
     @Column(columnDefinition = "TEXT")
     private String indictment;
 
+    private Boolean isFinalIndictmentDone;
     @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(
@@ -155,4 +158,9 @@ public class Case {
 
         log.debug("Removed all attached files from case {}", this.number);
     }
+    public boolean isAtLeastOneFileProcessed() {
+        return files.stream()
+                .anyMatch(f -> CaseFileStatusEnum.COMPLETED.equals(f.getStatus()));
+    }
+
 }

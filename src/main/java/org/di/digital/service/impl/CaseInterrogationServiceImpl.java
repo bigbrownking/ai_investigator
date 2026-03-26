@@ -2,6 +2,7 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.constants.MessageConstant;
 import org.di.digital.dto.message.AudioProcessingMessage;
 import org.di.digital.dto.request.AddInterrogationRequest;
 import org.di.digital.dto.request.EditAudioTranscribedTextRequest;
@@ -17,10 +18,10 @@ import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseInterrogationService;
 import org.di.digital.service.FLService;
 import org.di.digital.service.LogService;
+import org.di.digital.service.MinioService;
 import org.di.digital.service.impl.queue.AudioQueueService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -30,6 +31,9 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static org.di.digital.util.UserUtil.validateUserAccess;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -52,9 +56,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(caseEntity, user);
 
         return caseEntity.getInterrogations().stream()
                 .filter(i -> role.equals("Все") || (i.getRole() != null && i.getRole().equalsIgnoreCase(role)))
@@ -73,8 +75,13 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
+        validateUserAccess(caseEntity, user);
+
+        if (!caseEntity.isAtLeastOneFileProcessed()) {
+            throw new IllegalStateException(MessageConstant.NO_FILE_PROCESSED.format(caseEntity.getNumber()));}
+
+        if(caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()){
+            throw new IllegalStateException(MessageConstant.CANNOT_CREATE_INTERROGATION.format(caseEntity.getNumber()));
         }
 
         String caseNumber = caseEntity.getNumber();
@@ -152,9 +159,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
@@ -253,9 +258,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
@@ -317,9 +320,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
@@ -376,9 +377,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!interrogation.getCaseEntity().isOwner(user) && !interrogation.getCaseEntity().hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new RuntimeException("Interrogation does not belong to case: " + caseId);
@@ -411,9 +410,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
@@ -440,9 +437,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!interrogation.getCaseEntity().isOwner(user) && !interrogation.getCaseEntity().hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new RuntimeException("Interrogation does not belong to case: " + caseId);
@@ -459,9 +454,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!interrogation.getCaseEntity().isOwner(user) && !interrogation.getCaseEntity().hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new RuntimeException("Interrogation does not belong to case: " + caseId);
@@ -522,9 +515,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!interrogation.getCaseEntity().isOwner(user) && !interrogation.getCaseEntity().hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new RuntimeException("Interrogation does not belong to case: " + caseId);
@@ -605,9 +596,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
         Case caseEntity = interrogation.getCaseEntity();
 
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
 
@@ -700,9 +689,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!interrogation.getCaseEntity().isOwner(user) && !interrogation.getCaseEntity().hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(interrogation.getCaseEntity(), user);
 
         CaseInterrogationApplicationFile file = interrogation.getApplicationFiles().stream()
                 .filter(f -> f.getId().equals(fileId))

@@ -3,7 +3,7 @@ package org.di.digital.util;
 import lombok.RequiredArgsConstructor;
 import org.di.digital.dto.response.*;
 import org.di.digital.model.*;
-import org.di.digital.service.impl.MinioService;
+import org.di.digital.service.MinioService;
 import org.springframework.stereotype.Component;
 
 import java.util.List;

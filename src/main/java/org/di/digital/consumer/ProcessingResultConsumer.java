@@ -60,7 +60,10 @@ public class ProcessingResultConsumer {
     }
 
     private void handleCompletion(ProcessingResultMessage message) {
-        CaseFile caseFile = caseFileService.markAsCompleted(message.getCaseFileId(), message.getResult());
+        CaseFile caseFile = caseFileService.markAsCompleted(
+                message.getCaseFileId(),
+                message.getResult(),
+                message.getProcessingDurationSeconds());
 
         // Send case-level notification
         notificationService.notifyFileProcessingCompleted(

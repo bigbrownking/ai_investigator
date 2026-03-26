@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.AddInterrogationRequest;
 import org.di.digital.dto.request.EditAudioTranscribedTextRequest;
-import org.di.digital.dto.request.TimerActionRequest;
 import org.di.digital.dto.request.UpdateProtocolFieldRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.service.CaseInterrogationService;

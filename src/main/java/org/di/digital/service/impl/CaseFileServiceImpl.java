@@ -19,7 +19,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     private final TaskQueueService taskQueueService;
 
     @Override
-    public CaseFile markAsCompleted(Long caseFileId, String result) {
+    public CaseFile markAsCompleted(Long caseFileId, String result, Long processingDurationSeconds) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
                 .orElseThrow(() -> new RuntimeException("File not found: " + caseFileId));
 
@@ -28,7 +28,7 @@ public class CaseFileServiceImpl implements CaseFileService {
 
         caseFileRepository.save(caseFile);
 
-        taskQueueService.completeTask(caseFileId);
+        taskQueueService.completeTask(caseFileId, processingDurationSeconds);
 
         log.info("File {} marked as COMPLETED", caseFileId);
         return caseFile;

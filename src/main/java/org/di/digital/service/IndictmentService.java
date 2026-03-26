@@ -7,4 +7,5 @@ public interface IndictmentService {
     SseEmitter generateIndictment(String caseNumber, String email);
     Resource downloadIndictmentAsWord(String caseNumber, String email);
     String getIndictment(String caseNumber);
+    SseEmitter completeIndictment(String caseNumber, String email);
 }

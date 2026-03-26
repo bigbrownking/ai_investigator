@@ -2,6 +2,7 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.constants.MessageConstant;
 import org.di.digital.dto.request.AddFigurantToCaseRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
 import org.di.digital.dto.request.FileType;
@@ -19,6 +20,7 @@ import org.di.digital.repository.FigurantRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseService;
 import org.di.digital.service.LogService;
+import org.di.digital.service.MinioService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
 import org.springframework.beans.factory.annotation.Value;
@@ -35,6 +37,8 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static org.di.digital.util.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -126,9 +130,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + id);
-        }
+        validateUserAccess(caseEntity, user);
 
         return mapper.mapToCaseResponse(caseEntity);
     }
@@ -160,9 +162,7 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new RuntimeException("Case not found"));
 
         String caseNumber = caseEntity.getNumber();
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new RuntimeException("Access denied: User doesn't have access to this case");
-        }
+        validateUserAccess(caseEntity, user);
 
         if (!caseEntity.isOwner(user)) {
             throw new RuntimeException("Access denied: Only case owner can change status");
@@ -194,10 +194,12 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("user not found: " + email));
 
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(caseEntity, user);
 
+
+        if(caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()){
+            throw new IllegalStateException(MessageConstant.CANNOT_UPLOAD_FILE.format(caseEntity.getNumber()));
+        }
 
         String caseNumber = caseEntity.getNumber();
         boolean isQualification = type == FileType.QUALIFICATION;
@@ -260,22 +262,26 @@ public class CaseServiceImpl implements CaseService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
-
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
         String caseNumber = caseEntity.getNumber();
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
-        }
+        validateUserAccess(caseEntity, user);
 
         CaseFile fileToDelete = caseEntity.getFiles().stream()
                 .filter(f -> f.getOriginalFileName().equals(fileName))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("File not found: " + fileName));
 
+        if(CaseFileStatusEnum.PROCESSING.equals(fileToDelete.getStatus())){
+            String message = MessageConstant.CANNOT_DELETE_FILE.format(caseNumber);
+            log.warn(message);
+            throw new IllegalStateException(message);
+        }
         try {
-            deleteFileFromWorkspace(caseEntity.getNumber(), fileName);
+            if(CaseFileStatusEnum.COMPLETED.equals(fileToDelete.getStatus())){
+                deleteFileFromWorkspace(caseEntity.getNumber(), fileName);
+            }
 
             minioService.deleteFile(fileToDelete.getFileUrl());
 
@@ -346,9 +352,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            throw new AccessDeniedException("Access denied");
-        }
+        validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
         CaseFile caseFile = caseEntity.getFiles().stream()
@@ -376,9 +380,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
-            throw new AccessDeniedException("You don't have permission to add users to this case");
-        }
+        validateUserAccess(caseEntity, currentUser);
 
         User userToAdd = userRepository.findByEmail(userEmailToAdd)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmailToAdd));
@@ -412,9 +414,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
-            throw new AccessDeniedException("You don't have permission to add users to this case");
-        }
+        validateUserAccess(caseEntity, currentUser);
 
         boolean alreadyExists = caseEntity.getFigurants().stream()
                 .anyMatch(f -> f.getFio().equals(request.getFio())
@@ -453,9 +453,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        if (!caseEntity.isOwner(currentUser)) {
-            throw new AccessDeniedException("Only the case owner can remove users");
-        }
+        validateUserAccess(caseEntity, currentUser);
 
         User userToRemove = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
@@ -491,9 +489,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
-            throw new AccessDeniedException("You don't have permission to remove figurants from this case");
-        }
+        validateUserAccess(caseEntity, currentUser);
 
         Figurant figurant = caseEntity.getFigurants().stream()
                 .filter(f -> f.getId().equals(figurantId))
@@ -515,9 +511,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
-            throw new AccessDeniedException("You don't have permission to view users of this case");
-        }
+        validateUserAccess(caseEntity, currentUser);
 
         return caseEntity.getUsers().stream()
                 .map(user -> mapper.mapToCaseUserResponse(user, caseEntity))
@@ -532,9 +526,8 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
-            throw new AccessDeniedException("You don't have permission to view users of this case");
-        }
+        validateUserAccess(caseEntity, currentUser);
+
         return caseEntity.getFigurants().stream()
                 .map(mapper::mapToFigurantResponse)
                 .collect(Collectors.toList());
@@ -588,9 +581,8 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        if (!caseEntity.isOwner(currentUser) && !caseEntity.hasUser(currentUser)) {
-            throw new AccessDeniedException("You don't have permission to view users of this case");
-        }
+        validateUserAccess(caseEntity, currentUser);
+
         String caseNumber = caseEntity.getNumber();
         try {
             deleteAllFilesFromWorkspace(caseEntity.getNumber());
@@ -626,9 +618,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
-        if (!caseEntity.isOwner(currentUser)) {
-            throw new AccessDeniedException("Only owner can delete case");
-        }
+        validateUserAccess(caseEntity, currentUser);
 
         deleteAllFiles(caseId, currentUserEmail);
 

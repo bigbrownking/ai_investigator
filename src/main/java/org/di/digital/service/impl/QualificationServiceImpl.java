@@ -3,6 +3,7 @@ package org.di.digital.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.constants.MessageConstant;
 import org.di.digital.model.Case;
 import org.di.digital.model.enums.CaseActivityType;
 import org.di.digital.model.enums.LogAction;
@@ -13,9 +14,12 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
+import java.time.LocalDateTime;
 import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
@@ -46,11 +50,28 @@ public class QualificationServiceImpl implements QualificationService {
     @Override
     public SseEmitter generateQualification(String caseNumber, String email) {
         SseEmitter emitter = new SseEmitter(0L);
-        executor.execute(() -> streamQualification(caseNumber, emitter, email));
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        executor.execute(() -> {
+            RequestContextHolder.setRequestAttributes(requestAttributes);
+            try {
+                streamQualification(caseNumber, emitter, email);
+            } finally {
+                RequestContextHolder.resetRequestAttributes();
+            }
+        });
         return emitter;
     }
 
     private void streamQualification(String caseNumber, SseEmitter emitter, String userEmail) {
+
+        Case entity = caseRepository.findByNumber(caseNumber)
+                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
+        if (!entity.isAtLeastOneFileProcessed()) {
+            String message = MessageConstant.NO_FILE_PROCESSED.format(caseNumber);
+            log.warn(message);
+            emitter.completeWithError(new IllegalStateException(message));
+            return;
+        }
         streamingService.stream(
                 qualificationUrl(pythonHost, pythonPort, caseNumber),
                 List.of(),
@@ -85,6 +106,7 @@ public class QualificationServiceImpl implements QualificationService {
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
         entity.setQualification(text);
+        entity.setQualificationGeneratedAt(LocalDateTime.now());
         caseRepository.save(entity);
     }
 

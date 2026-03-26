@@ -38,4 +38,5 @@ public class TaskQueue {
     private LocalDateTime lastHeartbeatAt;
 
     private String errorMessage;
+    private Long processingDurationSeconds;
 }
