@@ -15,7 +15,6 @@ public class CaseResponse {
     private Long id;
     private String title;
     private String number;
-    private String description;
     private boolean status;
 
     private List<CaseUserResponse> users;

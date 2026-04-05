@@ -1,10 +1,12 @@
 package org.di.digital.util;
 
 import lombok.experimental.UtilityClass;
+import org.di.digital.model.CaseInterrogationQA;
 
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 @UtilityClass
 public class RequestBodyBuilder {
@@ -33,12 +35,15 @@ public class RequestBodyBuilder {
     }
 
 
-    public static Map<String, Object> interrogationBody(String fio, String role, String question, String answer) {
-        String lastQuestion = String.format("Вопрос: %s\\nОтвет: %s", question, answer);
+    public static Map<String, Object> interrogationBody(String fio, String role, List<CaseInterrogationQA> qaList) {
+        String prior_qa_text = qaList == null || qaList.isEmpty() ? "" :
+                qaList.stream()
+                        .map(qa -> "Вопрос: " + qa.getQuestion() + " Ответ: " + qa.getAnswer())
+                        .collect(Collectors.joining("\n"));
         Map<String, Object> body = new HashMap<>();
         body.put("fio", fio);
         body.put("role", role);
-        body.put("last_question", lastQuestion);
+        body.put("prior_qa_text", prior_qa_text);
         return body;
     }
 }

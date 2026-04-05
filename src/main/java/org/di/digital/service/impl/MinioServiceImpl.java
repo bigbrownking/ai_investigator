@@ -141,6 +141,58 @@ public class MinioServiceImpl implements MinioService {
             throw new RuntimeException("Failed to upload audio file", e);
         }
     }
+    public String uploadPlan(MultipartFile file, String folder) {
+        try {
+            ensureBucketExists();
+
+            String storedFileName = generateFileName(file.getOriginalFilename());
+            String objectName = folder + "/plan/components/" + storedFileName;
+
+            try (InputStream inputStream = file.getInputStream()) {
+                minioClient.putObject(
+                        PutObjectArgs.builder()
+                                .bucket(bucketName)
+                                .object(objectName)
+                                .stream(inputStream, file.getSize(), -1)
+                                .contentType(file.getContentType())
+                                .build()
+                );
+            }
+
+            String objectPath = bucketName + "/" + objectName;
+            log.info("Plan file uploaded for case: {}, path: {}", folder, objectPath);
+            return objectPath;
+
+        } catch (Exception e) {
+            log.error("Error uploading plan file: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload plan file", e);
+        }
+    }
+    public String uploadPlanBytes(byte[] bytes, String folder, String filename) {
+        try {
+            ensureBucketExists();
+
+            String storedFileName = generateFileName(filename);
+            String objectName = folder + "/plan/" + storedFileName;
+
+            minioClient.putObject(
+                    PutObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .stream(new java.io.ByteArrayInputStream(bytes), bytes.length, -1)
+                            .contentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                            .build()
+            );
+
+            String objectPath = bucketName + "/" + objectName;
+            log.info("Plan uploaded successfully for case: {}, path: {}", folder, objectPath);
+            return objectPath;
+
+        } catch (Exception e) {
+            log.error("Error uploading plan bytes: {}", e.getMessage(), e);
+            throw new RuntimeException("Failed to upload plan", e);
+        }
+    }
 
     public String generatePresignedUrlForPreview(String objectPath) {
         try {

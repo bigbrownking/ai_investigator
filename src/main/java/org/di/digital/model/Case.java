@@ -33,8 +33,6 @@ public class Case {
 
     private String number;
 
-    private String description;
-
     @Builder.Default
     private boolean status = true;
 

@@ -37,13 +37,22 @@ public class Mapper {
     }
 
     public CaseInterrogationProtocolResponse mapToInterrogationProtocolResponse(CaseInterrogationProtocol protocol) {
+        List<EducationResponse> educations = protocol.getEducations() != null
+                ? protocol.getEducations().stream()
+                .map(e -> EducationResponse.builder()
+                        .id(e.getId())
+                        .type(e.getType())
+                        .edu(e.getEdu())
+                        .build())
+                .toList()
+                : List.of();
         return CaseInterrogationProtocolResponse.builder()
                 .fio(protocol.getFio())
                 .dateOfBirth(protocol.getDateOfBirth())
                 .birthPlace(protocol.getBirthPlace())
                 .citizenship(protocol.getCitizenship())
                 .nationality(protocol.getNationality())
-                .education(protocol.getEducation())
+                .educations(educations)
                 .martialStatus(protocol.getMartialStatus())
                 .workOrStudyPlace(protocol.getWorkOrStudyPlace())
                 .position(protocol.getPosition())
@@ -65,7 +74,6 @@ public class Mapper {
                 .id(caseEntity.getId())
                 .title(caseEntity.getTitle())
                 .number(caseEntity.getNumber())
-                .description(caseEntity.getDescription())
                 .status(caseEntity.isStatus())
                 .files(caseEntity.getFiles().stream()
                         .map(this::mapToCaseFileResponse)
@@ -183,6 +191,7 @@ public class Mapper {
                     .map(this::mapToApplicationFileResponse)
                     .toList();
         }
+        String caseNumber = interrogation.getCaseEntity().getNumber();
         return CaseInterrogationFullResponse.builder()
                 .id(interrogation.getId())
                 .room(interrogation.getRoom())
@@ -195,6 +204,7 @@ public class Mapper {
                 .notificationDate(interrogation.getNotificationDate())
                 .state(interrogation.getState())
                 .caseNumberState(interrogation.getCaseNumberState())
+                .caseNumber(caseNumber)
                 .number(interrogation.getNumber())
                 .documentType(interrogation.getDocumentType())
                 .fio(interrogation.getFio())
@@ -237,6 +247,8 @@ public class Mapper {
                 .downloadUrl(minioService.generatePresignedUrlForDownload(f.getFileUrl(), f.getOriginalFileName()))
                 .uploadedAt(String.valueOf(f.getUploadedAt()))
                 .isQualification(f.isQualification())
+                .isPlan(f.isPlan())
+                .isPlanComponent(f.isPlanComponent())
                 .tom(f.getTom())
                 .build();
     }
@@ -251,6 +263,17 @@ public class Mapper {
                 .contentType(file.getContentType())
                 .fileSize(file.getFileSize())
                 .uploadedAt(String.valueOf(file.getUploadedAt()))
+                .build();
+    }
+
+    public QAResponse mapToQAResponse(CaseInterrogationQA caseInterrogationQA){
+        return QAResponse.builder()
+                .id(caseInterrogationQA.getId())
+                .question(caseInterrogationQA.getQuestion())
+                .answer(caseInterrogationQA.getAnswer())
+                .orderIndex(caseInterrogationQA.getOrderIndex())
+                .edited(caseInterrogationQA.getIsEdited())
+                .status(caseInterrogationQA.getStatus())
                 .build();
     }
 }

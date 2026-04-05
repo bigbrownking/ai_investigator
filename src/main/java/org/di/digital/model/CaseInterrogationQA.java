@@ -27,7 +27,7 @@ public class CaseInterrogationQA {
     @Column(columnDefinition = "TEXT")
     private String audioFileUrl;
 
-    private Boolean freeStory;
+    private Boolean isEdited;
 
     @Enumerated(EnumType.STRING)
     private QAStatusEnum status;

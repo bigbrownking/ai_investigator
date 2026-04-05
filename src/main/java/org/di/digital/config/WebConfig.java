@@ -106,12 +106,12 @@ public class WebConfig {
     public WebClient.Builder webClientBuilder() {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
-                .responseTimeout(Duration.ofMinutes(5));
+                .responseTimeout(Duration.ofMinutes(30));
 
         return WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(httpClient))
                 .codecs(configurer -> configurer
                         .defaultCodecs()
-                        .maxInMemorySize(16 * 1024 * 1024));
+                        .maxInMemorySize(50 * 1024 * 1024));
     }
 }

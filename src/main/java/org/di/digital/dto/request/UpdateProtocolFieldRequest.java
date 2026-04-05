@@ -12,4 +12,8 @@ import lombok.Setter;
 public class UpdateProtocolFieldRequest {
     private String field;
     private String value;
+
+    private Long educationId;
+    private String educationType;
+    private String educationEdu;
 }

@@ -12,9 +12,7 @@ import org.di.digital.model.*;
 import org.di.digital.model.enums.*;
 import org.di.digital.model.fl.FLAddress;
 import org.di.digital.model.fl.FLRecord;
-import org.di.digital.repository.CaseInterrogationRepository;
-import org.di.digital.repository.CaseRepository;
-import org.di.digital.repository.UserRepository;
+import org.di.digital.repository.*;
 import org.di.digital.service.CaseInterrogationService;
 import org.di.digital.service.FLService;
 import org.di.digital.service.LogService;
@@ -40,6 +38,8 @@ import static org.di.digital.util.UserUtil.validateUserAccess;
 public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final CaseRepository caseRepository;
     private final CaseInterrogationRepository caseInterrogationRepository;
+    private final CaseInterrogationEducationRepository caseInterrogationEducationRepository;
+    private final InterrogationChatRepository interrogationChatRepository;
     private final UserRepository userRepository;
     private final MinioService minioService;
     private final AudioQueueService audioQueueService;
@@ -198,7 +198,23 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             case "birthPlace"     -> protocol.setBirthPlace(request.getValue());
             case "citizenship"    -> protocol.setCitizenship(request.getValue());
             case "nationality"    -> protocol.setNationality(request.getValue());
-            case "education"      -> protocol.setEducation(request.getValue());
+            case "education" -> {
+                CaseInterrogationEducation education;
+                Long eduId = request.getEducationId();
+                if (eduId != null) {
+                    education = caseInterrogationEducationRepository.findById(eduId)
+                            .orElseThrow(() -> new RuntimeException("Education not found: " + eduId));
+                    education.setEdu(request.getEducationEdu());
+                    education.setType(request.getEducationType());
+                } else {
+                    education = CaseInterrogationEducation.builder()
+                            .type(request.getEducationType())
+                            .edu(request.getEducationEdu())
+                            .protocol(protocol)
+                            .build();
+                    protocol.getEducations().add(education);
+                }
+            }
             case "martialStatus"  -> protocol.setMartialStatus(request.getValue());
             case "workOrStudyPlace"-> protocol.setWorkOrStudyPlace(request.getValue());
             case "position"       -> protocol.setPosition(request.getValue());
@@ -250,7 +266,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         }
     }
     @Transactional
-    public QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question, Boolean freeStory,
+    public QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question,
                                             MultipartFile file, String language, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
@@ -274,7 +290,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .audioFileUrl(audioUrl)
                 .status(QAStatusEnum.TRANSCRIBING)
                 .orderIndex(orderIndex)
-                .freeStory(freeStory)
+                .isEdited(false)
                 .createdAt(LocalDateTime.now())
                 .interrogation(interrogation)
                 .build();
@@ -304,7 +320,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .question(question)
                 .answer(null)
                 .orderIndex(orderIndex)
-                .freeStory(freeStory)
+                .edited(false)
                 .status(QAStatusEnum.TRANSCRIBING)
                 .build();
     }
@@ -389,6 +405,13 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .orElseThrow(() -> new RuntimeException("QA not found: " + request.getQaId()));
 
         qa.setAnswer(request.getAnswer());
+
+        boolean assistantReplied = interrogationChatRepository.findByInterrogationId(interrogationId)
+                .map(chat -> chat.getMessages().stream()
+                        .anyMatch(m -> m.getRole() == MessageRole.ASSISTANT && m.isComplete()))
+                .orElse(false);
+        qa.setIsEdited(assistantReplied);
+
         qa.setStatus(QAStatusEnum.TRANSCRIBED);
         caseInterrogationRepository.save(interrogation);
 
@@ -398,7 +421,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .answer(qa.getAnswer())
                 .orderIndex(qa.getOrderIndex())
                 .status(qa.getStatus())
-                .freeStory(false)
+                .edited(true)
                 .build();
     }
 
@@ -418,13 +441,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
 
         return interrogation.getQaList().stream()
-                .map(qa -> QAResponse.builder()
-                        .id(qa.getId())
-                        .question(qa.getQuestion())
-                        .answer(qa.getAnswer())
-                        .orderIndex(qa.getOrderIndex())
-                        .status(qa.getStatus())
-                        .build())
+                .map(mapper::mapToQAResponse)
                 .collect(Collectors.toList());
     }
 

@@ -14,6 +14,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
+import java.time.temporal.ChronoUnit;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -24,14 +27,13 @@ public class RoundRobinScheduler {
     private final CaseFileRepository caseFileRepository;
     private final NotificationService notificationService;
 
-    @Scheduled(fixedDelay = 1, timeUnit = java.util.concurrent.TimeUnit.MINUTES)
+    @Scheduled(fixedDelayString = "${scheduler.round-robin.delay-seconds}", timeUnit = java.util.concurrent.TimeUnit.SECONDS)
     @Transactional
     public void processTasksRoundRobin() {
         long processingCount = taskQueueService.getProcessingTasksCount();
-//        if (processingCount > 0) {
-//            log.info("Waiting for {} task(s) to finish processing", processingCount);
-//            return;
-//        }
+        if (processingCount > 0) {
+            return;
+        }
         TaskQueue task = taskQueueService.getNextTaskByRoundRobin();
 
         if (task != null) {

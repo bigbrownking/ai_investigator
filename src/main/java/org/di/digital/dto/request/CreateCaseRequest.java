@@ -13,7 +13,6 @@ import java.util.List;
 public class CreateCaseRequest {
     private String title;
     private String number;
-    private String description;
     private int tom;
     private List<MultipartFile> files;
 }

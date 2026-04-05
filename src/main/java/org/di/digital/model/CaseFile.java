@@ -27,6 +27,8 @@ public class CaseFile {
     private LocalDateTime completedAt;
     private boolean isQualification;
     private Integer tom;
+    private boolean isPlanComponent;
+    private boolean isPlan;
 
     @Enumerated(EnumType.STRING)
     private CaseFileStatusEnum status;

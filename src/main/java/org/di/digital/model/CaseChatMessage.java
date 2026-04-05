@@ -38,7 +38,7 @@ public class CaseChatMessage {
     @Column(nullable = false, columnDefinition = "TEXT")
     private String content;
 
-    private Boolean freeStory;
+    private Boolean isEdited;
 
     @CreatedDate
     @Column(name = "created_date", updatable = false)

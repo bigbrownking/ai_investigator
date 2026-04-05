@@ -123,14 +123,13 @@ public class CaseInterrogationController {
             @PathVariable Long caseId,
             @PathVariable Long interrogationId,
             @RequestParam String question,
-            @RequestParam(required = false) Boolean freeStory,
             @RequestParam("file") MultipartFile file,
             @RequestParam(defaultValue = "ru") String language,
             Authentication authentication
     ) {
         log.info("Uploading audio for interrogation: {}, case: {}", interrogationId, caseId);
         QAResponse response = caseInterrogationService.uploadAudioAndEnqueue(
-                caseId, interrogationId, question, freeStory, file, language, authentication.getName()
+                caseId, interrogationId, question, file, language, authentication.getName()
         );
         return ResponseEntity.accepted().body(response);
     }

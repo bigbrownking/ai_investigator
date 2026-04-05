@@ -15,6 +15,6 @@ public class QAResponse {
     private String question;
     private String answer;
     private int orderIndex;
-    private Boolean freeStory;
+    private Boolean edited;
     private QAStatusEnum status;
 }

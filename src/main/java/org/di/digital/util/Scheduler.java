@@ -2,7 +2,7 @@ package org.di.digital.util;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.TaskStatus;
+import org.di.digital.model.enums.TaskStatus;
 import org.di.digital.repository.TaskQueueRepository;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;

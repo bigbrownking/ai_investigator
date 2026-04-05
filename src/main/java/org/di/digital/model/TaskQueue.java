@@ -1,10 +1,10 @@
 package org.di.digital.model;
 
 import lombok.*;
+import org.di.digital.model.enums.TaskStatus;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;
-import org.springframework.data.mongodb.core.mapping.Field;
 
 import java.time.LocalDateTime;
 

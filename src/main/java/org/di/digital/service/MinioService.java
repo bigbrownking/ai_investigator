@@ -10,6 +10,8 @@ public interface MinioService {
     CaseFile uploadFile(MultipartFile file, String folder);
     CaseInterrogationApplicationFile uploadApplicationFile(MultipartFile file, String folder, String fio);
     String uploadAudio(MultipartFile file, String folder, String fio);
+    String uploadPlan(MultipartFile file, String folder);
+    String uploadPlanBytes(byte[] bytes, String folder, String filename);
     String generatePresignedUrlForPreview(String objectPath);
     String generatePresignedUrlForDownload(String objectPath, String fileName);
     void deleteFile(String objectPath);

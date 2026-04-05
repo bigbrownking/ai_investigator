@@ -18,7 +18,7 @@ public interface CaseInterrogationService {
 
     void updateProtocolField(Long caseId, Long interrogationId, UpdateProtocolFieldRequest request, String email);
     void updateOtherField(Long caseId, Long interrogationId, UpdateProtocolFieldRequest request,  String email);
-    QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question, Boolean freeStory, MultipartFile file, String language, String email);
+    QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question, MultipartFile file, String language, String email);
     OtherAudioResponse uploadOtherAudioAndEnqueue(Long caseId, Long interrogationId, String fieldName, MultipartFile file, String language, String email);
     QAResponse editTranscribedText(Long caseId, Long interrogationId, EditAudioTranscribedTextRequest request, String email);
     List<QAResponse> getQAList(Long caseId, Long interrogationId, String email);

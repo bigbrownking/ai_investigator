@@ -2,6 +2,8 @@ package org.di.digital.dto.response;
 
 import lombok.*;
 
+import java.util.List;
+
 @Getter
 @Setter
 @Builder
@@ -14,7 +16,7 @@ public class CaseInterrogationProtocolResponse {
     private String birthPlace;
     private String citizenship;
     private String nationality;
-    private String education;
+    private List<EducationResponse> educations;
     private String martialStatus;
     private String workOrStudyPlace;
     private String position;

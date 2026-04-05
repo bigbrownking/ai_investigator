@@ -31,4 +31,8 @@ public class UrlBuilder {
     public static String generalChatUrl(String host, String port) {
         return buildUrl(host, port, "/v1/chat/completions");
     }
+
+    public static String planGeneratorUrl(String host, String port) {
+        return buildUrl(host, port, "/api/generate_plan");
+    }
 }

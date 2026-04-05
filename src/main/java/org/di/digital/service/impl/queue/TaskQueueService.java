@@ -4,10 +4,9 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
-import org.di.digital.config.RabbitMQConfig;
 import org.di.digital.model.QueueState;
 import org.di.digital.model.TaskQueue;
-import org.di.digital.model.TaskStatus;
+import org.di.digital.model.enums.TaskStatus;
 import org.di.digital.repository.QueueStateRepository;
 import org.di.digital.repository.TaskQueueRepository;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
@@ -22,6 +21,7 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -35,13 +35,17 @@ public class TaskQueueService {
 
     @Value("${spring.rabbitmq.mediator.queue}")
     public String DOCUMENT_QUEUE;
+    private static final Set<String> EXCLUDED_CASE_NUMBERS = Set.of(
+            "240000121000034",
+            "250000121000008"
+   );
     private static final String ROUND_ROBIN_STATE_ID = "round_robin_state";
 
     @PostConstruct
     public void resetStuckTasks() {
         Query query = new Query();
         query.addCriteria(Criteria.where("status").is(TaskStatus.PROCESSING)
-                .and("sentToQueueAt").lt(LocalDateTime.now().minusMinutes(5)));
+                .and("sentToQueueAt").lt(LocalDateTime.now()));
         List<TaskQueue> stuckTasks = mongoTemplate.find(query, TaskQueue.class);
 
         if (!stuckTasks.isEmpty()) {
@@ -59,6 +63,11 @@ public class TaskQueueService {
 
     public void addTaskToQueue(String userEmail, Long caseId, String caseNumber,
                                String fileName, String fileUrl, Long caseFileId) {
+        if (EXCLUDED_CASE_NUMBERS.contains(caseNumber)) {
+            log.info("Skipping task for excluded caseNumber {}", caseNumber);
+            return;
+        }
+
         boolean exists = taskQueueRepository
                 .existsByCaseFileIdAndStatusIn(
                         caseFileId,
@@ -158,7 +167,10 @@ public class TaskQueueService {
 
     private List<String> getOrderedUsersWithPendingTasks() {
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(Criteria.where("status").is(TaskStatus.PENDING)),
+                Aggregation.match(
+                        Criteria.where("status").is(TaskStatus.PENDING)
+                                .and("caseNumber").nin(EXCLUDED_CASE_NUMBERS)
+                ),
                 Aggregation.group("userEmail")
                         .min("createdAt").as("firstTaskTime"),
                 Aggregation.sort(Sort.by(Sort.Direction.ASC, "firstTaskTime"))

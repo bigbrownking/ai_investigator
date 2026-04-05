@@ -1136,7 +1136,12 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
         addInlineSignatureLine(doc, roleLabel, fio);
         addEmptyLine(doc);
     }
-
+    private String formatEducations(CaseInterrogationProtocolResponse p) {
+        if (p == null || p.getEducations() == null || p.getEducations().isEmpty()) return "—";
+        return p.getEducations().stream()
+                .map(e -> safe(e.getType()) + (e.getEdu() != null && !e.getEdu().isBlank() ? " (" + e.getEdu() + ")" : ""))
+                .collect(java.util.stream.Collectors.joining(", "));
+    }
     private void addPersonDataTable(XWPFDocument doc, CaseInterrogationFullResponse data) {
         CaseInterrogationProtocolResponse p = data.getProtocol();
         String[][] rows = {
@@ -1145,7 +1150,7 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
                 {"Место рождения:", p != null ? safe(p.getBirthPlace()) : "—"},
                 {"Гражданство:", p != null ? safe(p.getCitizenship()) : "—"},
                 {"Национальность:", p != null ? safe(p.getNationality()) : "—"},
-                {"Образование:", p != null ? safe(p.getEducation()) : "—"},
+                {"Образование:", formatEducations(p)},
                 {"Семейное положение:", p != null ? safe(p.getMartialStatus()) : "—"},
                 {"Место работы или учебы:", p != null ? safe(p.getWorkOrStudyPlace()) : "—"},
                 {"Род занятий или должность:", p != null ? safe(p.getPosition()) : "—"},
@@ -1157,8 +1162,7 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
                 {"Отношение к воинской обязанности:", p != null ? safe(p.getMilitary()) : "—"},
                 {"Наличие судимости:", p != null ? safe(p.getCriminalRecord()) : "—"},
                 {"Паспорт или иной документ, удостоверяющий личность:",
-                        safe(data.getDocumentType()) + " " + safe(data.getNumber()) +
-                                (p != null && p.getIinOrPassport() != null ? " / " + p.getIinOrPassport() : "")},
+                        safe(data.getDocumentType()) + " " + safe(data.getNumber())},
                 {"Применение технических средств аудио/видео фиксации:",
                         p != null ? safe(p.getTechnical()) : "Не применяются"}
         };
@@ -1173,7 +1177,7 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
                 {"Дата рождения:", p != null ? safe(p.getDateOfBirth()) : "—"},
                 {"Место рождения:", p != null ? safe(p.getBirthPlace()) : "—"},
                 {"Национальность:", p != null ? safe(p.getNationality()) : "—"},
-                {"Образование:", p != null ? safe(p.getEducation()) : "—"},
+                {"Образование:", formatEducations(p)},
                 {"Гражданство:", p != null ? safe(p.getCitizenship()) : "—"},
                 {"Семейное положение:", p != null ? safe(p.getMartialStatus()) : "—"},
                 {"Судимость:", p != null ? safe(p.getCriminalRecord()) : "—"},

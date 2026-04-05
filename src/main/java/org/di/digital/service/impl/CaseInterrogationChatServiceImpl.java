@@ -70,21 +70,24 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
 
         CaseChatMessage userMessage = CaseChatMessage.builder()
                 .interrogationChat(chat).role(MessageRole.USER)
-                .freeStory(request.getFreeStory())
+                .isEdited(false)
                 .content(request.getQuestion()).complete(true).build();
         chat.addMessage(userMessage);
         chatMessageRepository.save(userMessage);
 
         CaseChatMessage assistantMessage = CaseChatMessage.builder()
                 .interrogationChat(chat).role(MessageRole.ASSISTANT)
-                .freeStory(request.getFreeStory())
+                .isEdited(false)
                 .content("").complete(false).build();
         chat.addMessage(assistantMessage);
         final Long messageId = chatMessageRepository.save(assistantMessage).getId();
+
+        List<CaseInterrogationQA> qaList = interrogation.getQaList();
+
         streamingService.stream(
                 interrogationQuestionsUrl(pythonHost, interrogationChatPort, caseEntity.getNumber()),
                 interrogationBody(interrogation.getFio(), interrogation.getRole(),
-                        request.getQuestion(), request.getAnswer()),
+                        qaList),
                 emitter,
                 this::extractInterrogationChunk,
                 fullText -> {

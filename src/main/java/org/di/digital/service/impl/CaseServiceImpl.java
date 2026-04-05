@@ -75,7 +75,6 @@ public class CaseServiceImpl implements CaseService {
         Case newCase = Case.builder()
                 .title(request.getTitle())
                 .number(request.getNumber())
-                .description(request.getDescription())
                 .files(new ArrayList<>())
                 .owner(user)
                 .users(new HashSet<>())
@@ -256,6 +255,51 @@ public class CaseServiceImpl implements CaseService {
         return savedFiles.stream()
                 .map(mapper::mapToCaseFileResponse)
                 .toList();
+    }
+    @Transactional
+    public CaseFileResponse addErdrToCase(Long caseId, MultipartFile file, String email) {
+        if (file == null || file.isEmpty()) {
+            return null;
+        }
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        validateUserAccess(caseEntity, user);
+
+        if (caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()) {
+            throw new IllegalStateException(MessageConstant.CANNOT_UPLOAD_FILE.format(caseEntity.getNumber()));
+        }
+
+        String caseNumber = caseEntity.getNumber();
+
+        try {
+            CaseFile caseFile = minioService.uploadFile(file, caseEntity.getNumber());
+            caseFile.addCaseEntity(caseEntity);
+            caseFile.setQualification(false);
+            caseFile.setStatus(CaseFileStatusEnum.COMPLETED);
+
+            CaseFile savedFile = caseFileRepository.saveAndFlush(caseFile);
+
+            log.info("ERDR file uploaded to case: {}", caseId);
+
+            logService.log(
+                    String.format("Uploading ERDR file by %s user in case %s", email, caseNumber),
+                    LogLevel.INFO,
+                    LogAction.FILE_UPLOAD,
+                    caseNumber,
+                    email
+            );
+
+            return mapper.mapToCaseFileResponse(savedFile);
+
+        } catch (Exception e) {
+            log.error("Failed to upload ERDR file to case: {}", caseId, e);
+            throw new RuntimeException("Failed to upload ERDR file", e);
+        }
     }
     @Transactional
     public void deleteFileFromCase(Long caseId, String fileName, String email) {
