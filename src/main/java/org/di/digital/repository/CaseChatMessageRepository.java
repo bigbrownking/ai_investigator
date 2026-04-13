@@ -39,5 +39,5 @@ public interface CaseChatMessageRepository extends JpaRepository<CaseChatMessage
     List<CaseChatMessage> findRecentInterrogationMessages(@Param("chatId") Long chatId, Pageable pageable);
 
     void deleteAllByInterrogationChatId(Long interrogationChatId);
-
+    Page<CaseChatMessage> findByInterrogationChatIdOrderByIdAsc(Long chatId, Pageable pageable);
 }

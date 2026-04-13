@@ -9,6 +9,8 @@ import org.springframework.stereotype.Component;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.di.digital.util.UserUtil.getCurrentUser;
+
 @Component
 @RequiredArgsConstructor
 public class Mapper {
@@ -122,13 +124,14 @@ public class Mapper {
 
         return UserProfile.builder()
                 .id(user.getId())
-                .username(user.getUsername())
+                .iin(user.getIin())
                 .name(user.getName())
                 .surname(user.getSurname())
                 .fathername(user.getFathername())
                 .role(roles)
-                .profession(user.getProfession())
-                .region(user.getRegion())
+                .administration(user.getAdministration() != null ? user.getAdministration().getName() : null)
+                .profession(user.getProfession() != null ? user.getProfession().getName() : null)
+                .region(user.getRegion() != null ? user.getRegion().getName() : null)
                 .email(user.getEmail())
                 .active(user.isActive())
                 .settings(settingsDto)
@@ -148,13 +151,15 @@ public class Mapper {
     }
 
     public CaseInterrogationFullResponse mapToInterrogationFullResponse(CaseInterrogation interrogation, User user) {
+        String userProf = user.getProfession() == null ? null : user.getProfession().getName();
         String profession = interrogation.getInvestigatorProfession() != null
                 ? interrogation.getInvestigatorProfession()
-                : user.getProfession();
+                : userProf;
 
+        String userReg = user.getRegion() == null ? null : user.getRegion().getName();
         String region = interrogation.getInvestigatorRegion() != null
                 ? interrogation.getInvestigatorRegion()
-                : user.getRegion();
+                : userReg;
 
         String street = interrogation.getAddrezz() != null
                 ? interrogation.getAddrezz()
@@ -191,6 +196,10 @@ public class Mapper {
                     .map(this::mapToApplicationFileResponse)
                     .toList();
         }
+        String investigator = interrogation.getInvestigator() != null
+                ? interrogation.getInvestigator()
+                : user.getSurname() + " " + user.getName() + " " + user.getFathername();
+
         String caseNumber = interrogation.getCaseEntity().getNumber();
         return CaseInterrogationFullResponse.builder()
                 .id(interrogation.getId())
@@ -221,7 +230,7 @@ public class Mapper {
                 .additionalInfo(interrogation.getAdditionalInfo())
                 .additionalText(interrogation.getAdditionalText())
                 .application(interrogation.getApplication())
-                .investigator(interrogation.getInvestigator())
+                .investigator(investigator)
                 .investigatorProfession(profession)
                 .investigatorRegion(region)
                 .status(interrogation.getStatus().name())
@@ -274,6 +283,40 @@ public class Mapper {
                 .orderIndex(caseInterrogationQA.getOrderIndex())
                 .edited(caseInterrogationQA.getIsEdited())
                 .status(caseInterrogationQA.getStatus())
+                .build();
+    }
+    public AppealDto toAppealDto(Appeal appeal) {
+        return AppealDto.builder()
+                .id(appeal.getId())
+                .userId(appeal.getUser().getId())
+                .userName(appeal.getUser().getName())
+                .userSurname(appeal.getUser().getSurname())
+                .userEmail(appeal.getUser().getEmail())
+                .regionId(appeal.getRegion() != null ? appeal.getRegion().getId() : null)
+                .regionName(appeal.getRegion() != null ? appeal.getRegion().getName() : null)
+                .status(appeal.getStatus())
+                .createdAt(appeal.getCreatedAt())
+                .reviewedAt(appeal.getReviewedAt())
+                .build();
+    }
+    public ProfessionDto toProfessionDto(Profession profession){
+        return ProfessionDto.builder()
+                .id(profession.getId())
+                .name(profession.getName())
+                .build();
+    }
+
+    public RegionDto toRegionDto(Region region){
+        return RegionDto.builder()
+                .id(region.getId())
+                .name(region.getName())
+                .build();
+    }
+
+    public AdministrationDto toAdministrationDto(Administration administration){
+        return AdministrationDto.builder()
+                .id(administration.getId())
+                .name(administration.getName())
                 .build();
     }
 }

@@ -30,7 +30,7 @@ public class User {
     private Long id;
 
     @Column(unique = true)
-    private String username;
+    private String iin;
 
     @Column(name = "name")
     private String name;
@@ -44,11 +44,17 @@ public class User {
     @Column(unique = true)
     private String email;
 
-    @Column(name = "profession")
-    private String profession;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "profession_id")
+    private Profession profession;
 
-    @Column(name = "region")
-    private String region;
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "region_id")
+    private Region region;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "administration_id")
+    private Administration administration;
 
     @Column(name = "street")
     private String street;
@@ -90,19 +96,4 @@ public class User {
     @Builder.Default
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CaseChat> chats = new ArrayList<>();
-
-    public void addRole(Role role) {
-        this.roles.add(role);
-        log.debug("Added role {} to user {}", role.getName(), username);
-    }
-
-    public void removeRole(Role role) {
-        this.roles.remove(role);
-        log.debug("Removed role {} from user {}", role.getName(), username);
-    }
-
-    public boolean hasRole(String roleName) {
-        return this.roles.stream()
-                .anyMatch(role -> role.getName().equals(roleName));
-    }
 }

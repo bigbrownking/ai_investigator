@@ -20,6 +20,7 @@ import org.di.digital.service.MinioService;
 import org.di.digital.service.impl.queue.AudioQueueService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
@@ -40,6 +41,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final CaseInterrogationEducationRepository caseInterrogationEducationRepository;
     private final InterrogationChatRepository interrogationChatRepository;
+    private final CaseChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
     private final MinioService minioService;
     private final AudioQueueService audioQueueService;
@@ -142,7 +144,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
 
         logService.log(
-                String.format("Interrogation %s to %s added by user %s", saved.getId(),caseNumber, email),
+                String.format("Interrogation %s to %s added by user %s", saved.getFio(),caseNumber, email),
                 LogLevel.INFO,
                 LogAction.INTERROGATION_ADDED,
                 caseNumber,
@@ -171,7 +173,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         log.info("Interrogation removed from case: {}", caseId);
 
         logService.log(
-                String.format("Deleting interrogation %s by %s user in case %s", interrogationId, email, caseNumber),
+                String.format("Deleting interrogation %s by %s user in case %s", interrogation.getFio(), email, caseNumber),
                 LogLevel.INFO,
                 LogAction.INTERROGATION_DELETED,
                 caseNumber,
@@ -410,8 +412,26 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .map(chat -> chat.getMessages().stream()
                         .anyMatch(m -> m.getRole() == MessageRole.ASSISTANT && m.isComplete()))
                 .orElse(false);
+
         qa.setIsEdited(assistantReplied);
 
+        if (assistantReplied) {
+            interrogationChatRepository.findByInterrogationId(interrogationId)
+                    .ifPresent(chat -> {
+                        chatMessageRepository.findByInterrogationChatId(chat.getId(), PageRequest.of(0, Integer.MAX_VALUE))
+                                .getContent()
+                                .stream()
+                                .filter(m -> m.getRole() == MessageRole.USER
+                                        && m.getContent() != null
+                                        && m.getContent().contains(qa.getQuestion()))
+                                .findFirst()
+                                .ifPresent(m -> {
+                                    m.setIsEdited(true);
+                                    m.setContent("Вопрос: " + qa.getQuestion() + "\n" + "Ответ: " + request.getAnswer());
+                                    chatMessageRepository.save(m);
+                                });
+                    });
+        }
         qa.setStatus(QAStatusEnum.TRANSCRIBED);
         caseInterrogationRepository.save(interrogation);
 
@@ -421,7 +441,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .answer(qa.getAnswer())
                 .orderIndex(qa.getOrderIndex())
                 .status(qa.getStatus())
-                .edited(true)
+                .edited(assistantReplied)
                 .build();
     }
 
@@ -507,7 +527,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         caseInterrogationRepository.save(interrogation);
 
         logService.log(
-                String.format("Completing interrogation %s by %s user in case %s", interrogationId, email, caseNumber),
+                String.format("Completing interrogation %s by %s user in case %s", interrogation.getFio(), email, caseNumber),
                 LogLevel.INFO,
                 LogAction.INTERROGATION_COMPLETED,
                 caseNumber,
@@ -687,8 +707,13 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 uploadedFiles.size(), files.size(), interrogationId);
 
 
+        String fileNames = uploadedFiles.stream()
+                .map(CaseInterrogationApplicationFile::getOriginalFileName)
+                .collect(Collectors.joining(", "));
+
         logService.log(
-                String.format("Adding new file to interrogation by %s user in case %s", email, caseNumber),
+                String.format("Uploading application files [%s] to interrogation №%d (FIO: %s) by user %s in case №%s",
+                        fileNames, interrogationId, interrogation.getFio(), email, caseNumber),
                 LogLevel.INFO,
                 LogAction.FILE_UPLOAD,
                 caseNumber,

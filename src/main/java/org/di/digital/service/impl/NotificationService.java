@@ -29,7 +29,14 @@ public class NotificationService {
     private final SimpMessagingTemplate messagingTemplate;
     private final CaseRepository caseRepository;
     private final CaseFileRepository caseFileRepository;
-
+    public void sendNotificationToUser(String userEmail, String message) {
+        messagingTemplate.convertAndSendToUser(
+                userEmail,
+                buildAppealDestination(),
+                message
+        );
+        log.info("Appeal notification sent to user: {}", userEmail);
+    }
     @Transactional(readOnly = true)
     public void sendCaseNotificationToAllUsers(String caseNumber, String activity, Long activityFileId, String activityFileName) {
         Set<String> userEmails = caseRepository.findAllAccessibleUserEmailsByCaseNumber(caseNumber);
@@ -276,6 +283,9 @@ public class NotificationService {
     }
     private String buildCaseDestination(String caseNumber) {
         return String.format("/queue/case/%s/status", caseNumber);
+    }
+    private String buildAppealDestination() {
+        return "/queue/appeals";
     }
     private String getCaseTitle(String caseNumber) {
         return caseRepository.findByNumber(caseNumber)

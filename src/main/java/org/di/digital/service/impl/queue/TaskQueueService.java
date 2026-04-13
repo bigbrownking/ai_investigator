@@ -35,10 +35,6 @@ public class TaskQueueService {
 
     @Value("${spring.rabbitmq.mediator.queue}")
     public String DOCUMENT_QUEUE;
-    private static final Set<String> EXCLUDED_CASE_NUMBERS = Set.of(
-            "240000121000034",
-            "250000121000008"
-   );
     private static final String ROUND_ROBIN_STATE_ID = "round_robin_state";
 
     @PostConstruct
@@ -63,10 +59,6 @@ public class TaskQueueService {
 
     public void addTaskToQueue(String userEmail, Long caseId, String caseNumber,
                                String fileName, String fileUrl, Long caseFileId) {
-        if (EXCLUDED_CASE_NUMBERS.contains(caseNumber)) {
-            log.info("Skipping task for excluded caseNumber {}", caseNumber);
-            return;
-        }
 
         boolean exists = taskQueueRepository
                 .existsByCaseFileIdAndStatusIn(
@@ -169,7 +161,6 @@ public class TaskQueueService {
         Aggregation aggregation = Aggregation.newAggregation(
                 Aggregation.match(
                         Criteria.where("status").is(TaskStatus.PENDING)
-                                .and("caseNumber").nin(EXCLUDED_CASE_NUMBERS)
                 ),
                 Aggregation.group("userEmail")
                         .min("createdAt").as("firstTaskTime"),

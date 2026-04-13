@@ -287,23 +287,4 @@ public class CaseController {
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
-
-    @PostMapping(value = "/{caseId}/erdr", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<CaseFileResponse> addErdrToCase(
-            @PathVariable Long caseId,
-            @RequestParam("file") MultipartFile file,
-            Authentication authentication
-    ) {
-
-        log.info("Adding erdr to case: {} for user: {}",
-                file.getOriginalFilename(), authentication.getName());
-
-        if (file == null || file.isEmpty()) {
-            return ResponseEntity.badRequest().build();
-        }
-
-        CaseFileResponse response = caseService.addErdrToCase(caseId, file, authentication.getName());
-        return ResponseEntity.ok(response);
-    }
-
 }

@@ -34,6 +34,12 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 String username = jwtTokenUtil.getUsernameFromJwtToken(jwt);
 
                 UserDetails userDetails = userDetailsService.loadUserByUsername(username);
+                if (!userDetails.isEnabled()) {
+                    log.warn("User {} is disabled", username);
+                    response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.getWriter().write("{\"error\": \"Account is disabled\"}");
+                    return;
+                }
                 UsernamePasswordAuthenticationToken authentication = new UsernamePasswordAuthenticationToken(
                         userDetails, null, userDetails.getAuthorities());
                 authentication.setDetails(new WebAuthenticationDetailsSource().buildDetails(request));

@@ -143,7 +143,7 @@ public class ChatServiceImpl implements ChatService {
                 }
         );
         logService.log(
-                String.format("New chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseNumber),
+                String.format("New chat message %s by %s user to case %s", userMessage.getContent(), userEmail, caseNumber),
                 LogLevel.INFO,
                 LogAction.CHAT_MESSAGE,
                 caseNumber,
@@ -183,6 +183,7 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
         validateUserAccess(caseEntity, user);
         clearChatHistory(caseEntity.getId(), user.getId());
+
         logService.log(
                 String.format("Cleared chat by %s user to case %s", userEmail, caseNumber),
                 LogLevel.INFO,

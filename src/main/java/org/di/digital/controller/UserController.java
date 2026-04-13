@@ -35,28 +35,6 @@ public class UserController {
         return ResponseEntity.ok(updatedProfile);
     }
 
-    @PatchMapping("/profession")
-    public ResponseEntity<UserProfile> updateProfession(
-            Authentication authentication,
-            @RequestParam String profession
-    ) {
-        String email = authentication.getName();
-        log.info("Updating profession for {} to {}", email, profession);
-        UserProfile updatedProfile = userService.updateProfession(email, profession);
-        return ResponseEntity.ok(updatedProfile);
-    }
-
-    @PatchMapping("/region")
-    public ResponseEntity<UserProfile> updateRegion(
-            Authentication authentication,
-            @RequestParam String region
-    ) {
-        String email = authentication.getName();
-        log.info("Updating region for {} to {}", email, region);
-        UserProfile updatedProfile = userService.updateRegion(email, region);
-        return ResponseEntity.ok(updatedProfile);
-    }
-
     @PatchMapping("/street")
     public ResponseEntity<UserProfile> updateStreet(
             Authentication authentication,
@@ -64,7 +42,7 @@ public class UserController {
     ) {
         String email = authentication.getName();
         log.info("Updating region for {} to {}", email, region);
-        UserProfile updatedProfile = userService.updateRegion(email, region);
+        UserProfile updatedProfile = userService.updateStreet(email, region);
         return ResponseEntity.ok(updatedProfile);
     }
 }

@@ -26,4 +26,7 @@ public class ChatRequest {
     @JsonProperty("stream")
     @Builder.Default
     private Boolean stream = true;
+
+    @JsonProperty("qaId")
+    private Long qaId;
 }

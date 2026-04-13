@@ -21,7 +21,6 @@ public interface CaseService {
     void updateCaseStatus(Long caseId, boolean status, String email);
     InputStreamResource downloadFile(Long caseId, String fileUrl, String email);
     List<CaseFileResponse> addFilesToCase(Long caseId, List<MultipartFile> files, FileType type, int tom, String email);
-    CaseFileResponse addErdrToCase(Long caseId, MultipartFile file, String email);
     void deleteFileFromCase(Long caseId, String fileName, String email);
     CaseUserResponse addUserToCase(Long caseId, String userEmailToAdd, String currentUserEmail);
     FigurantResponse addFigurantToCase(Long caseId, AddFigurantToCaseRequest request, String currentUserEmail);

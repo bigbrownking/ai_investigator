@@ -16,6 +16,7 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -82,7 +83,18 @@ public class QualificationServiceImpl implements QualificationService {
                     caseService.updateCaseActivity(caseNumber, CaseActivityType.QUALIFICATION_GENERATED.name());
                     log.info("Qualification streaming completed for case {}", caseNumber);
                 },
-                error -> log.error("Qualification streaming error for case {}", caseNumber, error)
+                error -> {
+                    log.error("Qualification streaming error for case {}", caseNumber, error);
+                    if (error instanceof WebClientResponseException.BadRequest) {
+                        emitter.completeWithError(new IllegalStateException(
+                                "Квалификация деяния не может быть сгенерирована, поскольку в материалах дела " +
+                                        "отсутствуют необходимые документы: ПОСТАНОВЛЕНИЕ о признании лица в качестве " +
+                                        "подозреваемого либо ПРОТОКОЛ задержания лица, подозреваемого в совершении " +
+                                        "уголовного правонарушения."));
+                    } else {
+                        emitter.completeWithError(error);
+                    }
+                }
         );
         logService.log(
                 String.format("Getting case qualification by %s user in case %s", userEmail, caseNumber),

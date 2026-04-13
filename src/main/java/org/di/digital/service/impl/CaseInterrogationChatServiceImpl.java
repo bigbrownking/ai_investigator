@@ -71,7 +71,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         CaseChatMessage userMessage = CaseChatMessage.builder()
                 .interrogationChat(chat).role(MessageRole.USER)
                 .isEdited(false)
-                .content(request.getQuestion()).complete(true).build();
+                .content("Вопрос: " + request.getQuestion() + '\n' + "Ответ: " + request.getAnswer()).complete(true).build();
         chat.addMessage(userMessage);
         chatMessageRepository.save(userMessage);
 
@@ -101,7 +101,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 }
         );
         logService.log(
-                String.format("New interrogation chat message %s by %s user to case %s", userMessage.getId(), userEmail, caseNumber),
+                String.format("New interrogation chat message %s by %s user to case %s", userMessage.getContent(), userEmail, caseNumber),
                 LogLevel.INFO,
                 LogAction.CHAT_MESSAGE,
                 caseNumber,
@@ -121,8 +121,9 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         CaseInterrogationChat chat = interrogationChatRepository.findByInterrogationId(interrogationId).orElse(null);
         if (chat == null) return CaseChatHistoryResponse.builder().messages(List.of()).totalMessages(0).build();
 
-        List<CaseChatMessage> messages = chatMessageRepository.findByInterrogationChatId(
-                chat.getId(), PageRequest.of(page, size)).getContent();
+        List<CaseChatMessage> messages = chatMessageRepository
+                .findByInterrogationChatIdOrderByIdAsc(chat.getId(), PageRequest.of(page, size))
+                .getContent();
         long total = chatMessageRepository.countByInterrogationChatId(chat.getId());
 
         return CaseChatHistoryResponse.builder()

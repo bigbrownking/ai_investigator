@@ -16,10 +16,13 @@ import java.util.Set;
 @Repository
 public interface CaseRepository extends JpaRepository<Case, Long> {
     List<Case> findByOwner(User user);
+
     @Query("SELECT c FROM Case c LEFT JOIN FETCH c.users WHERE c.number = :number")
     Optional<Case> findByNumberWithUsers(@Param("number") String number);
+
     @Query("SELECT c FROM Case c LEFT JOIN FETCH c.users LEFT JOIN FETCH c.owner WHERE c.number = :number")
     Optional<Case> findByNumberWithUsersAndOwner(@Param("number") String number);
+
     @Query("SELECT c FROM Case c " +
             "LEFT JOIN c.users u " +
             "WHERE (c.owner.email = :userEmail OR u.email = :userEmail) " +
@@ -52,4 +55,16 @@ public interface CaseRepository extends JpaRepository<Case, Long> {
     Set<String> findAllAccessibleUserEmailsByCaseNumber(@Param("caseNumber") String caseNumber);
 
     boolean existsByNumber(String number);
+
+    @Query("SELECT c FROM Case c JOIN c.users u WHERE u.id = :userId")
+    List<Case> findByUserId(@Param("userId") Long userId);
+
+    @Query("SELECT c FROM Case c JOIN c.users u WHERE u.id = :userId")
+    Page<Case> findByUserId(@Param("userId") Long userId, Pageable pageable);
+
+    @Query("SELECT c FROM Case c WHERE c.owner.region.id = :regionId")
+    Page<Case> findByOwnerRegionId(@Param("regionId") Long regionId, Pageable pageable);
+
+    @Query("SELECT COUNT(*) FROM Case c WHERE c.owner.region.id = :regionId")
+    long countByRegionId(Long regionId);
 }

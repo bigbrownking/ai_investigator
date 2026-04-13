@@ -196,7 +196,7 @@ public class CaseServiceImpl implements CaseService {
         validateUserAccess(caseEntity, user);
 
 
-        if(caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()){
+        if (caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()) {
             throw new IllegalStateException(MessageConstant.CANNOT_UPLOAD_FILE.format(caseEntity.getNumber()));
         }
 
@@ -245,8 +245,12 @@ public class CaseServiceImpl implements CaseService {
 
         log.info("Added {}/{} files to case: {}", uploadedFiles.size(), files.size(), caseId);
 
+        String fileNames = savedFiles.stream()
+                .map(CaseFile::getOriginalFileName)
+                .collect(Collectors.joining(", "));
+
         logService.log(
-                String.format("Uploading files by %s user in case %s", email, caseNumber),
+                String.format("Uploading files by %s user in case %s: [%s]", email, caseNumber, fileNames),
                 LogLevel.INFO,
                 LogAction.FILE_UPLOAD,
                 caseNumber,
@@ -255,51 +259,6 @@ public class CaseServiceImpl implements CaseService {
         return savedFiles.stream()
                 .map(mapper::mapToCaseFileResponse)
                 .toList();
-    }
-    @Transactional
-    public CaseFileResponse addErdrToCase(Long caseId, MultipartFile file, String email) {
-        if (file == null || file.isEmpty()) {
-            return null;
-        }
-
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
-
-        validateUserAccess(caseEntity, user);
-
-        if (caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()) {
-            throw new IllegalStateException(MessageConstant.CANNOT_UPLOAD_FILE.format(caseEntity.getNumber()));
-        }
-
-        String caseNumber = caseEntity.getNumber();
-
-        try {
-            CaseFile caseFile = minioService.uploadFile(file, caseEntity.getNumber());
-            caseFile.addCaseEntity(caseEntity);
-            caseFile.setQualification(false);
-            caseFile.setStatus(CaseFileStatusEnum.COMPLETED);
-
-            CaseFile savedFile = caseFileRepository.saveAndFlush(caseFile);
-
-            log.info("ERDR file uploaded to case: {}", caseId);
-
-            logService.log(
-                    String.format("Uploading ERDR file by %s user in case %s", email, caseNumber),
-                    LogLevel.INFO,
-                    LogAction.FILE_UPLOAD,
-                    caseNumber,
-                    email
-            );
-
-            return mapper.mapToCaseFileResponse(savedFile);
-
-        } catch (Exception e) {
-            log.error("Failed to upload ERDR file to case: {}", caseId, e);
-            throw new RuntimeException("Failed to upload ERDR file", e);
-        }
     }
     @Transactional
     public void deleteFileFromCase(Long caseId, String fileName, String email) {
@@ -336,7 +295,7 @@ public class CaseServiceImpl implements CaseService {
             log.info("Deleted file: {} from case: {}", fileName, caseId);
 
             logService.log(
-                    String.format("Deleted %d file from case %s", fileToDelete.getId(), caseNumber),
+                    String.format("Deleted %s file from case %s", fileToDelete.getOriginalFileName(), caseNumber),
                     LogLevel.INFO,
                     LogAction.FILE_DELETE,
                     caseNumber,
@@ -405,7 +364,7 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new RuntimeException("File not found: " + originalFileName));
 
         logService.log(
-                String.format("Downloaded %d file from case %s", caseFile.getId(), caseNumber),
+                String.format("Downloaded %s file from case %s", caseFile.getOriginalFileName(), caseNumber),
                 LogLevel.INFO,
                 LogAction.FILE_DOWNLOAD,
                 caseNumber,
@@ -440,7 +399,8 @@ public class CaseServiceImpl implements CaseService {
         log.info("User {} added to case {} by {}", userEmailToAdd, caseId, currentUserEmail);
 
         logService.log(
-                String.format("Added %s user to case %s", userEmailToAdd, caseNumber),
+                String.format("User '%s' added to case №%s by user %s",
+                        userEmailToAdd, caseNumber, currentUserEmail),
                 LogLevel.INFO,
                 LogAction.USER_ADD,
                 caseNumber,
@@ -515,7 +475,8 @@ public class CaseServiceImpl implements CaseService {
         caseRepository.save(caseEntity);
 
         logService.log(
-                String.format("Removed %s user to case %s", userToRemove, caseNumber),
+                String.format("User '%s' removed from case №%s by user %s",
+                        userToRemove.getEmail(), caseNumber, currentUserEmail),
                 LogLevel.INFO,
                 LogAction.USER_DELETE,
                 caseNumber,
@@ -640,7 +601,7 @@ public class CaseServiceImpl implements CaseService {
             log.info("Deleted all files from case: {}", caseId);
 
             logService.log(
-                    String.format("Deleted all files from case %s", caseNumber),
+                    String.format("All files deleted from case №%s by user %s", caseNumber, currentUserEmail),
                     LogLevel.INFO,
                     LogAction.FILE_DELETE,
                     caseNumber,
