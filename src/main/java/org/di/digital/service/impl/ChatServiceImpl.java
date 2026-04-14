@@ -134,7 +134,7 @@ public class ChatServiceImpl implements ChatService {
                 emitter,
                 fullText -> {
                     updateAssistantMessage(messageId, fullText);
-                    caseService.updateCaseActivity(caseNumber, CaseActivityType.CHAT_MESSAGE.name());
+                    caseService.updateCaseActivity(caseNumber, CaseActivityType.CHAT_MESSAGE.getDescription());
                     log.info("Case chat streaming completed for case {} (user: {})", caseNumber, userEmail);
                 },
                 error -> {
