@@ -19,11 +19,12 @@ import org.di.digital.service.LogService;
 import org.di.digital.service.StreamingService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import static org.di.digital.util.RequestBodyBuilder.interrogationBody;
@@ -69,45 +70,78 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         CaseInterrogationChat chat = getOrCreateChat(interrogation);
 
         CaseChatMessage userMessage = CaseChatMessage.builder()
-                .interrogationChat(chat).role(MessageRole.USER)
+                .interrogationChat(chat)
+                .role(MessageRole.USER)
                 .isEdited(false)
-                .content("Вопрос: " + request.getQuestion() + '\n' + "Ответ: " + request.getAnswer()).complete(true).build();
+                .content("Вопрос: " + request.getQuestion() + '\n' + "Ответ: " + request.getAnswer())
+                .complete(true)
+                .build();
         chat.addMessage(userMessage);
         chatMessageRepository.save(userMessage);
 
-        CaseChatMessage assistantMessage = CaseChatMessage.builder()
-                .interrogationChat(chat).role(MessageRole.ASSISTANT)
+        CaseChatMessage placeholderMessage = CaseChatMessage.builder()
+                .interrogationChat(chat)
+                .role(MessageRole.ASSISTANT)
                 .isEdited(false)
-                .content("").complete(false).build();
-        chat.addMessage(assistantMessage);
-        final Long messageId = chatMessageRepository.save(assistantMessage).getId();
+                .content("")
+                .complete(false)
+                .build();
+        chat.addMessage(placeholderMessage);
+        final Long placeholderId = chatMessageRepository.save(placeholderMessage).getId();
 
         List<CaseInterrogationQA> qaList = interrogation.getQaList();
 
         streamingService.stream(
                 interrogationQuestionsUrl(pythonHost, interrogationChatPort, caseEntity.getNumber()),
-                interrogationBody(interrogation.getFio(), interrogation.getRole(),
-                        qaList),
+                interrogationBody(interrogation.getFio(), interrogation.getRole(), qaList),
                 emitter,
                 this::extractInterrogationChunk,
                 fullText -> {
-                    updateAssistantMessage(messageId, fullText);
-                    log.info("Interrogation chat streaming completed for interrogation {}, {} characters",
-                            interrogationId, fullText.length());
+                    chatMessageRepository.deleteById(placeholderId);
+
+                    List<String> questions = parseQuestions(fullText);
+                    if (questions.isEmpty()) {
+                        CaseChatMessage single = CaseChatMessage.builder()
+                                .interrogationChat(chat)
+                                .role(MessageRole.ASSISTANT)
+                                .isEdited(false)
+                                .content(fullText)
+                                .complete(true)
+                                .build();
+                        chatMessageRepository.save(single);
+                    } else {
+                        for (String question : questions) {
+                            if (question.isBlank()) continue;
+                            CaseChatMessage msg = CaseChatMessage.builder()
+                                    .interrogationChat(chat)
+                                    .role(MessageRole.ASSISTANT)
+                                    .isEdited(false)
+                                    .content(question.trim())
+                                    .complete(true)
+                                    .build();
+                            chatMessageRepository.save(msg);
+                        }
+                    }
+
+                    log.info("Saved {} question messages for interrogation {}",
+                            questions.size(), interrogationId);
                 },
                 error -> {
                     log.error("Streaming error for interrogation {}: ", interrogationId, error);
-                    updateAssistantMessage(messageId, "[Error: " + error.getMessage() + "]");
+                    updateAssistantMessage(placeholderId, "[Error: " + error.getMessage() + "]");
                 }
         );
+
         logService.log(
-                String.format("New interrogation chat message %s by %s user to case %s", userMessage.getContent(), userEmail, caseNumber),
+                String.format("New interrogation chat message %s by %s user to case %s",
+                        userMessage.getContent(), userEmail, caseNumber),
                 LogLevel.INFO,
                 LogAction.CHAT_MESSAGE,
                 caseNumber,
                 userEmail
         );
     }
+
     @Override
     @Transactional(readOnly = true)
     public CaseChatHistoryResponse getChatHistory(Long caseId, Long interrogationId,
@@ -118,8 +152,14 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
         validateUserAccess(caseEntity, user);
 
-        CaseInterrogationChat chat = interrogationChatRepository.findByInterrogationId(interrogationId).orElse(null);
-        if (chat == null) return CaseChatHistoryResponse.builder().messages(List.of()).totalMessages(0).build();
+        CaseInterrogationChat chat = interrogationChatRepository
+                .findByInterrogationId(interrogationId).orElse(null);
+        if (chat == null) {
+            return CaseChatHistoryResponse.builder()
+                    .messages(List.of())
+                    .totalMessages(0)
+                    .build();
+        }
 
         List<CaseChatMessage> messages = chatMessageRepository
                 .findByInterrogationChatIdOrderByIdAsc(chat.getId(), PageRequest.of(page, size))
@@ -129,8 +169,11 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         return CaseChatHistoryResponse.builder()
                 .chatId(chat.getId())
                 .messages(messages.stream().map(CaseChatMessageDto::from).toList())
-                .totalMessages((int) total).currentPage(page).pageSize(size)
-                .lastMessageAt(chat.getLastMessageAt()).build();
+                .totalMessages((int) total)
+                .currentPage(page)
+                .pageSize(size)
+                .lastMessageAt(chat.getLastMessageAt())
+                .build();
     }
 
     @Override
@@ -165,7 +208,9 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         return interrogationChatRepository.findByInterrogationId(interrogation.getId())
                 .orElseGet(() -> {
                     CaseInterrogationChat newChat = CaseInterrogationChat.builder()
-                            .interrogation(interrogation).active(true).build();
+                            .interrogation(interrogation)
+                            .active(true)
+                            .build();
                     log.info("Creating new chat for interrogation {}", interrogation.getId());
                     CaseInterrogationChat saved = interrogationChatRepository.save(newChat);
                     interrogationChatRepository.flush();
@@ -180,6 +225,41 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         message.setContent(fullContent);
         message.setComplete(true);
         chatMessageRepository.save(message);
+    }
+
+    @Override
+    @Transactional
+    public void toggleMessageSelected(Long caseId, Long interrogationId, Long messageId, boolean selected, String userEmail) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+        validateUserAccess(caseEntity, user);
+
+        CaseChatMessage message = chatMessageRepository.findById(messageId)
+                .orElseThrow(() -> new RuntimeException("Message not found: " + messageId));
+
+        message.setIsSelected(selected);
+        chatMessageRepository.save(message);
+    }
+
+    private List<String> parseQuestions(String fullText) {
+        try {
+            JsonNode node = objectMapper.readTree(fullText);
+            if (node.has("questions")) {
+                List<String> result = new ArrayList<>();
+                node.get("questions").forEach(q -> result.add(q.asText()));
+                return result;
+            }
+        } catch (Exception ignored) {}
+
+        if (fullText.contains("\n")) {
+            return Arrays.stream(fullText.split("\n"))
+                    .filter(s -> !s.isBlank())
+                    .toList();
+        }
+
+        return List.of(fullText);
     }
 
     private String extractInterrogationChunk(String chunk) {

@@ -148,7 +148,7 @@ public class WordDocumentServiceImpl implements WordDocumentService {
 
         XWPFRun cityRun = paragraph.createRun();
         cityRun.setText(city);
-        cityRun.setFontSize(12);
+        cityRun.setFontSize(14);
         cityRun.setFontFamily("Times New Roman");
 
         XWPFRun tabRun = paragraph.createRun();
@@ -156,7 +156,7 @@ public class WordDocumentServiceImpl implements WordDocumentService {
 
         XWPFRun dateRun = paragraph.createRun();
         dateRun.setText(date);
-        dateRun.setFontSize(12);
+        dateRun.setFontSize(14);
         dateRun.setFontFamily("Times New Roman");
     }
 
@@ -165,7 +165,7 @@ public class WordDocumentServiceImpl implements WordDocumentService {
         XWPFRun run = paragraph.createRun();
         run.setText(text);
         run.setBold(true);
-        run.setFontSize(12);
+        run.setFontSize(14);
         run.setFontFamily("Times New Roman");
     }
 
@@ -175,7 +175,7 @@ public class WordDocumentServiceImpl implements WordDocumentService {
 
         XWPFRun run = paragraph.createRun();
         run.setText(text);
-        run.setFontSize(12);
+        run.setFontSize(14);
         run.setFontFamily("Times New Roman");
     }
 

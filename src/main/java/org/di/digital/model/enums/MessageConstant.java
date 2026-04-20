@@ -10,7 +10,9 @@ public enum MessageConstant {
     NO_FILE_PROCESSED("Должно быть обработано не менее одного документа в деле: %s"),
     NO_QUALIFICATION("Не найдено документа помеченного как квалификация дела в деле: %s"),
     ALL_FILES_PROCESSED("Все документы должны быть обработаны в деле: %s"),
-    ALL_INTERROGATION_PROCESSED("Все допросы должны быть завершены в деле: %s");
+    ALL_INTERROGATION_PROCESSED("Все допросы должны быть завершены в деле: %s"),
+    WORKSPACE_ALREADY_EXISTS("Дело с именем %s уже существует в модели"),
+    WORKSPACE_RENAME_FAILED("Не удалось переименовать дело %s -> %s");
     private final String template;
 
     MessageConstant(String template) {

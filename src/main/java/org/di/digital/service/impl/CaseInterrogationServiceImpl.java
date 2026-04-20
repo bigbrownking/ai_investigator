@@ -516,7 +516,6 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         LocalDateTime now = LocalDateTime.now();
 
         if (interrogation.getStartedAt() != null) {
-            // Если таймер был запущен (не на паузе) — закрываем активную сессию
             if (!Boolean.TRUE.equals(interrogation.getIsPaused())) {
                 InterrogationTimerSession lastSession = interrogation.getTimerSessions().stream()
                         .filter(s -> s.getPausedAt() == null)
@@ -533,7 +532,6 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 }
             }
 
-            // finishedAt ставим только здесь — при реальном завершении
             interrogation.setFinishedAt(now);
             interrogation.setIsPaused(false);
         }

@@ -17,6 +17,7 @@ public class CaseChatMessageDto {
     private Long id;
     private MessageRole role;
     private Boolean edited;
+    private Boolean selected;
     private String content;
     private LocalDateTime createdDate;
     private boolean complete;
@@ -27,6 +28,7 @@ public class CaseChatMessageDto {
                 .role(message.getRole())
                 .content(message.getContent())
                 .edited(message.getIsEdited())
+                .selected(message.getIsSelected())
                 .createdDate(message.getCreatedDate())
                 .complete(message.isComplete())
                 .build();

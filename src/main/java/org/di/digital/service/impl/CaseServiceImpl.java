@@ -23,6 +23,7 @@ import org.di.digital.service.LogService;
 import org.di.digital.service.MinioService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
+import org.di.digital.util.UrlBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
@@ -33,11 +34,13 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
+import reactor.core.publisher.Mono;
 
 import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.di.digital.util.UrlBuilder.renameWorkspaceUrl;
 import static org.di.digital.util.UserUtil.validateUserAccess;
 
 @Slf4j
@@ -140,8 +143,10 @@ public class CaseServiceImpl implements CaseService {
 
         if (request.getNumber() != null && !request.getNumber().equals(oldNumber)) {
             if (caseRepository.existsByNumber(request.getNumber())) {
-                throw new RuntimeException("Case with number " + request.getNumber() + " already exists");
+                throw new IllegalStateException(MessageConstant.WORKSPACE_ALREADY_EXISTS.format(request.getNumber()));
             }
+
+            renameWorkspace(oldNumber, request.getNumber());
             caseEntity.setNumber(request.getNumber());
         }
 
@@ -162,6 +167,36 @@ public class CaseServiceImpl implements CaseService {
         );
 
         return mapper.mapToCaseResponse(savedCase);
+    }
+    private void renameWorkspace(String oldNumber, String newNumber) {
+        String url = UrlBuilder.renameWorkspaceUrl(pythonHost, pythonPort, oldNumber);
+        Map<String, String> body = Map.of("new_name", newNumber);
+
+        log.info("Renaming workspace from {} to {}", oldNumber, newNumber);
+
+        try {
+            webClientBuilder.build()
+                    .patch()
+                    .uri(url)
+                    .contentType(org.springframework.http.MediaType.APPLICATION_JSON)
+                    .bodyValue(body)
+                    .retrieve()
+                    .onStatus(
+                            status -> status.value() == 409,
+                            response -> Mono.error(new IllegalStateException(
+                                    MessageConstant.WORKSPACE_ALREADY_EXISTS.format(newNumber)
+                            ))
+                    )
+                    .bodyToMono(String.class)
+                    .block();
+
+            log.info("Workspace renamed successfully: {} -> {}", oldNumber, newNumber);
+
+        } catch (IllegalStateException e) {
+            throw e;
+        } catch (Exception e) {
+            log.warn(MessageConstant.WORKSPACE_RENAME_FAILED.format(oldNumber, newNumber) + ": " + e.getMessage());
+        }
     }
     @Transactional(readOnly = true)
     public CaseResponse getCaseById(Long id, String email) {

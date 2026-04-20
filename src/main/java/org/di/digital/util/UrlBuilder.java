@@ -35,4 +35,7 @@ public class UrlBuilder {
     public static String planGeneratorUrl(String host, String port) {
         return buildUrl(host, port, "/api/generate_plan");
     }
+    public static String renameWorkspaceUrl(String host, String port, String caseNumber) {
+        return buildUrl(host, port, String.format("/workspaces/%s/rename", caseNumber));
+    }
 }

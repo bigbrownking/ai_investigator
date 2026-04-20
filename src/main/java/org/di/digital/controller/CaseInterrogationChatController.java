@@ -57,4 +57,16 @@ public class CaseInterrogationChatController {
         interrogationChatService.clearChatHistory(caseId, interrogationId, authentication.getName());
         return ResponseEntity.noContent().build();
     }
+
+    @PatchMapping("/{caseId}/interrogations/{interrogationId}/chat/messages/{messageId}/select")
+    public ResponseEntity<Void> toggleMessageSelected(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            @PathVariable Long messageId,
+            @RequestParam boolean selected,
+            Authentication authentication
+    ) {
+        interrogationChatService.toggleMessageSelected(caseId, interrogationId, messageId, selected, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
 }

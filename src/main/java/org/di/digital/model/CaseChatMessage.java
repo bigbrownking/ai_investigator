@@ -40,6 +40,9 @@ public class CaseChatMessage {
 
     private Boolean isEdited;
 
+    @Builder.Default
+    private Boolean isSelected = false;
+
     @CreatedDate
     @Column(name = "created_date", updatable = false)
     private LocalDateTime createdDate;

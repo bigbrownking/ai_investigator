@@ -868,71 +868,135 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
 
     /** Шапка времени: начат / окончен */
     private void addCityDateBlock(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        XWPFParagraph p = doc.createParagraph();
-        p.setAlignment(ParagraphAlignment.LEFT);
-        XWPFRun r = p.createRun();
-        r.setText(safe(data.getCity()) + "          " +
-                (data.getDate() != null ? data.getDate().format(DATE_RU) : "«___» ________ ____ года"));
-        r.setFontFamily("Times New Roman");
-        r.setFontSize(12);
+        // Город слева, дата справа — через таблицу без рамок
+        XWPFTable headerTable = doc.createTable(1, 2);
+        removeTableBorders(headerTable);
+
+        XWPFTableCell cityCell = headerTable.getRow(0).getCell(0);
+        setCellWidth(cityCell, 4500);
+        XWPFParagraph cityPara = cityCell.getParagraphs().get(0);
+        cityPara.setAlignment(ParagraphAlignment.LEFT);
+        XWPFRun cityRun = cityPara.createRun();
+        cityRun.setBold(true);
+        cityRun.setText(safe(data.getCity()));
+        cityRun.setFontFamily("Times New Roman");
+        cityRun.setFontSize(14);
+
+        XWPFTableCell dateCell = headerTable.getRow(0).getCell(1);
+        setCellWidth(dateCell, 4826);
+        XWPFParagraph datePara = dateCell.getParagraphs().get(0);
+        datePara.setAlignment(ParagraphAlignment.RIGHT);
+        XWPFRun dateRun = datePara.createRun();
+        dateRun.setBold(true);
+        dateRun.setText(data.getDate() != null ? data.getDate().format(DATE_RU) : "«___» ________ ____ года");
+        dateRun.setFontFamily("Times New Roman");
+        dateRun.setFontSize(14);
 
         addEmptyLine(doc);
 
+        // Время — справа
         XWPFParagraph timePara = doc.createParagraph();
         timePara.setAlignment(ParagraphAlignment.RIGHT);
 
         List<InterrogationTimerSessionResponse> sessions = data.getTimerSessions();
+        boolean hasRealPause = sessions != null && sessions.size() > 1; // реальный перерыв = есть возобновление
 
         if (sessions != null && !sessions.isEmpty()) {
             InterrogationTimerSessionResponse first = sessions.get(0);
             XWPFRun r1 = timePara.createRun();
-            r1.setBold(true); r1.setFontFamily("Times New Roman"); r1.setFontSize(12);
+            r1.setBold(true); r1.setFontFamily("Times New Roman"); r1.setFontSize(14);
             r1.setText("Допрос начат: " + (first.getStartedAt() != null ? first.getStartedAt().format(TIME_FMT) : "__ час. __ мин."));
             r1.addBreak();
 
-            for (int i = 0; i < sessions.size(); i++) {
-                InterrogationTimerSessionResponse s = sessions.get(i);
+            // Прерван
+            String pausedTime = hasRealPause
+                    ? sessions.get(0).getPausedAt() != null ? sessions.get(0).getPausedAt().format(TIME_FMT) : "- час. - мин."
+                    : "- час. - мин.";
+            XWPFRun rp = timePara.createRun();
+            rp.setBold(true); rp.setFontFamily("Times New Roman"); rp.setFontSize(14);
+            rp.setText("Прерван ");
+            XWPFRun rpI = timePara.createRun();
+            rpI.setItalic(true); rpI.setFontFamily("Times New Roman"); rpI.setFontSize(14);
+            rpI.setText("(согласно ст.209 УПК РК)");
+            XWPFRun rpT = timePara.createRun();
+            rpT.setBold(true); rpT.setFontFamily("Times New Roman"); rpT.setFontSize(14);
+            rpT.setText(": " + pausedTime);
+            rpT.addBreak();
 
-                if (s.getPausedAt() != null) {
-                    XWPFRun rp = timePara.createRun();
-                    rp.setFontFamily("Times New Roman"); rp.setFontSize(12);
-                    rp.setText("Прерван (согласно ст.209 УПК РК): " + s.getPausedAt().format(TIME_FMT));
-                    rp.addBreak();
-                }
-
-                if (i > 0) {
-                    XWPFRun rr = timePara.createRun();
-                    rr.setFontFamily("Times New Roman"); rr.setFontSize(12);
-                    rr.setText("Возобновлен (согласно ст.209 УПК РК): " + (s.getStartedAt() != null ? s.getStartedAt().format(TIME_FMT) : "__ час. __ мин."));
-                    rr.addBreak();
-                }
-            }
+            // Возобновлен
+            String resumedTime = hasRealPause && sessions.get(1).getStartedAt() != null
+                    ? sessions.get(1).getStartedAt().format(TIME_FMT)
+                    : "- час. - мин.";
+            XWPFRun rr = timePara.createRun();
+            rr.setBold(true); rr.setFontFamily("Times New Roman"); rr.setFontSize(14);
+            rr.setText("Возобновлен ");
+            XWPFRun rrI = timePara.createRun();
+            rrI.setItalic(true); rrI.setFontFamily("Times New Roman"); rrI.setFontSize(14);
+            rrI.setText("(согласно ст.209 УПК РК)");
+            XWPFRun rrT = timePara.createRun();
+            rrT.setBold(true); rrT.setFontFamily("Times New Roman"); rrT.setFontSize(14);
+            rrT.setText(": " + resumedTime);
+            rrT.addBreak();
 
             String end = data.getFinishedAt() != null ? data.getFinishedAt().format(TIME_FMT) : "__ час. __ мин.";
             XWPFRun re = timePara.createRun();
-            re.setBold(true); re.setFontFamily("Times New Roman"); re.setFontSize(12);
+            re.setBold(true); re.setFontFamily("Times New Roman"); re.setFontSize(14);
             re.setText("Допрос окончен: " + end);
 
         } else {
-            String start = data.getStartedAt() != null ? data.getStartedAt().format(TIME_FMT) : "__ час. __ мин.";
-            String end   = data.getFinishedAt() != null ? data.getFinishedAt().format(TIME_FMT) : "__ час. __ мин.";
             XWPFRun rs = timePara.createRun();
-            rs.setBold(true); rs.setFontFamily("Times New Roman"); rs.setFontSize(12);
-            rs.setText("Допрос начат: " + start); rs.addBreak();
+            rs.setBold(true); rs.setFontFamily("Times New Roman"); rs.setFontSize(14);
+            rs.setText("Допрос начат: __ час. __ мин."); rs.addBreak();
+
+            XWPFRun rp = timePara.createRun();
+            rp.setBold(true); rp.setFontFamily("Times New Roman"); rp.setFontSize(14);
+            rp.setText("Прерван ");
+            XWPFRun rpI = timePara.createRun();
+            rpI.setItalic(true); rpI.setFontFamily("Times New Roman"); rpI.setFontSize(14);
+            rpI.setText("(согласно ст.209 УПК РК)");
+            XWPFRun rpT = timePara.createRun();
+            rpT.setBold(true); rpT.setFontFamily("Times New Roman"); rpT.setFontSize(14);
+            rpT.setText(": - час. - мин."); rpT.addBreak();
+
+            XWPFRun rr = timePara.createRun();
+            rr.setBold(true); rr.setFontFamily("Times New Roman"); rr.setFontSize(14);
+            rr.setText("Возобновлен ");
+            XWPFRun rrI = timePara.createRun();
+            rrI.setItalic(true); rrI.setFontFamily("Times New Roman"); rrI.setFontSize(14);
+            rrI.setText("(согласно ст.209 УПК РК)");
+            XWPFRun rrT = timePara.createRun();
+            rrT.setBold(true); rrT.setFontFamily("Times New Roman"); rrT.setFontSize(14);
+            rrT.setText(": - час. - мин."); rrT.addBreak();
+
             XWPFRun re = timePara.createRun();
-            re.setBold(true); re.setFontFamily("Times New Roman"); re.setFontSize(12);
-            re.setText("Допрос окончен: " + end);
+            re.setBold(true); re.setFontFamily("Times New Roman"); re.setFontSize(14);
+            re.setText("Допрос окончен: __ час. __ мин.");
         }
     }
 
     private void addCityDateBlockExtended(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        XWPFParagraph p = doc.createParagraph();
-        p.setAlignment(ParagraphAlignment.LEFT);
-        XWPFRun r = p.createRun();
-        r.setText(safe(data.getCity()) + "          " +
-                (data.getDate() != null ? data.getDate().format(DATE_RU) : "«___» ________ ____ года"));
-        r.setFontFamily("Times New Roman");
-        r.setFontSize(12);
+        XWPFTable headerTable = doc.createTable(1, 2);
+        removeTableBorders(headerTable);
+
+        XWPFTableCell cityCell = headerTable.getRow(0).getCell(0);
+        setCellWidth(cityCell, 4500);
+        XWPFParagraph cityPara = cityCell.getParagraphs().get(0);
+        cityPara.setAlignment(ParagraphAlignment.LEFT);
+        XWPFRun cityRun = cityPara.createRun();
+        cityRun.setBold(true);
+        cityRun.setText(safe(data.getCity()));
+        cityRun.setFontFamily("Times New Roman");
+        cityRun.setFontSize(14);
+
+        XWPFTableCell dateCell = headerTable.getRow(0).getCell(1);
+        setCellWidth(dateCell, 4826);
+        XWPFParagraph datePara = dateCell.getParagraphs().get(0);
+        datePara.setAlignment(ParagraphAlignment.RIGHT);
+        XWPFRun dateRun = datePara.createRun();
+        dateRun.setBold(true);
+        dateRun.setText(data.getDate() != null ? data.getDate().format(DATE_RU) : "«___» ________ ____ года");
+        dateRun.setFontFamily("Times New Roman");
+        dateRun.setFontSize(14);
 
         addEmptyLine(doc);
 
@@ -940,66 +1004,102 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
         timePara.setAlignment(ParagraphAlignment.RIGHT);
 
         List<InterrogationTimerSessionResponse> sessions = data.getTimerSessions();
+        boolean hasRealPause = sessions != null && sessions.size() > 1;
 
         if (sessions != null && !sessions.isEmpty()) {
             InterrogationTimerSessionResponse first = sessions.get(0);
             XWPFRun r1 = timePara.createRun();
-            r1.setBold(true); r1.setFontFamily("Times New Roman"); r1.setFontSize(12);
+            r1.setBold(true); r1.setFontFamily("Times New Roman"); r1.setFontSize(14);
             r1.setText("Допрос начат: " + (first.getStartedAt() != null ? first.getStartedAt().format(TIME_FMT) : "__ час. __ мин."));
             r1.addBreak();
 
-            for (int i = 0; i < sessions.size(); i++) {
-                InterrogationTimerSessionResponse s = sessions.get(i);
+            String pausedTime = hasRealPause
+                    ? (sessions.get(0).getPausedAt() != null ? sessions.get(0).getPausedAt().format(TIME_FMT) : "- час. - мин.")
+                    : "- час. - мин.";
+            XWPFRun rp = timePara.createRun();
+            rp.setBold(true); rp.setFontFamily("Times New Roman"); rp.setFontSize(14);
+            rp.setText("Прерван ");
+            XWPFRun rpI = timePara.createRun();
+            rpI.setItalic(true); rpI.setFontFamily("Times New Roman"); rpI.setFontSize(14);
+            rpI.setText("(согласно ст.209 УПК РК)");
+            XWPFRun rpT = timePara.createRun();
+            rpT.setBold(true); rpT.setFontFamily("Times New Roman"); rpT.setFontSize(14);
+            rpT.setText(": " + pausedTime);
+            rpT.addBreak();
 
-                if (s.getPausedAt() != null) {
-                    XWPFRun rp = timePara.createRun();
-                    rp.setFontFamily("Times New Roman"); rp.setFontSize(12);
-                    rp.setText("Прерван (согласно ст.209 УПК РК): " + s.getPausedAt().format(TIME_FMT));
-                    rp.addBreak();
-                }
-
-                if (i > 0) {
-                    XWPFRun rr = timePara.createRun();
-                    rr.setFontFamily("Times New Roman"); rr.setFontSize(12);
-                    rr.setText("Возобновлен (согласно ст.209 УПК РК): " + (s.getStartedAt() != null ? s.getStartedAt().format(TIME_FMT) : "__ час. __ мин."));
-                    rr.addBreak();
-                }
-            }
+            String resumedTime = hasRealPause && sessions.get(1).getStartedAt() != null
+                    ? sessions.get(1).getStartedAt().format(TIME_FMT)
+                    : "- час. - мин.";
+            XWPFRun rr = timePara.createRun();
+            rr.setBold(true); rr.setFontFamily("Times New Roman"); rr.setFontSize(14);
+            rr.setText("Возобновлен ");
+            XWPFRun rrI = timePara.createRun();
+            rrI.setItalic(true); rrI.setFontFamily("Times New Roman"); rrI.setFontSize(14);
+            rrI.setText("(согласно ст.209 УПК РК)");
+            XWPFRun rrT = timePara.createRun();
+            rrT.setBold(true); rrT.setFontFamily("Times New Roman"); rrT.setFontSize(14);
+            rrT.setText(": " + resumedTime);
+            rrT.addBreak();
 
             String end = data.getFinishedAt() != null ? data.getFinishedAt().format(TIME_FMT) : "__ час. __ мин.";
             XWPFRun re = timePara.createRun();
-            re.setBold(true); re.setFontFamily("Times New Roman"); re.setFontSize(12);
+            re.setBold(true); re.setFontFamily("Times New Roman"); re.setFontSize(14);
             re.setText("Допрос окончен: " + end);
 
         } else {
-            String start = data.getStartedAt() != null ? data.getStartedAt().format(TIME_FMT) : "__ час. __ мин.";
-            String end   = data.getFinishedAt() != null ? data.getFinishedAt().format(TIME_FMT) : "__ час. __ мин.";
-            XWPFRun r1 = timePara.createRun();
-            r1.setBold(true); r1.setFontFamily("Times New Roman"); r1.setFontSize(12);
-            r1.setText("Допрос начат: " + start); r1.addBreak();
+            XWPFRun rs = timePara.createRun();
+            rs.setBold(true); rs.setFontFamily("Times New Roman"); rs.setFontSize(14);
+            rs.setText("Допрос начат: __ час. __ мин."); rs.addBreak();
 
-            XWPFRun r2 = timePara.createRun();
-            r2.setFontFamily("Times New Roman"); r2.setFontSize(12);
-            r2.setText("Прерван (согласно ст.209 УПК РК): __ час. __ мин."); r2.addBreak();
+            XWPFRun rp = timePara.createRun();
+            rp.setBold(true); rp.setFontFamily("Times New Roman"); rp.setFontSize(14);
+            rp.setText("Прерван ");
+            XWPFRun rpI = timePara.createRun();
+            rpI.setItalic(true); rpI.setFontFamily("Times New Roman"); rpI.setFontSize(14);
+            rpI.setText("(согласно ст.209 УПК РК)");
+            XWPFRun rpT = timePara.createRun();
+            rpT.setBold(true); rpT.setFontFamily("Times New Roman"); rpT.setFontSize(14);
+            rpT.setText(": - час. - мин."); rpT.addBreak();
 
-            XWPFRun r3 = timePara.createRun();
-            r3.setFontFamily("Times New Roman"); r3.setFontSize(12);
-            r3.setText("Возобновлен (согласно ст.209 УПК РК): __ час. __ мин."); r3.addBreak();
+            XWPFRun rr = timePara.createRun();
+            rr.setBold(true); rr.setFontFamily("Times New Roman"); rr.setFontSize(14);
+            rr.setText("Возобновлен ");
+            XWPFRun rrI = timePara.createRun();
+            rrI.setItalic(true); rrI.setFontFamily("Times New Roman"); rrI.setFontSize(14);
+            rrI.setText("(согласно ст.209 УПК РК)");
+            XWPFRun rrT = timePara.createRun();
+            rrT.setBold(true); rrT.setFontFamily("Times New Roman"); rrT.setFontSize(14);
+            rrT.setText(": - час. - мин."); rrT.addBreak();
 
-            XWPFRun r4 = timePara.createRun();
-            r4.setBold(true); r4.setFontFamily("Times New Roman"); r4.setFontSize(12);
-            r4.setText("Допрос окончен: " + end);
+            XWPFRun re = timePara.createRun();
+            re.setBold(true); re.setFontFamily("Times New Roman"); re.setFontSize(14);
+            re.setText("Допрос окончен: __ час. __ мин.");
         }
     }
 
     private void addCityDateBlockSimple(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        XWPFParagraph p = doc.createParagraph();
-        p.setAlignment(ParagraphAlignment.LEFT);
-        XWPFRun r = p.createRun();
-        r.setText(safe(data.getCity()) + "          " +
-                (data.getDate() != null ? data.getDate().format(DATE_RU) : "«___» ________ ____ года"));
-        r.setFontFamily("Times New Roman");
-        r.setFontSize(12);
+        XWPFTable headerTable = doc.createTable(1, 2);
+        removeTableBorders(headerTable);
+
+        XWPFTableCell cityCell = headerTable.getRow(0).getCell(0);
+        setCellWidth(cityCell, 4500);
+        XWPFParagraph cityPara = cityCell.getParagraphs().get(0);
+        cityPara.setAlignment(ParagraphAlignment.LEFT);
+        XWPFRun cityRun = cityPara.createRun();
+        cityRun.setBold(true);
+        cityRun.setText(safe(data.getCity()));
+        cityRun.setFontFamily("Times New Roman");
+        cityRun.setFontSize(14);
+
+        XWPFTableCell dateCell = headerTable.getRow(0).getCell(1);
+        setCellWidth(dateCell, 4826);
+        XWPFParagraph datePara = dateCell.getParagraphs().get(0);
+        datePara.setAlignment(ParagraphAlignment.RIGHT);
+        XWPFRun dateRun = datePara.createRun();
+        dateRun.setBold(true);
+        dateRun.setText(data.getDate() != null ? data.getDate().format(DATE_RU) : "«___» ________ ____ года");
+        dateRun.setFontFamily("Times New Roman");
+        dateRun.setFontSize(14);
 
         addEmptyLine(doc);
 
@@ -1007,46 +1107,52 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
         timePara.setAlignment(ParagraphAlignment.RIGHT);
 
         List<InterrogationTimerSessionResponse> sessions = data.getTimerSessions();
+        boolean hasRealPause = sessions != null && sessions.size() > 1;
 
         if (sessions != null && !sessions.isEmpty()) {
             InterrogationTimerSessionResponse first = sessions.get(0);
             XWPFRun r1 = timePara.createRun();
-            r1.setFontFamily("Times New Roman"); r1.setFontSize(12);
+            r1.setFontFamily("Times New Roman"); r1.setFontSize(14);
             r1.setText("Начало: " + (first.getStartedAt() != null ? first.getStartedAt().format(TIME_FMT) : "__ час. __ мин."));
             r1.addBreak();
 
-            for (int i = 0; i < sessions.size(); i++) {
-                InterrogationTimerSessionResponse s = sessions.get(i);
+            String pausedTime = hasRealPause
+                    ? (sessions.get(0).getPausedAt() != null ? sessions.get(0).getPausedAt().format(TIME_FMT) : "- час. - мин.")
+                    : "- час. - мин.";
+            XWPFRun rp = timePara.createRun();
+            rp.setFontFamily("Times New Roman"); rp.setFontSize(14);
+            rp.setText("Прерван (согласно ст.209 УПК РК): " + pausedTime);
+            rp.addBreak();
 
-                if (s.getPausedAt() != null) {
-                    XWPFRun rp = timePara.createRun();
-                    rp.setFontFamily("Times New Roman"); rp.setFontSize(12);
-                    rp.setText("Прерван (согласно ст.209 УПК РК): " + s.getPausedAt().format(TIME_FMT));
-                    rp.addBreak();
-                }
-
-                if (i > 0) {
-                    XWPFRun rr = timePara.createRun();
-                    rr.setFontFamily("Times New Roman"); rr.setFontSize(12);
-                    rr.setText("Возобновлен (согласно ст.209 УПК РК): " + (s.getStartedAt() != null ? s.getStartedAt().format(TIME_FMT) : "__ час. __ мин."));
-                    rr.addBreak();
-                }
-            }
+            String resumedTime = hasRealPause && sessions.get(1).getStartedAt() != null
+                    ? sessions.get(1).getStartedAt().format(TIME_FMT)
+                    : "- час. - мин.";
+            XWPFRun rr = timePara.createRun();
+            rr.setFontFamily("Times New Roman"); rr.setFontSize(14);
+            rr.setText("Возобновлен (согласно ст.209 УПК РК): " + resumedTime);
+            rr.addBreak();
 
             String end = data.getFinishedAt() != null ? data.getFinishedAt().format(TIME_FMT) : "__ час. __ мин.";
             XWPFRun re = timePara.createRun();
-            re.setFontFamily("Times New Roman"); re.setFontSize(12);
+            re.setFontFamily("Times New Roman"); re.setFontSize(14);
             re.setText("Окончание: " + end);
 
         } else {
-            String start = data.getStartedAt() != null ? data.getStartedAt().format(TIME_FMT) : "__ час. __ мин.";
-            String end   = data.getFinishedAt() != null ? data.getFinishedAt().format(TIME_FMT) : "__ час. __ мин.";
-            XWPFRun tr = timePara.createRun();
-            tr.setFontFamily("Times New Roman"); tr.setFontSize(12);
-            tr.setText("Начало: " + start); tr.addBreak();
-            XWPFRun er = timePara.createRun();
-            er.setFontFamily("Times New Roman"); er.setFontSize(12);
-            er.setText("Окончание: " + end);
+            XWPFRun rs = timePara.createRun();
+            rs.setFontFamily("Times New Roman"); rs.setFontSize(14);
+            rs.setText("Начало: __ час. __ мин."); rs.addBreak();
+
+            XWPFRun rp = timePara.createRun();
+            rp.setFontFamily("Times New Roman"); rp.setFontSize(14);
+            rp.setText("Прерван (согласно ст.209 УПК РК): - час. - мин."); rp.addBreak();
+
+            XWPFRun rr = timePara.createRun();
+            rr.setFontFamily("Times New Roman"); rr.setFontSize(14);
+            rr.setText("Возобновлен (согласно ст.209 УПК РК): - час. - мин."); rr.addBreak();
+
+            XWPFRun re = timePara.createRun();
+            re.setFontFamily("Times New Roman"); re.setFontSize(14);
+            re.setText("Окончание: __ час. __ мин.");
         }
     }
 
@@ -1056,11 +1162,11 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
         p.setAlignment(ParagraphAlignment.LEFT);
         XWPFRun r1 = p.createRun();
         r1.setText("В ходе допроса   ");
-        r1.setFontFamily("Times New Roman"); r1.setFontSize(12);
+        r1.setFontFamily("Times New Roman"); r1.setFontSize(14);
         XWPFRun r2 = p.createRun();
         r2.setUnderline(UnderlinePatterns.SINGLE);
         r2.setText(involved);
-        r2.setFontFamily("Times New Roman"); r2.setFontSize(12);
+        r2.setFontFamily("Times New Roman"); r2.setFontSize(14);
         addEmptyLine(doc);
     }
 
@@ -1195,7 +1301,7 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
         buildTable(doc, rows);
     }
 
-    private void buildTable(XWPFDocument doc, String[][] rows) {
+    private void  buildTable(XWPFDocument doc, String[][] rows) {
         XWPFTable table = doc.createTable(rows.length, 2);
         removeTableBorders(table);
         for (int i = 0; i < rows.length; i++) {
@@ -1204,12 +1310,12 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
             XWPFTableCell labelCell = row.getCell(0);
             setCellWidth(labelCell, 3600); setCellThinBorder(labelCell); setCellPadding(labelCell);
             XWPFRun lr = labelCell.getParagraphs().get(0).createRun();
-            lr.setText(rows[i][0]); lr.setFontFamily("Times New Roman"); lr.setFontSize(11);
+            lr.setText(rows[i][0]); lr.setFontFamily("Times New Roman"); lr.setFontSize(14);
 
             XWPFTableCell valueCell = row.getCell(1);
             setCellWidth(valueCell, 5726); setCellThinBorder(valueCell); setCellPadding(valueCell);
             XWPFRun vr = valueCell.getParagraphs().get(0).createRun();
-            vr.setText(rows[i][1]); vr.setFontFamily("Times New Roman"); vr.setFontSize(11);
+            vr.setText(rows[i][1]); vr.setFontFamily("Times New Roman"); vr.setFontSize(14);
         }
     }
 
@@ -1223,14 +1329,14 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
             XWPFRun qRun = qPara.createRun();
             qRun.setBold(true);
             qRun.setText("Вопрос следователя: " + safe(qa.getQuestion()));
-            qRun.setFontFamily("Times New Roman"); qRun.setFontSize(12);
+            qRun.setFontFamily("Times New Roman"); qRun.setFontSize(14);
 
             XWPFParagraph aPara = doc.createParagraph();
             aPara.setAlignment(ParagraphAlignment.BOTH);
             aPara.setIndentationFirstLine(720);
             XWPFRun aRun = aPara.createRun();
             aRun.setText("Ответ: " + (qa.getAnswer() != null && !qa.getAnswer().isBlank() ? qa.getAnswer() : "Ответ не получен."));
-            aRun.setFontFamily("Times New Roman"); aRun.setFontSize(12);
+            aRun.setFontFamily("Times New Roman"); aRun.setFontSize(14);
 
             addEmptyLine(doc);
             addInlineSignatureLine(doc, roleLabel, fio);
@@ -1258,11 +1364,11 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
         famPara.setIndentationFirstLine(720);
         XWPFRun famLabel = famPara.createRun();
         famLabel.setText("С настоящим протоколом допроса ознакомлен(ы) путем   ");
-        famLabel.setFontFamily("Times New Roman"); famLabel.setFontSize(12);
+        famLabel.setFontFamily("Times New Roman"); famLabel.setFontSize(14);
         XWPFRun famValue = famPara.createRun();
         famValue.setUnderline(UnderlinePatterns.SINGLE);
         famValue.setText(safe(data.getFamiliarization()).equals("—") ? "путем оглашения" : data.getFamiliarization());
-        famValue.setFontFamily("Times New Roman"); famValue.setFontSize(12);
+        famValue.setFontFamily("Times New Roman"); famValue.setFontSize(14);
         addEmptyLine(doc);
 
         addJustifiedParagraph(doc,
@@ -1274,11 +1380,11 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
         appPara.setIndentationFirstLine(720);
         XWPFRun appLabel = appPara.createRun();
         appLabel.setText("Заявлений, замечаний, дополнений, уточнений и исправлений, подлежащих внесению в протокол   ");
-        appLabel.setFontFamily("Times New Roman"); appLabel.setFontSize(12);
+        appLabel.setFontFamily("Times New Roman"); appLabel.setFontSize(14);
         XWPFRun appValue = appPara.createRun();
         appValue.setUnderline(UnderlinePatterns.SINGLE);
         appValue.setText(safe(data.getApplication()).equals("—") ? "не имею" : data.getApplication());
-        appValue.setFontFamily("Times New Roman"); appValue.setFontSize(12);
+        appValue.setFontFamily("Times New Roman"); appValue.setFontSize(14);
         addEmptyLine(doc);
 
         addInlineSignatureLine(doc, roleLabel, fio);
@@ -1329,20 +1435,20 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
         XWPFParagraph label = doc.createParagraph();
         XWPFRun lr = label.createRun();
         lr.setBold(true); lr.setText("Допросил, протокол составил:");
-        lr.setFontFamily("Times New Roman"); lr.setFontSize(12);
+        lr.setFontFamily("Times New Roman"); lr.setFontSize(14);
         addEmptyLine(doc);
 
         XWPFParagraph profPara = doc.createParagraph();
         profPara.setAlignment(ParagraphAlignment.LEFT);
         XWPFRun pr = profPara.createRun();
         pr.setBold(true); pr.setText(safe(data.getInvestigatorProfession()));
-        pr.setFontFamily("Times New Roman"); pr.setFontSize(12);
+        pr.setFontFamily("Times New Roman"); pr.setFontSize(14);
         addEmptyLine(doc);
 
         XWPFParagraph sigPara = doc.createParagraph();
         XWPFRun sr = sigPara.createRun();
         sr.setText("___________________________                    " + safe(data.getInvestigator()));
-        sr.setFontFamily("Times New Roman"); sr.setFontSize(12);
+        sr.setFontFamily("Times New Roman"); sr.setFontSize(14);
 
         XWPFParagraph notePara = doc.createParagraph();
         notePara.setAlignment(ParagraphAlignment.LEFT);
@@ -1584,40 +1690,67 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
     private void addCenteredBoldParagraph(XWPFDocument doc, String text, int fontSize) {
         XWPFParagraph p = doc.createParagraph();
         p.setAlignment(ParagraphAlignment.CENTER);
+        setLineSpacing(p);
         XWPFRun r = p.createRun();
-        r.setBold(true); r.setText(text); r.setFontFamily("Times New Roman"); r.setFontSize(fontSize);
+        r.setBold(true);
+        r.setText(text);
+        r.setFontFamily("Times New Roman");
+        r.setFontSize(fontSize);
     }
 
     private void addCenteredParagraph(XWPFDocument doc, String text, int fontSize) {
         XWPFParagraph p = doc.createParagraph();
         p.setAlignment(ParagraphAlignment.CENTER);
+        setLineSpacing(p);
         XWPFRun r = p.createRun();
-        r.setText(text); r.setFontFamily("Times New Roman"); r.setFontSize(fontSize);
+        r.setText(text);
+        r.setFontFamily("Times New Roman");
+        r.setFontSize(fontSize);
     }
 
     private void addJustifiedParagraph(XWPFDocument doc, String text) {
         XWPFParagraph p = doc.createParagraph();
         p.setAlignment(ParagraphAlignment.BOTH);
         p.setIndentationFirstLine(720);
+        setLineSpacing(p);
         XWPFRun r = p.createRun();
-        r.setText(text); r.setFontFamily("Times New Roman"); r.setFontSize(12);
+        r.setText(text);
+        r.setFontFamily("Times New Roman");
+        r.setFontSize(14);
+    }
+    private void setLineSpacing(XWPFParagraph p) {
+        CTPPr pPr = p.getCTP().isSetPPr() ? p.getCTP().getPPr() : p.getCTP().addNewPPr();
+        CTSpacing spacing = pPr.isSetSpacing() ? pPr.getSpacing() : pPr.addNewSpacing();
+        spacing.setLineRule(STLineSpacingRule.AUTO);
+        spacing.setLine(BigInteger.valueOf(360)); // 360 = полуторный интервал (240 = одинарный)
     }
 
     private void addJustifiedItalicParagraph(XWPFDocument doc, String text) {
         XWPFParagraph p = doc.createParagraph();
         p.setAlignment(ParagraphAlignment.BOTH);
         p.setIndentationFirstLine(720);
+        setLineSpacing(p);
         XWPFRun r = p.createRun();
-        r.setItalic(true); r.setText(text); r.setFontFamily("Times New Roman"); r.setFontSize(12);
+        r.setItalic(true);
+        r.setText(text);
+        r.setFontFamily("Times New Roman");
+        r.setFontSize(14);
     }
 
     private void addInlineSignatureLine(XWPFDocument doc, String roleLabel, String fio) {
+        addEmptyLine(doc);
+        addEmptyLine(doc);
         XWPFParagraph p = doc.createParagraph();
+        setLineSpacing(p);
         XWPFRun r1 = p.createRun();
-        r1.setText(roleLabel + ":   "); r1.setFontFamily("Times New Roman"); r1.setFontSize(12);
+        r1.setText(roleLabel + ":   ");
+        r1.setFontFamily("Times New Roman");
+        r1.setFontSize(14);
         XWPFRun r2 = p.createRun();
         String fioLine = (fio != null && !fio.isBlank()) ? fio : "";
-        r2.setText("____________________          " + fioLine); r2.setFontFamily("Times New Roman"); r2.setFontSize(12);
+        r2.setText("____________________          " + fioLine);
+        r2.setFontFamily("Times New Roman");
+        r2.setFontSize(14);
     }
 
     private void addEmptyLine(XWPFDocument doc) {
@@ -1629,10 +1762,10 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
     private void setPageMargins(XWPFDocument doc) {
         CTSectPr sectPr = doc.getDocument().getBody().addNewSectPr();
         CTPageMar pageMar = sectPr.addNewPgMar();
-        pageMar.setTop(BigInteger.valueOf(1440));
-        pageMar.setBottom(BigInteger.valueOf(1440));
-        pageMar.setLeft(BigInteger.valueOf(1800));
-        pageMar.setRight(BigInteger.valueOf(1080));
+        pageMar.setTop(BigInteger.valueOf(567));     // 1 см = 567 dxa
+        pageMar.setBottom(BigInteger.valueOf(567));
+        pageMar.setLeft(BigInteger.valueOf(1134));   // 2 см = 1134 dxa
+        pageMar.setRight(BigInteger.valueOf(567));   // 1 см = 567 dxa
     }
 
     private void setCellWidth(XWPFTableCell cell, int widthDxa) {
