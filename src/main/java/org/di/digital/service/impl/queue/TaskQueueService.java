@@ -120,7 +120,7 @@ public class TaskQueueService {
             String candidate = users.get((startIndex + i) % users.size());
 
             List<TaskQueue> userTasks = taskQueueRepository
-                    .findByUserEmailAndStatus(candidate, TaskStatus.PENDING);
+                    .findByUserEmailAndStatusOrderByPriorityDescCreatedAtAsc(candidate, TaskStatus.PENDING);
             log.info("DEBUG: User {} has {} pending tasks", candidate, userTasks.size());
             if (!userTasks.isEmpty()) {
                 TaskQueue task = userTasks.get(0);
@@ -163,8 +163,12 @@ public class TaskQueueService {
                         Criteria.where("status").is(TaskStatus.PENDING)
                 ),
                 Aggregation.group("userEmail")
-                        .min("createdAt").as("firstTaskTime"),
-                Aggregation.sort(Sort.by(Sort.Direction.ASC, "firstTaskTime"))
+                        .min("createdAt").as("firstTaskTime")
+                        .max("priority").as("maxPriority"),
+                Aggregation.sort(
+                        Sort.by(Sort.Direction.DESC, "maxPriority")
+                                .and(Sort.by(Sort.Direction.ASC, "firstTaskTime"))
+                )
         );
 
         AggregationResults<Document> results =

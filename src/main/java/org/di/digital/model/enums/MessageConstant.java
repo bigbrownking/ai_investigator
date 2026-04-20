@@ -1,4 +1,4 @@
-package org.di.digital.constants;
+package org.di.digital.model.enums;
 
 import lombok.Getter;
 

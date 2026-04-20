@@ -3,6 +3,7 @@ package org.di.digital.service.impl;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.*;
+import org.di.digital.model.Case;
 import org.di.digital.model.Region;
 import org.di.digital.model.User;
 import org.di.digital.model.enums.AppealStatus;
@@ -118,6 +119,7 @@ public class AdminServiceImpl implements AdminService {
                 .map(region -> RegionStatsDto.builder()
                         .regionId(region.getId())
                         .regionName(region.getName())
+                        .mapCode(region.getMapCode())
                         .totalUsers(userRepository.countByRegionId(region.getId()))
                         .activeUsers(userRepository.countByRegionIdAndActiveTrue(region.getId()))
                         .totalCases(caseRepository.countByRegionId(region.getId()))
@@ -163,6 +165,20 @@ public class AdminServiceImpl implements AdminService {
     public CaseResponse getCaseDetail(Long caseId) {
         return caseRepository.findById(caseId)
                 .map(mapper::mapToCaseResponse)
+                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+    }
+
+    @Override
+    public String getCaseQualification(Long caseId) {
+        return caseRepository.findById(caseId)
+                .map(Case::getQualification)
+                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+    }
+
+    @Override
+    public String getCaseIndictment(Long caseId) {
+        return caseRepository.findById(caseId)
+                .map(Case::getIndictment)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
     }
 

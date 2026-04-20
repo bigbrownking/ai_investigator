@@ -128,7 +128,6 @@ public class Case {
     public void removeInterrogation(CaseInterrogation interrogation) {
         this.interrogations.remove(interrogation);
         interrogation.setCaseEntity(null);
-        log.debug("Removed interrogation {} from case {}", interrogation.getId(), this.number);
     }
     public void addFigurant(Figurant figurant) {
         this.figurants.add(figurant);
@@ -153,12 +152,9 @@ public class Case {
                 interrogation.getOtherAudios().clear();
             }
         }
-
-        log.debug("Removed all attached files from case {}", this.number);
     }
     public boolean isAtLeastOneFileProcessed() {
         return files.stream()
                 .anyMatch(f -> CaseFileStatusEnum.COMPLETED.equals(f.getStatus()));
     }
-
 }

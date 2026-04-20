@@ -54,7 +54,7 @@ public class CaseInterrogation {
     private String personYear;
     private String personTranslator;
     private String personSpecialist;
-
+    private String testimony;
     private Boolean isDop;
 
     @Column(name = "started_at")

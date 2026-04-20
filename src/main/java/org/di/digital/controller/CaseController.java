@@ -3,10 +3,7 @@ package org.di.digital.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.AddFigurantToCaseRequest;
-import org.di.digital.dto.request.AddUserToCaseRequest;
-import org.di.digital.dto.request.CreateCaseRequest;
-import org.di.digital.dto.request.FileType;
+import org.di.digital.dto.request.*;
 import org.di.digital.dto.response.CaseFileResponse;
 import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.CaseUserResponse;
@@ -52,6 +49,17 @@ public class CaseController {
 
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
+    @PatchMapping("/{caseId}")
+    public ResponseEntity<CaseResponse> editCase(
+            @PathVariable Long caseId,
+            @RequestBody EditCaseRequest request,
+            Authentication authentication
+    ) {
+        log.info("Editing case: {} by user: {}", caseId, authentication.getName());
+        CaseResponse response = caseService.editCase(caseId, request, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
 
     @GetMapping("/{id}")
     public ResponseEntity<CaseResponse> getCaseById(

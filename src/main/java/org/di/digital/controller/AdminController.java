@@ -51,6 +51,17 @@ public class AdminController {
     public ResponseEntity<CaseResponse> getCaseDetail(@PathVariable Long caseId) {
         return ResponseEntity.ok(adminService.getCaseDetail(caseId));
     }
+
+    @GetMapping("/cases/{caseId}/indictment")
+    public ResponseEntity<String> getCaseIndictment(@PathVariable Long caseId) {
+        return ResponseEntity.ok(adminService.getCaseIndictment(caseId));
+    }
+
+    @GetMapping("/cases/{caseId}/qualification")
+    public ResponseEntity<String> getCaseQualification(@PathVariable Long caseId) {
+        return ResponseEntity.ok(adminService.getCaseQualification(caseId));
+    }
+
     @GetMapping("/appeals")
     public ResponseEntity<Page<AppealDto>> getAllAppeals(
             @RequestParam(defaultValue = "0") int page,

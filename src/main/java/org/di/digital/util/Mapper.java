@@ -221,6 +221,7 @@ public class Mapper {
                 .date(interrogation.getDate())
                 .involved(interrogation.getInvolved())
                 .involvedPersons(interrogation.getInvolvedPersons())
+                .testimony(interrogation.getTestimony())
                 .confession(interrogation.getConfession())
                 .confessionText(interrogation.getConfessionText())
                 .language(interrogation.getLanguage())

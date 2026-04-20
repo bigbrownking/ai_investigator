@@ -2,7 +2,7 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.constants.MessageConstant;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.dto.request.ChatRequest;
 import org.di.digital.dto.response.CaseChatHistoryResponse;
 import org.di.digital.dto.response.CaseChatMessageDto;

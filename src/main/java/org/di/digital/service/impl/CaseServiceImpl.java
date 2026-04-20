@@ -2,9 +2,10 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.constants.MessageConstant;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.dto.request.AddFigurantToCaseRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
+import org.di.digital.dto.request.EditCaseRequest;
 import org.di.digital.dto.request.FileType;
 import org.di.digital.dto.response.CaseFileResponse;
 import org.di.digital.dto.response.CaseResponse;
@@ -16,7 +17,6 @@ import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.repository.CaseRepository;
-import org.di.digital.repository.FigurantRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseService;
 import org.di.digital.service.LogService;
@@ -121,6 +121,48 @@ public class CaseServiceImpl implements CaseService {
         return mapper.mapToCaseResponse(savedCase);
     }
 
+    @Override
+    @Transactional
+    public CaseResponse editCase(Long caseId, EditCaseRequest request, String email) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        validateUserAccess(caseEntity, user);
+
+        if (!caseEntity.isOwner(user)) {
+            throw new AccessDeniedException("Only the case owner can edit this case");
+        }
+
+        String oldNumber = caseEntity.getNumber();
+
+        if (request.getNumber() != null && !request.getNumber().equals(oldNumber)) {
+            if (caseRepository.existsByNumber(request.getNumber())) {
+                throw new RuntimeException("Case with number " + request.getNumber() + " already exists");
+            }
+            caseEntity.setNumber(request.getNumber());
+        }
+
+        if (request.getTitle() != null) {
+            caseEntity.setTitle(request.getTitle());
+        }
+
+        Case savedCase = caseRepository.save(caseEntity);
+
+        log.info("Case {} edited by user: {}", caseId, email);
+
+        logService.log(
+                String.format("Case %s edited by user %s", savedCase.getNumber(), email),
+                LogLevel.INFO,
+                LogAction.CASE_UPDATED,
+                savedCase.getNumber(),
+                email
+        );
+
+        return mapper.mapToCaseResponse(savedCase);
+    }
     @Transactional(readOnly = true)
     public CaseResponse getCaseById(Long id, String email) {
         Case caseEntity = caseRepository.findById(id)

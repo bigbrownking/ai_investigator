@@ -29,6 +29,9 @@ public class CaseFile {
     private Integer tom;
     private boolean isPlanComponent;
     private boolean isPlan;
+    
+    @Column(name = "order_index")
+    private Integer orderIndex;
 
     @Enumerated(EnumType.STRING)
     private CaseFileStatusEnum status;

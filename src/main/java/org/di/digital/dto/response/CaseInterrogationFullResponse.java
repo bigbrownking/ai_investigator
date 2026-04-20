@@ -32,6 +32,7 @@ public class CaseInterrogationFullResponse {
     private LocalDate date;
     private String involved;
     private String involvedPersons;
+    private String testimony;
     private String confession;
     private String confessionText;
     private String language;

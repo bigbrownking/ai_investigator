@@ -2,6 +2,7 @@ package org.di.digital.service;
 
 import org.di.digital.dto.request.AddFigurantToCaseRequest;
 import org.di.digital.dto.request.CreateCaseRequest;
+import org.di.digital.dto.request.EditCaseRequest;
 import org.di.digital.dto.request.FileType;
 import org.di.digital.dto.response.CaseFileResponse;
 import org.di.digital.dto.response.CaseResponse;
@@ -16,6 +17,7 @@ import java.util.Optional;
 
 public interface CaseService {
     List<CaseResponse> getUserCases(String username, String sort);
+    CaseResponse editCase(Long caseId, EditCaseRequest request, String email);
     CaseResponse getCaseById(Long id, String username);
     CaseResponse createCase(CreateCaseRequest request, String username);
     void updateCaseStatus(Long caseId, boolean status, String email);

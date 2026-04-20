@@ -3,7 +3,7 @@ package org.di.digital.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.constants.MessageConstant;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.Case;
 import org.di.digital.model.enums.CaseActivityType;
 import org.di.digital.model.enums.LogAction;
@@ -21,7 +21,6 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.time.LocalDateTime;
-import java.util.Arrays;
 import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;

@@ -57,6 +57,21 @@ public class RegAdminController {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return ResponseEntity.ok(regAdminService.getMyRegionCaseDetail(userDetails.getId(), caseId));
     }
+    @GetMapping("/cases/{caseId}/indictment")
+    public ResponseEntity<String> getCaseIndictment(
+            @PathVariable Long caseId,
+            Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionCaseIndictment(userDetails.getId(), caseId));
+    }
+    @GetMapping("/cases/{caseId}/qualification")
+    public ResponseEntity<String> getCaseQualification(
+            @PathVariable Long caseId,
+            Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionCaseQualification(userDetails.getId(), caseId));
+    }
+
     @GetMapping("/users/{userId}/cases")
     public ResponseEntity<Page<CaseResponse>> getUserCases(
             @PathVariable Long userId,

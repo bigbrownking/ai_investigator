@@ -2,7 +2,7 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.constants.MessageConstant;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.dto.message.AudioProcessingMessage;
 import org.di.digital.dto.request.AddInterrogationRequest;
 import org.di.digital.dto.request.EditAudioTranscribedTextRequest;
@@ -252,6 +252,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             case "addrezz"          -> interrogation.setAddrezz(request.getValue());
             case "notificationNumber"    -> interrogation.setNotificationNumber(request.getValue());
             case "notificationDate"     -> interrogation.setNotificationDate(request.getValue());
+            case "testimony"        -> interrogation.setTestimony(request.getValue());
             case "involved"    -> interrogation.setInvolved(request.getValue());
             case "involvedPersons" -> interrogation.setInvolvedPersons(request.getValue());
             case "confession"    -> interrogation.setConfession(request.getValue());
@@ -317,6 +318,13 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .fieldName(null)
                 .build());
 
+        logService.log(
+                String.format("Uploading qa audio %s by %s user in case %s", audioUrl, email, caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.AUDIO_UPLOADED,
+                caseEntity.getNumber(),
+                email
+        );
         return QAResponse.builder()
                 .id(qaId)
                 .question(question)
@@ -378,6 +386,13 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .fieldName(fieldName)
                 .build());
 
+        logService.log(
+                String.format("Uploading additional audio %s by %s user in case %s", audioUrl, email, caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.AUDIO_UPLOADED,
+                caseEntity.getNumber(),
+                email
+        );
         return OtherAudioResponse.builder()
                 .id(otherId)
                 .fieldName(fieldName)

@@ -15,4 +15,6 @@ public interface RegAdminService {
     Page<CaseResponse> getUserCases(Long adminId, Long userId, int page, int size);
     Page<CaseResponse> getMyRegionCases(Long adminId, int page, int size);
     CaseResponse getMyRegionCaseDetail(Long adminId, Long caseId);
+    String getMyRegionCaseIndictment(Long adminId, Long caseId);
+    String getMyRegionCaseQualification(Long adminId, Long caseId);
 }

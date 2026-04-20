@@ -16,4 +16,6 @@ public interface AdminService {
     List<RegionStatsDto> getRegionMapStats();
     RegionSummaryDto getRegionSummary(Long regionId, int page, int size);
     CaseResponse getCaseDetail(Long caseId);
+    String getCaseIndictment(Long caseId);
+    String getCaseQualification(Long caseId);
 }

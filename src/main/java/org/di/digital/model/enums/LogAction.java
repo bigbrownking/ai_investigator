@@ -22,6 +22,8 @@ public enum LogAction {
     INTERROGATION_DOWNLOAD("Interrogation Download"),
     INTERROGATION_ADDED("Interrogation Added"),
     INTERROGATION_DELETED("Interrogation Deleted"),
+    CASE_UPDATED("Case Updated"),
+    AUDIO_UPLOADED("Audio Uploaded"),
     INTERROGATION_COMPLETED("Interrogation Completed");
 
     private final String description;

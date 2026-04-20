@@ -152,4 +152,43 @@ public class RegAdminServiceImpl implements RegAdminService {
         return mapper.mapToCaseResponse(caseEntity);
     }
 
+    @Override
+    public String getMyRegionCaseIndictment(Long adminId, Long caseId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+        if (admin.getRegion() == null) {
+            throw new RuntimeException("Admin has no region assigned");
+        }
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found"));
+
+        if (caseEntity.getOwner() == null ||
+                caseEntity.getOwner().getRegion() == null ||
+                !caseEntity.getOwner().getRegion().getId().equals(admin.getRegion().getId())) {
+            throw new AccessDeniedException("This case does not belong to your region");
+        }
+        return caseEntity.getIndictment();
+    }
+
+    @Override
+    public String getMyRegionCaseQualification(Long adminId, Long caseId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+        if (admin.getRegion() == null) {
+            throw new RuntimeException("Admin has no region assigned");
+        }
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found"));
+
+        if (caseEntity.getOwner() == null ||
+                caseEntity.getOwner().getRegion() == null ||
+                !caseEntity.getOwner().getRegion().getId().equals(admin.getRegion().getId())) {
+            throw new AccessDeniedException("This case does not belong to your region");
+        }
+        return caseEntity.getQualification();
+    }
 }
