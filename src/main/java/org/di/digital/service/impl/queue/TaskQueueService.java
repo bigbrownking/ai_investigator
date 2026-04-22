@@ -92,7 +92,6 @@ public class TaskQueueService {
         log.info("DEBUG: Found {} users with pending tasks: {}", users.size(), users);
 
         if (users.isEmpty()) {
-            log.info("DEBUG: No pending tasks found in DB");
             return null;
         }
 

@@ -80,7 +80,8 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         validateUserAccess(caseEntity, user);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
-            throw new IllegalStateException(MessageConstant.NO_FILE_PROCESSED.format(caseEntity.getNumber()));}
+            throw new IllegalStateException(MessageConstant.NO_FILE_PROCESSED.format(caseEntity.getNumber()));
+        }
 
         if(caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()){
             throw new IllegalStateException(MessageConstant.CANNOT_CREATE_INTERROGATION.format(caseEntity.getNumber()));
@@ -96,8 +97,8 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         FLRecord flRecord = null;
         FLAddress flAddress = null;
         try {
-            flRecord = flService.getInfoByDocument(request.getDocumentType(), request.getNumber());
-            flAddress = flService.getRegAddressAbout(flRecord.getIin());
+            flRecord = flService.getInfoByDocument(request.getDocumentType(), request.getNumber(), request.getLanguage());
+            flAddress = flService.getRegAddressAbout(flRecord.getIin(), request.getLanguage());
         } catch (Exception e) {
             log.warn("Could not fetch FL data for document {}: {}", request.getNumber(), e.getMessage());
         }
@@ -124,6 +125,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .role(request.getRole())
                 .date(LocalDate.now())
                 .caseEntity(caseEntity)
+                .language(request.getLanguage().equals("rus") ? "русском" : "казахском")
                 .isDop(isDop)
                 .protocol(protocol)
                 .status(CaseInterrogationStatusEnum.IN_PROGRESS)
@@ -270,7 +272,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     }
     @Transactional
     public QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question,
-                                            MultipartFile file, String language, String email) {
+                                            MultipartFile file, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
@@ -313,7 +315,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .caseNumber(caseEntity.getNumber())
                 .audioFileUrl(audioUrl)
                 .originalFileName(file.getOriginalFilename())
-                .language(language)
+                .language(interrogation.getLanguage())
                 .email(email)
                 .fieldName(null)
                 .build());

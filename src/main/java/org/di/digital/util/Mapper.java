@@ -3,6 +3,7 @@ package org.di.digital.util;
 import lombok.RequiredArgsConstructor;
 import org.di.digital.dto.response.*;
 import org.di.digital.model.*;
+import org.di.digital.model.enums.UserSettingsLanguage;
 import org.di.digital.service.MinioService;
 import org.springframework.stereotype.Component;
 
@@ -15,6 +16,8 @@ import static org.di.digital.util.UserUtil.getCurrentUser;
 @RequiredArgsConstructor
 public class Mapper {
     private final MinioService minioService;
+    private final LocalizationHelper localizationHelper;
+
     public CaseInterrogationResponse mapToInterrogationResponse(CaseInterrogation interrogation) {
         return CaseInterrogationResponse.builder()
                 .id(interrogation.getId())
@@ -113,11 +116,12 @@ public class Mapper {
                 .reduce((r1, r2) -> r1 + ", " + r2)
                 .orElse("");
 
+        UserSettingsLanguage language = user.getSettings().getLanguage();
         UserSettingsDto settingsDto = null;
         if (user.getSettings() != null) {
             settingsDto = UserSettingsDto.builder()
                     .level(user.getSettings().getLevel() != null ? user.getSettings().getLevel().name() : null)
-                    .language(user.getSettings().getLanguage().getLanguage())
+                    .language(language.getLanguage())
                     .theme(user.getSettings().getTheme().getTheme())
                     .build();
         }
@@ -129,9 +133,9 @@ public class Mapper {
                 .surname(user.getSurname())
                 .fathername(user.getFathername())
                 .role(roles)
-                .administration(user.getAdministration() != null ? user.getAdministration().getName() : null)
-                .profession(user.getProfession() != null ? user.getProfession().getName() : null)
-                .region(user.getRegion() != null ? user.getRegion().getName() : null)
+                .administration(localizationHelper.getLocalizedName(user.getAdministration(), language))
+                .profession(localizationHelper.getLocalizedName(user.getProfession(), language))
+                .region(localizationHelper.getLocalizedName(user.getRegion(), language))
                 .email(user.getEmail())
                 .active(user.isActive())
                 .settings(settingsDto)
@@ -140,7 +144,7 @@ public class Mapper {
                 .build();
     }
 
-    public FigurantResponse mapToFigurantResponse(Figurant figurant) {
+    public FigurantResponse mapToFigurantResponse(CaseFigurant figurant) {
         return FigurantResponse.builder()
                 .id(figurant.getId())
                 .documentType(figurant.getDocumentType())
@@ -151,12 +155,12 @@ public class Mapper {
     }
 
     public CaseInterrogationFullResponse mapToInterrogationFullResponse(CaseInterrogation interrogation, User user) {
-        String userProf = user.getProfession() == null ? null : user.getProfession().getName();
+        String userProf = localizationHelper.getLocalizedName(user.getProfession(), user.getSettings().getLanguage());
         String profession = interrogation.getInvestigatorProfession() != null
                 ? interrogation.getInvestigatorProfession()
                 : userProf;
 
-        String userReg = user.getRegion() == null ? null : user.getRegion().getName();
+        String userReg = localizationHelper.getLocalizedName(user.getRegion(), user.getSettings().getLanguage());
         String region = interrogation.getInvestigatorRegion() != null
                 ? interrogation.getInvestigatorRegion()
                 : userReg;
@@ -294,7 +298,7 @@ public class Mapper {
                 .userSurname(appeal.getUser().getSurname())
                 .userEmail(appeal.getUser().getEmail())
                 .regionId(appeal.getRegion() != null ? appeal.getRegion().getId() : null)
-                .regionName(appeal.getRegion() != null ? appeal.getRegion().getName() : null)
+                .regionName(localizationHelper.getLocalizedName(appeal.getRegion(), getCurrentUser().getSettings().getLanguage()))
                 .status(appeal.getStatus())
                 .createdAt(appeal.getCreatedAt())
                 .reviewedAt(appeal.getReviewedAt())
@@ -303,21 +307,21 @@ public class Mapper {
     public ProfessionDto toProfessionDto(Profession profession){
         return ProfessionDto.builder()
                 .id(profession.getId())
-                .name(profession.getName())
+                .name(localizationHelper.getLocalizedName(profession, getCurrentUser().getSettings().getLanguage()))
                 .build();
     }
 
     public RegionDto toRegionDto(Region region){
         return RegionDto.builder()
                 .id(region.getId())
-                .name(region.getName())
+                .name(localizationHelper.getLocalizedName(region, getCurrentUser().getSettings().getLanguage()))
                 .build();
     }
 
     public AdministrationDto toAdministrationDto(Administration administration){
         return AdministrationDto.builder()
                 .id(administration.getId())
-                .name(administration.getName())
+                .name(localizationHelper.getLocalizedName(administration, getCurrentUser().getSettings().getLanguage()))
                 .build();
     }
 }

@@ -12,12 +12,16 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "regions")
-public class Region {
+public class Region implements Localizable{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String name;
+    @Column(name = "ru_name")
+    private String ruName;
+
+    @Column(name = "kz_name")
+    private String kzName;
 
     @OneToMany(mappedBy = "region", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<User> users;

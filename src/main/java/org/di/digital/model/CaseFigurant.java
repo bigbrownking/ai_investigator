@@ -10,7 +10,7 @@ import lombok.*;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "figurants")
-public class Figurant {
+public class CaseFigurant {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;

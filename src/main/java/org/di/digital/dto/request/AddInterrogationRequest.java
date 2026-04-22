@@ -20,4 +20,6 @@ public class AddInterrogationRequest {
 
     @NotBlank
     private String role;
+
+    private String language;
 }

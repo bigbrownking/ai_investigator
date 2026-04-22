@@ -12,6 +12,7 @@ import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.RegionRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.AdminService;
+import org.di.digital.util.LocalizationHelper;
 import org.di.digital.util.Mapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -20,6 +21,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static org.di.digital.util.UserUtil.getCurrentUser;
 
 @Slf4j
 @Service
@@ -31,7 +34,7 @@ public class AdminServiceImpl implements AdminService {
     private final AppealRepository appealRepository;
     private final RegionRepository regionRepository;
     private final Mapper mapper;
-
+    private final LocalizationHelper localizationHelper;
     @Override
     public Page<UserProfile> getAllUsers(int page, int size, Long regionId) {
         Pageable pageable = PageRequest.of(page, size);
@@ -118,7 +121,7 @@ public class AdminServiceImpl implements AdminService {
         return regionRepository.findAll().stream()
                 .map(region -> RegionStatsDto.builder()
                         .regionId(region.getId())
-                        .regionName(region.getName())
+                        .regionName(localizationHelper.getLocalizedName(region, getCurrentUser().getSettings().getLanguage()))
                         .mapCode(region.getMapCode())
                         .totalUsers(userRepository.countByRegionId(region.getId()))
                         .activeUsers(userRepository.countByRegionIdAndActiveTrue(region.getId()))
@@ -136,7 +139,7 @@ public class AdminServiceImpl implements AdminService {
 
         RegionStatsDto stats = RegionStatsDto.builder()
                 .regionId(region.getId())
-                .regionName(region.getName())
+                .regionName(localizationHelper.getLocalizedName(region, getCurrentUser().getSettings().getLanguage()))
                 .mapCode(region.getMapCode())
                 .totalUsers(userRepository.countByRegionId(regionId))
                 .activeUsers(userRepository.countByRegionIdAndActiveTrue(regionId))

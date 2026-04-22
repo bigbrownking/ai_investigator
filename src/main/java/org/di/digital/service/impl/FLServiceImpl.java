@@ -18,20 +18,20 @@ public class FLServiceImpl implements FLService {
     private final FLAddressRepository flAddressRepository;
     private final FLRecordRepository flRecordRepository;
     @Override
-    public FLRecord getInfoByDocument(String documentType, String number) {
+    public FLRecord getInfoByDocument(String documentType, String number, String language) {
         return switch (documentType.toUpperCase()) {
-            case "ИИН" -> flRecordRepository.findByIin(number);
-            case "ПАСПОРТ" -> flRecordRepository.findByDocumentNumber(number);
+            case "ИИН" -> flRecordRepository.findByIin(number, language);
+            case "ПАСПОРТ" -> flRecordRepository.findByDocumentNumber(number, language);
             default -> throw new RuntimeException("Unsupported document type: " + documentType);
         };
     }
     @Override
-    public FLRecord getInfoAbout(String iin) {
-        return flRecordRepository.findByIin(iin);
+    public FLRecord getInfoAbout(String iin, String language) {
+        return flRecordRepository.findByIin(iin, language);
     }
 
     @Override
-    public FLAddress getRegAddressAbout(String iin) {
+    public FLAddress getRegAddressAbout(String iin, String language) {
         return flAddressRepository.findByIin(iin);
     }
 }

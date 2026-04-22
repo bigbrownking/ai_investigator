@@ -34,7 +34,7 @@ public class QualificationServiceImpl implements QualificationService {
 
     private final CaseRepository caseRepository;
     private final ObjectMapper mapper;
-    private final WordDocumentService wordDocumentService;
+    private final DocumentFormatterService documentFormatterService;
     private final CaseService caseService;
     private final StreamingService streamingService;
     private final LogService logService;
@@ -132,7 +132,7 @@ public class QualificationServiceImpl implements QualificationService {
                     userEmail
             );
             return new ByteArrayResource(
-                    wordDocumentService.generateQualificationDocument(getQualification(caseNumber))
+                    documentFormatterService.generateQualificationDocument(getQualification(caseNumber))
             );
         } catch (IOException e) {
             throw new RuntimeException(e);

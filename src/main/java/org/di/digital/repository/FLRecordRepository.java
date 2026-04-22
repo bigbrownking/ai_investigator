@@ -20,7 +20,7 @@ public class FLRecordRepository {
     public FLRecordRepository(@Qualifier("flJdbcTemplate") JdbcTemplate flJdbcTemplate) {
         this.flJdbcTemplate = flJdbcTemplate;
     }
-    public FLRecord findByDocumentNumber(String documentNumber) {
+    public FLRecord findByDocumentNumber(String documentNumber, String language) {
         String docSql = """
             SELECT pd.IIN as iin
             FROM gbd_fl_30_09_25.person_documents pd
@@ -33,11 +33,14 @@ public class FLRecordRepository {
 
         if (iin.isEmpty()) throw new RuntimeException("Person not found by document: " + documentNumber);
 
-        return findByIin(iin);
+        return findByIin(iin, language);
     }
 
-    public FLRecord findByIin(String iin) {
-        String personSql = """
+    public FLRecord findByIin(String iin, String language) {
+        String personSql = "";
+        String docSql = "";
+        if(language.equals("ru")){
+            personSql = """
             SELECT
                 p.IIN as iin, p.SURNAME as surname, p.FIRSTNAME as firstname,
                 p.SECONDNAME as secondname, p.BIRTH_DATE as birthdate,
@@ -60,7 +63,7 @@ public class FLRecordRepository {
             LIMIT 1
             """;
 
-        String docSql = """
+            docSql = """
             SELECT
                 doc_type.RU_NAME AS documentType,
                 pd.DOCUMENT_NUMBER AS documentNumber,
@@ -75,6 +78,46 @@ public class FLRecordRepository {
             LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_INVALIDITY doc_invalid ON doc_invalid.ID = pd.DOCUMENT_INVALIDITY_ID
             WHERE pd.IIN = ?
             """;
+        }else if(language.equals("kz")){
+            personSql = """
+            SELECT
+                p.IIN as iin, p.SURNAME as surname, p.FIRSTNAME as firstname,
+                p.SECONDNAME as secondname, p.BIRTH_DATE as birthdate,
+                citizenship.KZ_NAME AS citizenship,
+                birthCountry.KZ_NAME AS birthCountry,
+                region.KZ_NAME AS birthRegion,
+                district.KZ_NAME AS birthDistricts,
+                CASE 
+                    WHEN p.SEX_ID = '1' THEN nat_m.KZ_NAME
+                    WHEN p.SEX_ID = '2' THEN nat_f.KZ_NAME
+                END AS nationality
+            FROM gbd_fl_30_09_25.person_info p
+            LEFT JOIN gbd_fl_30_09_25.DIC_COUNTRY citizenship ON citizenship.ID = p.CITIZENSHIP_ID
+            LEFT JOIN gbd_fl_30_09_25.DIC_COUNTRY birthCountry ON birthCountry.ID = p.BIRTH_COUNTRY_ID
+            LEFT JOIN gbd_fl_30_09_25.DIC_REGION region ON region.ID = p.BIRTH_REGION_ID
+            LEFT JOIN gbd_fl_30_09_25.DIC_DISTRICTS district ON district.ID = p.BIRTH_DISTRICTS_ID
+            LEFT JOIN gbd_fl_30_09_25.DIC_NATIONALITY_M nat_m ON nat_m.ID = p.NATIONALTY_ID
+            LEFT JOIN gbd_fl_30_09_25.DIC_NATIONALITY_F nat_f ON nat_f.ID = p.NATIONALTY_ID
+            WHERE p.IIN = ?
+            LIMIT 1
+            """;
+
+            docSql = """
+            SELECT
+                doc_type.KZ_NAME AS documentType,
+                pd.DOCUMENT_NUMBER AS documentNumber,
+                pd.DOCUMENT_BEGIN_DATE AS beginDate,
+                pd.DOCUMENT_END_DATE AS endDate,
+                doc_issue.KZ_NAME AS issueOrg,
+                doc_invalid.KZ_NAME AS invalidityReason,
+                pd.DOCUMENT_INVALIDITY_DATE AS invalidityDate
+            FROM gbd_fl_30_09_25.person_documents pd
+            LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_type ON doc_type.ID = pd.DOCUMENT_TYPE_ID
+            LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_issue ON doc_issue.ID = pd.ISSUE_ORGANIZATION_ID
+            LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_INVALIDITY doc_invalid ON doc_invalid.ID = pd.DOCUMENT_INVALIDITY_ID
+            WHERE pd.IIN = ?
+            """;
+        }
 
         FLRecord record = flJdbcTemplate.queryForObject(personSql, (rs, rowNum) -> FLRecord.builder()
                 .iin(rs.getString("iin"))

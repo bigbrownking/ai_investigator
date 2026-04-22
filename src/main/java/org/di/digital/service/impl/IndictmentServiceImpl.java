@@ -41,7 +41,7 @@ public class IndictmentServiceImpl implements IndictmentService {
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final CaseFileRepository caseFileRepository;
     private final ObjectMapper mapper;
-    private final WordDocumentService wordDocumentService;
+    private final DocumentFormatterService documentFormatterService;
     private final CaseService caseService;
     private final StreamingService streamingService;
     private final LogService logService;
@@ -213,7 +213,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                     userEmail
             );
             return new ByteArrayResource(
-                    wordDocumentService.generateIndictmentDocument(getIndictment(caseNumber))
+                    documentFormatterService.generateIndictmentDocument(getIndictment(caseNumber))
             );
         } catch (IOException e) {
             throw new RuntimeException(e);

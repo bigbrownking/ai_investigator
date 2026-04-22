@@ -505,7 +505,7 @@ public class CaseServiceImpl implements CaseService {
             throw new IllegalStateException("Figurant already exists in this case");
         }
 
-        Figurant figurant = Figurant.builder()
+        CaseFigurant figurant = CaseFigurant.builder()
                 .documentType(request.getDocumentType())
                 .number(request.getNumber())
                 .fio(request.getFio())
@@ -516,7 +516,7 @@ public class CaseServiceImpl implements CaseService {
         caseEntity.addFigurant(figurant);
         Case savedCase = caseRepository.save(caseEntity);
 
-        Figurant saved = savedCase.getFigurants().stream()
+        CaseFigurant saved = savedCase.getFigurants().stream()
                 .filter(f -> f.getFio().equals(request.getFio()) && f.getNumber().equals(request.getNumber()))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Failed to retrieve saved figurant"));
@@ -573,7 +573,7 @@ public class CaseServiceImpl implements CaseService {
 
         validateUserAccess(caseEntity, currentUser);
 
-        Figurant figurant = caseEntity.getFigurants().stream()
+        CaseFigurant figurant = caseEntity.getFigurants().stream()
                 .filter(f -> f.getId().equals(figurantId))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Figurant not found with id: " + figurantId));
