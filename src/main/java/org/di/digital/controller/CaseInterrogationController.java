@@ -7,7 +7,7 @@ import org.di.digital.dto.request.EditAudioTranscribedTextRequest;
 import org.di.digital.dto.request.UpdateProtocolFieldRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.service.CaseInterrogationService;
-import org.di.digital.service.InterrogationExportService;
+import org.di.digital.service.export.InterrogationExportService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;

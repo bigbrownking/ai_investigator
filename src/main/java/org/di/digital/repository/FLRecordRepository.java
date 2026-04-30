@@ -3,6 +3,7 @@ package org.di.digital.repository;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.fl.FLDocument;
 import org.di.digital.model.fl.FLRecord;
+import org.di.digital.model.fl.IssueOrganizationEnum;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -39,10 +40,10 @@ public class FLRecordRepository {
     public FLRecord findByIin(String iin, String language) {
         String personSql = "";
         String docSql = "";
-        if(language.equals("ru")){
+        if(language.equals("русском")){
             personSql = """
             SELECT
-                p.IIN as iin, p.SURNAME as surname, p.FIRSTNAME as firstname,
+                p.IIN as iin, p.SEX_ID as sexId, p.SURNAME as surname, p.FIRSTNAME as firstname,
                 p.SECONDNAME as secondname, p.BIRTH_DATE as birthdate,
                 citizenship.RU_NAME AS citizenship,
                 birthCountry.RU_NAME AS birthCountry,
@@ -69,16 +70,15 @@ public class FLRecordRepository {
                 pd.DOCUMENT_NUMBER AS documentNumber,
                 pd.DOCUMENT_BEGIN_DATE AS beginDate,
                 pd.DOCUMENT_END_DATE AS endDate,
-                doc_issue.RU_NAME AS issueOrg,
+                pd.ISSUE_ORGANIZATION_ID AS issueOrg,
                 doc_invalid.RU_NAME AS invalidityReason,
                 pd.DOCUMENT_INVALIDITY_DATE AS invalidityDate
             FROM gbd_fl_30_09_25.person_documents pd
             LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_type ON doc_type.ID = pd.DOCUMENT_TYPE_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_issue ON doc_issue.ID = pd.ISSUE_ORGANIZATION_ID
             LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_INVALIDITY doc_invalid ON doc_invalid.ID = pd.DOCUMENT_INVALIDITY_ID
             WHERE pd.IIN = ?
             """;
-        }else if(language.equals("kz")){
+        }else if(language.equals("казахском")){
             personSql = """
             SELECT
                 p.IIN as iin, p.SURNAME as surname, p.FIRSTNAME as firstname,
@@ -108,12 +108,11 @@ public class FLRecordRepository {
                 pd.DOCUMENT_NUMBER AS documentNumber,
                 pd.DOCUMENT_BEGIN_DATE AS beginDate,
                 pd.DOCUMENT_END_DATE AS endDate,
-                doc_issue.KZ_NAME AS issueOrg,
+                pd.ISSUE_ORGANIZATION_ID AS issueOrg,
                 doc_invalid.KZ_NAME AS invalidityReason,
                 pd.DOCUMENT_INVALIDITY_DATE AS invalidityDate
             FROM gbd_fl_30_09_25.person_documents pd
             LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_type ON doc_type.ID = pd.DOCUMENT_TYPE_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_issue ON doc_issue.ID = pd.ISSUE_ORGANIZATION_ID
             LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_INVALIDITY doc_invalid ON doc_invalid.ID = pd.DOCUMENT_INVALIDITY_ID
             WHERE pd.IIN = ?
             """;
@@ -121,6 +120,7 @@ public class FLRecordRepository {
 
         FLRecord record = flJdbcTemplate.queryForObject(personSql, (rs, rowNum) -> FLRecord.builder()
                 .iin(rs.getString("iin"))
+                .sexId(rs.getString("sexId"))
                 .fio(String.join(" ",
                         nullToEmpty(rs.getString("surname")),
                         nullToEmpty(rs.getString("firstname")),
@@ -141,7 +141,7 @@ public class FLRecordRepository {
                 .documentNumber(rs.getString("documentNumber"))
                 .beginDate(parseDate(rs.getString("beginDate")))
                 .endDate(parseDate(rs.getString("endDate")))
-                .issueOrg(rs.getString("issueOrg"))
+                .issueOrg(IssueOrganizationEnum.getNameById(rs.getString("issueOrg"), language))
                 .invalidityReason(rs.getString("invalidityReason"))
                 .invalidityDate(parseDate(rs.getString("invalidityDate")))
                 .build(), iin);

@@ -65,19 +65,4 @@ public class UserServiceImpl implements UserService {
     }
 
 
-    @Override
-    @Transactional
-    public UserProfile updateStreet(String email, String street) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
-
-        user.setStreet(street);
-        userRepository.save(user);
-
-        log.info("Updated street for user {}: {}", email, street);
-
-        return mapper.mapToUserProfileResponse(user);
-    }
-
-
 }

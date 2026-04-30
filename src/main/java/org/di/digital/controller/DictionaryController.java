@@ -73,7 +73,7 @@ public class DictionaryController {
 
     @GetMapping("/regions")
     public ResponseEntity<List<RegionDto>> getRegions() {
-        return ResponseEntity.ok(regionRepository.findAll().stream().map(mapper::toRegionDto).collect(Collectors.toList()));
+        return ResponseEntity.ok(regionRepository.findAllByOrderByRuNameAsc().stream().map(mapper::toRegionDto).collect(Collectors.toList()));
     }
 
     @GetMapping("/administrations")

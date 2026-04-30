@@ -2,6 +2,9 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.search.AppealSearchRequest;
+import org.di.digital.dto.request.search.CaseSearchRequest;
+import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.AppealDto;
 import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.UserProfile;
@@ -28,26 +31,29 @@ public class RegAdminController {
     public ResponseEntity<Page<AppealDto>> getAppeals(
             Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @ModelAttribute AppealSearchRequest appealSearchRequest) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        return ResponseEntity.ok(regAdminService.getMyRegionAppeals(userDetails.getId(), page, size));
+        return ResponseEntity.ok(regAdminService.getMyRegionAppeals(userDetails.getId(), page, size, appealSearchRequest));
     }
 
     @GetMapping("/users")
     public ResponseEntity<Page<UserProfile>> getUsers(
             Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @ModelAttribute UserSearchRequest userSearchRequest) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        return ResponseEntity.ok(regAdminService.getMyRegionUsers(userDetails.getId(), page, size));
+        return ResponseEntity.ok(regAdminService.getMyRegionUsers(userDetails.getId(), page, size, userSearchRequest));
     }
     @GetMapping("/cases")
     public ResponseEntity<Page<CaseResponse>> getRegionCases(
             Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @ModelAttribute CaseSearchRequest caseSearchRequest) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        return ResponseEntity.ok(regAdminService.getMyRegionCases(userDetails.getId(), page, size));
+        return ResponseEntity.ok(regAdminService.getMyRegionCases(userDetails.getId(), page, size, caseSearchRequest));
     }
 
     @GetMapping("/cases/{caseId}")
@@ -77,9 +83,10 @@ public class RegAdminController {
             @PathVariable Long userId,
             Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
+            @RequestParam(defaultValue = "20") int size,
+            @ModelAttribute CaseSearchRequest caseSearchRequest) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        return ResponseEntity.ok(regAdminService.getUserCases(userDetails.getId(), userId, page, size));
+        return ResponseEntity.ok(regAdminService.getUserCases(userDetails.getId(), userId, page, size, caseSearchRequest));
     }
     @PutMapping("/appeals/{id}/approve")
     public ResponseEntity<Void> approve(@PathVariable Long id, Authentication authentication) {

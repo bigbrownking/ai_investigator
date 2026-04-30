@@ -24,9 +24,9 @@ public class CaseInterrogationProtocolResponse {
     private String contactPhone;
     private String contactEmail;
     private String other;
-    private String relation;
+    private List<RelationResponse> relation;
     private String technical;
-    private String military;
-    private String criminalRecord;
+    private List<MilitaryResponse> military;
+    private List<CriminalResponse> criminalRecord;
     private String iinOrPassport;
 }

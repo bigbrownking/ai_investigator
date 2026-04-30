@@ -30,6 +30,7 @@ public class FLRecord {
     private String birthCountry; //BIRTH_COUNTRY_ID
     private String birthRegion; //BIRTH_REGION_ID
     private String birthDistricts; //BIRTH_DISTRICT_ID
+    private String sexId;
 
     private List<FLDocument> documents;
 }

@@ -7,6 +7,7 @@ import org.di.digital.model.enums.UserSettingsLanguage;
 import org.di.digital.service.MinioService;
 import org.springframework.stereotype.Component;
 
+import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
 
@@ -47,31 +48,85 @@ public class Mapper {
                 .map(e -> EducationResponse.builder()
                         .id(e.getId())
                         .type(e.getType())
-                        .edu(e.getEdu())
+                        .about(e.getAbout())
                         .build())
                 .toList()
                 : List.of();
+
+        List<CriminalResponse> criminals = protocol.getCriminals() != null
+                ? protocol.getCriminals().stream()
+                .map(e -> CriminalResponse.builder()
+                        .id(e.getId())
+                        .type(e.getType())
+                        .about(e.getAbout())
+                        .build())
+                .toList()
+                : List.of();
+
+        List<MilitaryResponse> militaries = protocol.getMilitaries() != null
+                ? protocol.getMilitaries().stream()
+                .map(e -> MilitaryResponse.builder()
+                        .id(e.getId())
+                        .type(e.getType())
+                        .about(e.getAbout())
+                        .build())
+                .toList()
+                : List.of();
+
+        List<RelationResponse> relations = protocol.getRelationRecords() != null
+                ? protocol.getRelationRecords().stream()
+                .map(e -> RelationResponse.builder()
+                        .id(e.getId())
+                        .type(e.getType())
+                        .about(e.getAbout())
+                        .build())
+                .toList()
+                : List.of();
+        String genderCorrectedStatus = formatMartialStatus(protocol);
         return CaseInterrogationProtocolResponse.builder()
-                .fio(protocol.getFio())
-                .dateOfBirth(protocol.getDateOfBirth())
-                .birthPlace(protocol.getBirthPlace())
-                .citizenship(protocol.getCitizenship())
-                .nationality(protocol.getNationality())
+                .fio(localizationHelper.toTitleCase(protocol.getFio()))
+                .dateOfBirth(localizationHelper.formatToRussianDate(protocol.getDateOfBirth()))
+                .birthPlace(localizationHelper.toTitleCase(protocol.getBirthPlace()))
+                .citizenship("гражданин Республики "+ localizationHelper.toTitleCase(protocol.getCitizenship()))
+                .nationality(localizationHelper.toTitleCase(protocol.getNationality()))
                 .educations(educations)
-                .martialStatus(protocol.getMartialStatus())
+                .martialStatus(genderCorrectedStatus)
                 .workOrStudyPlace(protocol.getWorkOrStudyPlace())
                 .position(protocol.getPosition())
                 .address(protocol.getAddress())
                 .contactPhone(protocol.getContactPhone())
                 .contactEmail(protocol.getContactEmail())
                 .other(protocol.getOther())
-                .relation(protocol.getRelation())
+                .relation(relations)
                 .technical(protocol.getTechnical())
-                .military(protocol.getMilitary())
-                .criminalRecord(protocol.getCriminalRecord())
+                .military(militaries)
+                .criminalRecord(criminals)
                 .iinOrPassport(protocol.getIinOrPassport())
                 .interrogationId(protocol.getInterrogation() != null ? protocol.getInterrogation().getId() : null)
                 .build();
+    }
+    private String formatMartialStatus(CaseInterrogationProtocol protocol) {
+        String status = protocol.getMartialStatus();
+        String sexId = protocol.getSexId();
+        if (status == null) return null;
+
+        String s = status.toLowerCase().trim();
+        boolean isFemale = "2".equals(sexId);
+
+        if (s.contains("холост") || s.contains("не замужем")) {
+            return isFemale ? "не замужем" : "холост";
+        }
+        if (s.contains("женат") || s.contains("замужем")) {
+            return isFemale ? "замужем" : "женат";
+        }
+        if (s.contains("разведен") || s.contains("разведена")) {
+            return isFemale ? "разведена" : "разведен";
+        }
+        if (s.contains("вдовец") || s.contains("вдова")) {
+            return isFemale ? "вдова" : "вдовец";
+        }
+
+        return status;
     }
 
     public CaseResponse mapToCaseResponse(Case caseEntity) {
@@ -81,6 +136,9 @@ public class Mapper {
                 .number(caseEntity.getNumber())
                 .status(caseEntity.isStatus())
                 .files(caseEntity.getFiles().stream()
+                        .sorted(Comparator
+                                .comparing(CaseFile::getTom, Comparator.nullsLast(Comparator.naturalOrder()))
+                                .thenComparing(f -> extractLeadingNumber(f.getOriginalFileName()), Comparator.nullsLast(Comparator.naturalOrder()))                                .thenComparing(CaseFile::getOriginalFileName, Comparator.nullsLast(Comparator.naturalOrder())))
                         .map(this::mapToCaseFileResponse)
                         .collect(Collectors.toList()))
                 .interrogations(caseEntity.getInterrogations().stream()
@@ -97,6 +155,12 @@ public class Mapper {
                 .indictmentGeneratedAt(caseEntity.getIndictmentGeneratedAt())
                 .updatedDate(caseEntity.getUpdatedDate())
                 .build();
+    }
+
+    private Long extractLeadingNumber(String fileName) {
+        if (fileName == null) return null;
+        java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(\\d+)").matcher(fileName);
+        return m.find() ? Long.parseLong(m.group(1)) : null;
     }
     public CaseUserResponse mapToCaseUserResponse(User user, Case caseEntity) {
         return CaseUserResponse.builder()
@@ -139,7 +203,7 @@ public class Mapper {
                 .email(user.getEmail())
                 .active(user.isActive())
                 .settings(settingsDto)
-                .street(user.getStreet())
+                .street(localizationHelper.getLocalizedName(user.getRegion().getAddresses().get(0), language))
                 .createdCaseCount(user.getCases() != null ? user.getCases().size() : 0)
                 .build();
     }
@@ -155,26 +219,39 @@ public class Mapper {
     }
 
     public CaseInterrogationFullResponse mapToInterrogationFullResponse(CaseInterrogation interrogation, User user) {
-        String userProf = localizationHelper.getLocalizedName(user.getProfession(), user.getSettings().getLanguage());
+        String userProf = localizationHelper.getLocalizedName(
+                user.getProfession(), user.getSettings().getLanguage());
         String profession = interrogation.getInvestigatorProfession() != null
                 ? interrogation.getInvestigatorProfession()
                 : userProf;
 
-        String userReg = localizationHelper.getLocalizedName(user.getRegion(), user.getSettings().getLanguage());
-        String region = interrogation.getInvestigatorRegion() != null
-                ? interrogation.getInvestigatorRegion()
-                : userReg;
+        String region = localizationHelper.getGenitive(
+                interrogation.getInvestigatorRegion() != null
+                        ? interrogation.getInvestigatorRegion()
+                        : user.getRegion().getRuName()
+        );
 
-        String street = interrogation.getAddrezz() != null
+        String administration = localizationHelper.getGenitive(
+                interrogation.getInvestigatorAdministration() != null
+                        ? interrogation.getInvestigatorAdministration()
+                        : user.getAdministration().getRuName()
+        );
+
+        String userAdr = localizationHelper.getLocalizedName(
+                user.getRegion().getAddresses().get(0), user.getSettings().getLanguage());
+        String address = interrogation.getAddrezz() != null
                 ? interrogation.getAddrezz()
-                : user.getStreet();
+                : userAdr;
+
         String city = interrogation.getCity() != null
                 ? interrogation.getCity()
                 : "г. Астана";
 
         CaseInterrogationProtocolResponse protocolResponse = null;
+        String fio = interrogation.getFio();
         if (interrogation.getProtocol() != null) {
             protocolResponse = mapToInterrogationProtocolResponse(interrogation.getProtocol());
+            fio = localizationHelper.toTitleCase(interrogation.getProtocol().getFio());
         }
 
         List<CaseInterrogationQAResponse> qaList = null;
@@ -212,7 +289,7 @@ public class Mapper {
                 .personYear(interrogation.getPersonYear())
                 .personSpecialist(interrogation.getPersonSpecialist())
                 .personTranslator(interrogation.getPersonTranslator())
-                .addrezz(street)
+                .addrezz(address)
                 .notificationNumber(interrogation.getNotificationNumber())
                 .notificationDate(interrogation.getNotificationDate())
                 .state(interrogation.getState())
@@ -220,7 +297,7 @@ public class Mapper {
                 .caseNumber(caseNumber)
                 .number(interrogation.getNumber())
                 .documentType(interrogation.getDocumentType())
-                .fio(interrogation.getFio())
+                .fio(fio)
                 .role(interrogation.getRole())
                 .date(interrogation.getDate())
                 .involved(interrogation.getInvolved())
@@ -228,7 +305,7 @@ public class Mapper {
                 .testimony(interrogation.getTestimony())
                 .confession(interrogation.getConfession())
                 .confessionText(interrogation.getConfessionText())
-                .language(interrogation.getLanguage())
+                .language(interrogation.getLanguage() == null || interrogation.getLanguage().equals("русском") ? "русском" : "казахском")
                 .translator(interrogation.getTranslator())
                 .defender(interrogation.getDefender())
                 .familiarization(interrogation.getFamiliarization())
@@ -237,6 +314,7 @@ public class Mapper {
                 .application(interrogation.getApplication())
                 .investigator(investigator)
                 .investigatorProfession(profession)
+                .investigatorAdministration(administration)
                 .investigatorRegion(region)
                 .status(interrogation.getStatus().name())
                 .protocol(protocolResponse)
@@ -296,10 +374,11 @@ public class Mapper {
                 .userId(appeal.getUser().getId())
                 .userName(appeal.getUser().getName())
                 .userSurname(appeal.getUser().getSurname())
+                .userFathername(appeal.getUser().getFathername())
                 .userEmail(appeal.getUser().getEmail())
                 .regionId(appeal.getRegion() != null ? appeal.getRegion().getId() : null)
                 .regionName(localizationHelper.getLocalizedName(appeal.getRegion(), getCurrentUser().getSettings().getLanguage()))
-                .status(appeal.getStatus())
+                .status(appeal.getStatus().getDescription())
                 .createdAt(appeal.getCreatedAt())
                 .reviewedAt(appeal.getReviewedAt())
                 .build();
@@ -307,21 +386,21 @@ public class Mapper {
     public ProfessionDto toProfessionDto(Profession profession){
         return ProfessionDto.builder()
                 .id(profession.getId())
-                .name(localizationHelper.getLocalizedName(profession, getCurrentUser().getSettings().getLanguage()))
+                .name(profession.getRuName())
                 .build();
     }
 
     public RegionDto toRegionDto(Region region){
         return RegionDto.builder()
                 .id(region.getId())
-                .name(localizationHelper.getLocalizedName(region, getCurrentUser().getSettings().getLanguage()))
+                .name(region.getRuName())
                 .build();
     }
 
     public AdministrationDto toAdministrationDto(Administration administration){
         return AdministrationDto.builder()
                 .id(administration.getId())
-                .name(localizationHelper.getLocalizedName(administration, getCurrentUser().getSettings().getLanguage()))
+                .name(administration.getRuName())
                 .build();
     }
 }

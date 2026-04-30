@@ -1,7 +1,11 @@
 package org.di.digital.service.impl;
 
+import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.search.AppealSearchRequest;
+import org.di.digital.dto.request.search.CaseSearchRequest;
+import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.model.Case;
 import org.di.digital.model.Region;
@@ -11,17 +15,21 @@ import org.di.digital.repository.AppealRepository;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.RegionRepository;
 import org.di.digital.repository.UserRepository;
+import org.di.digital.repository.search.CaseSpecifications;
+import org.di.digital.repository.search.UserSpecifications;
 import org.di.digital.service.AdminService;
 import org.di.digital.util.LocalizationHelper;
 import org.di.digital.util.Mapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 
+import static org.di.digital.repository.search.CaseSpecifications.hasOwner;
 import static org.di.digital.util.UserUtil.getCurrentUser;
 
 @Slf4j
@@ -35,45 +43,38 @@ public class AdminServiceImpl implements AdminService {
     private final RegionRepository regionRepository;
     private final Mapper mapper;
     private final LocalizationHelper localizationHelper;
+
     @Override
-    public Page<UserProfile> getAllUsers(int page, int size, Long regionId) {
+    public Page<UserProfile> getAllUsers(int page, int size, UserSearchRequest req) {
         Pageable pageable = PageRequest.of(page, size);
-        if (regionId != null) {
-            return userRepository.findByRegionId(regionId, pageable)
-                    .map(mapper::mapToUserProfileResponse);
-        }
-        return userRepository.findAll(pageable)
+        Specification<User> spec = UserSpecifications.build(req);
+        return userRepository.findAll(spec, pageable)
                 .map(mapper::mapToUserProfileResponse);
     }
     @Override
     @Transactional(readOnly = true)
-    public Page<CaseResponse> getUserCases(Long userId, int page, int size) {
+    public Page<CaseResponse> getUserCases(Long userId, int page, int size, CaseSearchRequest req) {
         userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userId));
 
         Pageable pageable = PageRequest.of(page, size);
-        return caseRepository.findByUserId(userId, pageable)
+        Specification<Case> spec = CaseSpecifications.build(req)
+                .and(hasOwner(userId));
+        return caseRepository.findAll(spec, pageable)
                 .map(mapper::mapToCaseResponse);
     }
 
     @Override
-    public Page<CaseResponse> getAllCases(int page, int size, Long regionId) {
+    public Page<CaseResponse> getAllCases(int page, int size, CaseSearchRequest req) {
         Pageable pageable = PageRequest.of(page, size);
-        if (regionId != null) {
-            return caseRepository.findByOwnerRegionId(regionId, pageable)
-                    .map(mapper::mapToCaseResponse);
-        }
-        return caseRepository.findAll(pageable)
+        Specification<Case> spec = CaseSpecifications.build(req);
+        return caseRepository.findAll(spec, pageable)
                 .map(mapper::mapToCaseResponse);
     }
 
     @Override
-    public Page<AppealDto> getAllAppeals(int page, int size, Long regionId) {
+    public Page<AppealDto> getAllAppeals(int page, int size, AppealSearchRequest req) {
         Pageable pageable = PageRequest.of(page, size);
-        if (regionId != null) {
-            return appealRepository.findByRegionId(regionId, pageable)
-                    .map(mapper::toAppealDto);
-        }
         return appealRepository.findAll(pageable)
                 .map(mapper::toAppealDto);
     }

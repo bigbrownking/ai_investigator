@@ -16,7 +16,7 @@ public class CaseInterrogationEducation {
     private Long id;
 
     private String type;
-    private String edu;
+    private String about;
 
     @ManyToOne
     @JoinColumn(name = "protocol_id")

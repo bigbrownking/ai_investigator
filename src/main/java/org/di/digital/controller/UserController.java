@@ -34,16 +34,5 @@ public class UserController {
         UserProfile updatedProfile = userService.updateUserSettings(email, settingsRequest);
         return ResponseEntity.ok(updatedProfile);
     }
-
-    @PatchMapping("/street")
-    public ResponseEntity<UserProfile> updateStreet(
-            Authentication authentication,
-            @RequestParam String region
-    ) {
-        String email = authentication.getName();
-        log.info("Updating region for {} to {}", email, region);
-        UserProfile updatedProfile = userService.updateStreet(email, region);
-        return ResponseEntity.ok(updatedProfile);
-    }
 }
 

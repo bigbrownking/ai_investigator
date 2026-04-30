@@ -50,6 +50,7 @@ public class CaseInterrogation {
     private String application;
     private String investigator;
     private String investigatorProfession;
+    private String investigatorAdministration;
     private String investigatorRegion;
     private String personYear;
     private String personTranslator;

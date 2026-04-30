@@ -13,7 +13,7 @@ public class UpdateProtocolFieldRequest {
     private String field;
     private String value;
 
-    private Long educationId;
-    private String educationType;
-    private String educationEdu;
+    private Long id;
+    private String type;
+    private String about;
 }

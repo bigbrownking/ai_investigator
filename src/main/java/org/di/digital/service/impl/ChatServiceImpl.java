@@ -109,6 +109,13 @@ public class ChatServiceImpl implements ChatService {
                 log.error("Failed to send error event", e);
                 emitter.completeWithError(e);
             }
+            logService.log(
+                    String.format("No file processed for chat request in case %s", caseNumber),
+                    LogLevel.ERROR,
+                    LogAction.NO_FILE_PROCESSED,
+                    caseNumber,
+                    user.getEmail()
+            );
             return;
         }
 
@@ -128,10 +135,11 @@ public class ChatServiceImpl implements ChatService {
 
         ChatRequest enhancedRequest = buildRequestWithHistory(chat, request);
 
-        streamingService.streamRaw(
+        streamingService.stream(
                 qualificationChatUrl(pythonHost, qualificationPort, caseNumber),
                 enhancedRequest,
                 emitter,
+                chunk -> chunk,
                 fullText -> {
                     updateAssistantMessage(messageId, fullText);
                     caseService.updateCaseActivity(caseNumber, CaseActivityType.CHAT_MESSAGE.getDescription());
@@ -140,7 +148,8 @@ public class ChatServiceImpl implements ChatService {
                 error -> {
                     log.error("Case chat streaming error for case {}: ", caseNumber, error);
                     updateAssistantMessage(messageId, "[Error: " + error.getMessage() + "]");
-                }
+                },
+                true
         );
         logService.log(
                 String.format("New chat message %s by %s user to case %s", userMessage.getContent(), userEmail, caseNumber),

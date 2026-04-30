@@ -11,6 +11,7 @@ import org.di.digital.dto.response.*;
 import org.di.digital.model.*;
 import org.di.digital.model.enums.*;
 import org.di.digital.model.fl.FLAddress;
+import org.di.digital.model.fl.FLDocument;
 import org.di.digital.model.fl.FLRecord;
 import org.di.digital.repository.*;
 import org.di.digital.service.CaseInterrogationService;
@@ -19,18 +20,25 @@ import org.di.digital.service.LogService;
 import org.di.digital.service.MinioService;
 import org.di.digital.service.impl.queue.AudioQueueService;
 import org.di.digital.service.impl.queue.TaskQueueService;
+import org.di.digital.util.LocalizationHelper;
 import org.di.digital.util.Mapper;
+import org.di.digital.util.UrlBuilder;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.reactive.function.client.WebClient;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static com.google.common.base.Strings.nullToEmpty;
 import static org.di.digital.util.UserUtil.validateUserAccess;
 
 @Slf4j
@@ -40,6 +48,9 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final CaseRepository caseRepository;
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final CaseInterrogationEducationRepository caseInterrogationEducationRepository;
+    private final CaseInterrogationMilitaryRepository caseInterrogationMilitaryRepository;
+    private final CaseInterrogationCriminalRepository caseInterrogationCriminalRepository;
+    private final CaseInterrogationRelationRepository caseInterrogationRelationRepository;
     private final InterrogationChatRepository interrogationChatRepository;
     private final CaseChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
@@ -49,6 +60,15 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final TaskQueueService taskQueueService;
     private final FLService flService;
     private final Mapper mapper;
+    private final WebClient.Builder webClientBuilder;
+    private final LocalizationHelper localizationHelper;
+
+
+    @Value("${qualification.model.host}")
+    private String pythonHost;
+
+    @Value("${tree.port}")
+    private String treePort;
 
     @Transactional(readOnly = true)
     public List<CaseInterrogationResponse> searchInterrogations(Long caseId, String role, String fio, Boolean isDop, LocalDate date, String email) {
@@ -83,7 +103,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             throw new IllegalStateException(MessageConstant.NO_FILE_PROCESSED.format(caseEntity.getNumber()));
         }
 
-        if(caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()){
+        if (caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()) {
             throw new IllegalStateException(MessageConstant.CANNOT_CREATE_INTERROGATION.format(caseEntity.getNumber()));
         }
 
@@ -103,15 +123,34 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             log.warn("Could not fetch FL data for document {}: {}", request.getNumber(), e.getMessage());
         }
 
+        String iinOrPassportStr;
+        if (flRecord != null && flRecord.getDocuments() != null && !flRecord.getDocuments().isEmpty()) {
+            FLDocument doc = flRecord.getDocuments().get(0);
+
+            String docType = localizationHelper.toTitleCase(nullToEmpty(doc.getDocumentType()));
+            String docNumber = doc.getDocumentNumber() != null ? "№" + doc.getDocumentNumber() : "";
+            String beginDate = doc.getBeginDate() != null ? "от " + formatDate(doc.getBeginDate()) : "";
+            String issueOrg = doc.getIssueOrg() != null
+                    ? "выдано " + localizationHelper.toTitleCase(doc.getIssueOrg())
+                    : "";
+            String iin = flRecord.getIin() != null ? "ИИН " + flRecord.getIin() : "";
+
+            iinOrPassportStr = String.join(" ",
+                    docType, docNumber, beginDate, issueOrg, iin
+            ).trim();
+        } else {
+            iinOrPassportStr = request.getNumber();
+        }
         CaseInterrogationProtocol protocol = CaseInterrogationProtocol.builder()
                 .fio(flRecord != null ? flRecord.getFio() : request.getFio())
+                .sexId(flRecord != null ? flRecord.getSexId() : null)
                 .dateOfBirth(flRecord != null && flRecord.getBirthDate() != null
                         ? flRecord.getBirthDate().toString() : null)
                 .birthPlace(flRecord != null ? flRecord.getBirthRegion() : null)
                 .citizenship(flRecord != null ? flRecord.getCitizenship() : null)
                 .nationality(flRecord != null ? flRecord.getNationality() : null)
                 .address(flAddress != null ? flAddress.getAddress() : null)
-                .iinOrPassport(request.getNumber())
+                .iinOrPassport(iinOrPassportStr)
                 .build();
 
         boolean isDop = caseEntity.getInterrogations().stream()
@@ -125,7 +164,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .role(request.getRole())
                 .date(LocalDate.now())
                 .caseEntity(caseEntity)
-                .language(request.getLanguage().equals("rus") ? "русском" : "казахском")
+                .language(request.getLanguage())
                 .isDop(isDop)
                 .protocol(protocol)
                 .status(CaseInterrogationStatusEnum.IN_PROGRESS)
@@ -135,6 +174,10 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
         session.setInterrogation(interrogation);
 
+        String article = fetchArticleFromCaseInfo(caseNumber);
+        if (article != null) {
+            interrogation.setState(article);
+        }
         caseEntity.getInterrogations().add(interrogation);
         Case savedCase = caseRepository.save(caseEntity);
 
@@ -146,13 +189,33 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
 
         logService.log(
-                String.format("Interrogation %s to %s added by user %s", saved.getFio(),caseNumber, email),
+                String.format("Interrogation %s to %s added by user %s", saved.getFio(), caseNumber, email),
                 LogLevel.INFO,
                 LogAction.INTERROGATION_ADDED,
                 caseNumber,
                 user.getEmail()
         );
         return mapper.mapToInterrogationFullResponse(saved, user);
+    }
+    private String formatDate(LocalDate date) {
+        if (date == null) return "";
+        return date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")) + "г.";
+    }
+
+    private String fetchArticleFromCaseInfo(String caseNumber) {
+        try {
+            String url = UrlBuilder.caseInfoUrl(pythonHost, treePort, caseNumber);
+            return webClientBuilder.build()
+                    .post()
+                    .uri(url)
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .map(body -> (String) body.get("article"))
+                    .block();
+        } catch (Exception e) {
+            log.warn("Could not fetch case info for {}: {}", caseNumber, e.getMessage());
+            return null;
+        }
     }
 
     @Override
@@ -197,79 +260,129 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         }
 
         switch (request.getField()) {
-            case "fio"            -> protocol.setFio(request.getValue());
-            case "dateOfBirth"    -> protocol.setDateOfBirth(request.getValue());
-            case "birthPlace"     -> protocol.setBirthPlace(request.getValue());
-            case "citizenship"    -> protocol.setCitizenship(request.getValue());
-            case "nationality"    -> protocol.setNationality(request.getValue());
+            case "fio" -> protocol.setFio(request.getValue());
+            case "dateOfBirth" -> protocol.setDateOfBirth(request.getValue());
+            case "birthPlace" -> protocol.setBirthPlace(request.getValue());
+            case "citizenship" -> protocol.setCitizenship(request.getValue());
+            case "nationality" -> protocol.setNationality(request.getValue());
             case "education" -> {
                 CaseInterrogationEducation education;
-                Long eduId = request.getEducationId();
+                Long eduId = request.getId();
                 if (eduId != null) {
                     education = caseInterrogationEducationRepository.findById(eduId)
                             .orElseThrow(() -> new RuntimeException("Education not found: " + eduId));
-                    education.setEdu(request.getEducationEdu());
-                    education.setType(request.getEducationType());
+                    education.setAbout(request.getAbout());
+                    education.setType(request.getType());
                 } else {
                     education = CaseInterrogationEducation.builder()
-                            .type(request.getEducationType())
-                            .edu(request.getEducationEdu())
+                            .type(request.getType())
+                            .about(request.getAbout())
                             .protocol(protocol)
                             .build();
                     protocol.getEducations().add(education);
                 }
             }
-            case "martialStatus"  -> protocol.setMartialStatus(request.getValue());
-            case "workOrStudyPlace"-> protocol.setWorkOrStudyPlace(request.getValue());
-            case "position"       -> protocol.setPosition(request.getValue());
-            case "address"        -> protocol.setAddress(request.getValue());
-            case "contactPhone"       -> protocol.setContactPhone(request.getValue());
-            case "contactEmail"       -> protocol.setContactEmail(request.getValue());
-            case "military"       -> protocol.setMilitary(request.getValue());
-            case "criminalRecord" -> protocol.setCriminalRecord(request.getValue());
-            case "iinOrPassport"  -> protocol.setIinOrPassport(request.getValue());
-            case "other"           -> protocol.setOther(request.getValue());
-            case "relation"        -> protocol.setRelation(request.getValue());
-            case "technical"        -> protocol.setTechnical(request.getValue());
+            case "martialStatus" -> protocol.setMartialStatus(request.getValue());
+            case "workOrStudyPlace" -> protocol.setWorkOrStudyPlace(request.getValue());
+            case "position" -> protocol.setPosition(request.getValue());
+            case "address" -> protocol.setAddress(request.getValue());
+            case "contactPhone" -> protocol.setContactPhone(request.getValue());
+            case "contactEmail" -> protocol.setContactEmail(request.getValue());
+            case "military" -> {
+                CaseInterrogationMilitaryRecord militaryRecord;
+                Long militaryId = request.getId();
+                if (militaryId != null) {
+                    militaryRecord = caseInterrogationMilitaryRepository.findById(militaryId)
+                            .orElseThrow(() -> new RuntimeException("Military not found: " + militaryId));
+                    militaryRecord.setAbout(request.getAbout());
+                    militaryRecord.setType(request.getType());
+                } else {
+                    militaryRecord = CaseInterrogationMilitaryRecord.builder()
+                            .type(request.getType())
+                            .about(request.getAbout())
+                            .protocol(protocol)
+                            .build();
+                    protocol.getMilitaries().add(militaryRecord);
+                }
+            }
+            case "criminalRecord" -> {
+                CaseInterrogationCriminalRecord criminalRecord;
+                Long criminalId = request.getId();
+                if (criminalId != null) {
+                    criminalRecord = caseInterrogationCriminalRepository.findById(criminalId)
+                            .orElseThrow(() -> new RuntimeException("Criminal not found: " + criminalId));
+                    criminalRecord.setAbout(request.getAbout());
+                    criminalRecord.setType(request.getType());
+                } else {
+                    criminalRecord = CaseInterrogationCriminalRecord.builder()
+                            .type(request.getType())
+                            .about(request.getAbout())
+                            .protocol(protocol)
+                            .build();
+                    protocol.getCriminals().add(criminalRecord);
+                }
+            }
+            case "iinOrPassport" -> protocol.setIinOrPassport(request.getValue());
+            case "other" -> protocol.setOther(request.getValue());
+            case "relation" -> {
+                CaseInterrogationRelationRecord relationRecord;
+                Long relationId = request.getId();
+                if (relationId != null) {
+                    relationRecord = caseInterrogationRelationRepository.findById(relationId)
+                            .orElseThrow(() -> new RuntimeException("Relation not found: " + relationId));
+                    relationRecord.setAbout(request.getAbout());
+                    relationRecord.setType(request.getType());
+                } else {
+                    relationRecord = CaseInterrogationRelationRecord.builder()
+                            .type(request.getType())
+                            .about(request.getAbout())
+                            .protocol(protocol)
+                            .build();
+                    protocol.getRelationRecords().add(relationRecord);
+                }
+            }
+            case "technical" -> protocol.setTechnical(request.getValue());
             default -> throw new IllegalArgumentException("Unknown field: " + request.getField());
         }
     }
 
     @Transactional
     public void updateOtherField(Long caseId, Long interrogationId,
-                                    UpdateProtocolFieldRequest request, String email) {
+                                 UpdateProtocolFieldRequest request, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
                 .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
 
         switch (request.getField()) {
-            case "city"             -> interrogation.setCity(request.getValue());
+            case "city" -> interrogation.setCity(request.getValue());
             case "personTranslator" -> interrogation.setPersonTranslator(request.getValue());
             case "personSpecialist" -> interrogation.setPersonSpecialist(request.getValue());
-            case "personYear"       -> interrogation.setPersonYear(request.getValue());
-            case "state"            -> interrogation.setState(request.getValue());
+            case "personYear" -> interrogation.setPersonYear(request.getValue());
+            case "state" -> interrogation.setState(request.getValue());
             case "investigatorProfession" -> interrogation.setInvestigatorProfession(request.getValue());
+            case "investigatorAdministration" -> interrogation.setInvestigatorAdministration(request.getValue());
             case "investigatorRegion" -> interrogation.setInvestigatorRegion(request.getValue());
-            case "caseNumberState"       -> interrogation.setCaseNumberState(request.getValue());
-            case "room"            -> interrogation.setRoom(request.getValue());
-            case "addrezz"          -> interrogation.setAddrezz(request.getValue());
-            case "notificationNumber"    -> interrogation.setNotificationNumber(request.getValue());
-            case "notificationDate"     -> interrogation.setNotificationDate(request.getValue());
-            case "testimony"        -> interrogation.setTestimony(request.getValue());
-            case "involved"    -> interrogation.setInvolved(request.getValue());
+            case "caseNumberState" -> interrogation.setCaseNumberState(request.getValue());
+            case "room" -> interrogation.setRoom(request.getValue());
+            case "addrezz" -> interrogation.setAddrezz(request.getValue());
+            case "notificationNumber" -> interrogation.setNotificationNumber(request.getValue());
+            case "notificationDate" -> interrogation.setNotificationDate(request.getValue());
+            case "testimony" -> interrogation.setTestimony(request.getValue());
+            case "involved" -> interrogation.setInvolved(request.getValue());
             case "involvedPersons" -> interrogation.setInvolvedPersons(request.getValue());
-            case "confession"    -> interrogation.setConfession(request.getValue());
+            case "confession" -> interrogation.setConfession(request.getValue());
             case "confessionText" -> interrogation.setConfessionText(request.getValue());
-            case "language"      -> interrogation.setLanguage(request.getValue());
-            case "translator"  -> interrogation.setTranslator(request.getValue());
-            case "defender"-> interrogation.setDefender(request.getValue());
-            case "familiarization"       -> interrogation.setFamiliarization(request.getValue());
-            case "additionalInfo"        -> interrogation.setAdditionalInfo(request.getValue());
-            case "additionalText"       -> interrogation.setAdditionalText(request.getValue());
-            case "application"       -> interrogation.setApplication(request.getValue());
+            case "language" -> interrogation.setLanguage(request.getValue());
+            case "translator" -> interrogation.setTranslator(request.getValue());
+            case "defender" -> interrogation.setDefender(request.getValue());
+            case "familiarization" -> interrogation.setFamiliarization(request.getValue());
+            case "additionalInfo" -> interrogation.setAdditionalInfo(request.getValue());
+            case "additionalText" -> interrogation.setAdditionalText(request.getValue());
+            case "application" -> interrogation.setApplication(request.getValue());
 
             default -> throw new IllegalArgumentException("Unknown field: " + request.getField());
         }
     }
+
     @Transactional
     public QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question,
                                             MultipartFile file, String email) {
@@ -341,7 +454,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     @Override
     @Transactional
     public OtherAudioResponse uploadOtherAudioAndEnqueue(Long caseId, Long interrogationId, String fieldName,
-                                            MultipartFile file, String language, String email) {
+                                                         MultipartFile file, String language, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
 
@@ -549,6 +662,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 email
         );
     }
+
     @Transactional
     public void controlTimer(Long caseId, Long interrogationId, String action, String email) {
         log.info("controlTimer called: caseId={}, interrogationId={}, action={}, email={}",
@@ -632,6 +746,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 saved.getFinishedAt(),
                 saved.getDurationSeconds());
     }
+
     @Transactional
     public List<CaseInterrogationApplicationFileResponse> uploadApplicationFiles(
             Long caseId, Long interrogationId, List<MultipartFile> files, String email) {
@@ -738,6 +853,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .map(mapper::mapToApplicationFileResponse)
                 .toList();
     }
+
     @Transactional
     public void deleteApplicationFile(Long caseId, Long interrogationId, Long fileId, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)

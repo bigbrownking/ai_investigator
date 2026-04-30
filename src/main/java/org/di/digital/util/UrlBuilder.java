@@ -15,6 +15,9 @@ public class UrlBuilder {
         return buildUrl(host, port,
                 String.format("/workspaces/%s/generate-qualification?mode=hybrid&stream=false", caseNumber));
     }
+    public static String caseInfoUrl(String host, String port, String caseNumber) {
+        return buildUrl(host, port, String.format("/workspaces/%s/case-info", caseNumber));
+    }
 
     public static String qualificationChatUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, "/chat/" + caseNumber);

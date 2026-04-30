@@ -70,7 +70,14 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
         if(caseRepository.existsByNumber(request.getNumber())){
-            throw new RuntimeException("Case already exists, please inform the case creator.");
+            logService.log(
+                    String.format("Case already exists: %s", request.getNumber()),
+                    LogLevel.ERROR,
+                    LogAction.CASE_CREATED,
+                    request.getNumber(),
+                    user.getEmail()
+            );
+            throw new IllegalStateException("Дело уже создано, пожалуйста проинформируйте создателя дела.");
         }
 
         int tom = request.getTom();
@@ -143,6 +150,13 @@ public class CaseServiceImpl implements CaseService {
 
         if (request.getNumber() != null && !request.getNumber().equals(oldNumber)) {
             if (caseRepository.existsByNumber(request.getNumber())) {
+                logService.log(
+                        String.format("Case already exists: %s", request.getNumber()),
+                        LogLevel.ERROR,
+                        LogAction.CASE_UPDATED,
+                        request.getNumber(),
+                        user.getEmail()
+                );
                 throw new IllegalStateException(MessageConstant.WORKSPACE_ALREADY_EXISTS.format(request.getNumber()));
             }
 
@@ -241,7 +255,7 @@ public class CaseServiceImpl implements CaseService {
         validateUserAccess(caseEntity, user);
 
         if (!caseEntity.isOwner(user)) {
-            throw new RuntimeException("Access denied: Only case owner can change status");
+            throw new AccessDeniedException("Access denied: Only case owner can change status");
         }
 
         caseEntity.setStatus(status);
@@ -272,8 +286,15 @@ public class CaseServiceImpl implements CaseService {
 
         validateUserAccess(caseEntity, user);
 
-
         if (caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()) {
+            logService.log(
+                    String.format("Cannot upload files by %s user in case %s: [%s]", email, caseEntity.getNumber(),
+                            files.stream().map(MultipartFile::getOriginalFilename).collect(Collectors.joining(", "))),
+                    LogLevel.ERROR,
+                    LogAction.FILE_UPLOAD,
+                    caseEntity.getNumber(),
+                    email
+            );
             throw new IllegalStateException(MessageConstant.CANNOT_UPLOAD_FILE.format(caseEntity.getNumber()));
         }
 
@@ -354,8 +375,16 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new RuntimeException("File not found: " + fileName));
 
         if(CaseFileStatusEnum.PROCESSING.equals(fileToDelete.getStatus())){
+
             String message = MessageConstant.CANNOT_DELETE_FILE.format(caseNumber);
             log.warn(message);
+            logService.log(
+                    String.format("Cannot delete processing file in case %s", caseEntity.getNumber()),
+                    LogLevel.ERROR,
+                    LogAction.FILE_DELETE,
+                    caseEntity.getNumber(),
+                    user.getEmail()
+            );
             throw new IllegalStateException(message);
         }
         try {
@@ -466,6 +495,14 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmailToAdd));
 
         if (caseEntity.hasUser(userToAdd)) {
+            logService.log(
+                    String.format("User '%s' already added to case №%s by user %s",
+                            userEmailToAdd, caseEntity.getNumber(), currentUserEmail),
+                    LogLevel.ERROR,
+                    LogAction.USER_ADD,
+                    caseEntity.getNumber(),
+                    currentUserEmail
+            );
             throw new IllegalStateException("User is already added to this case");
         }
 
@@ -502,6 +539,14 @@ public class CaseServiceImpl implements CaseService {
                         && f.getNumber().equals(request.getNumber()));
 
         if (alreadyExists) {
+            logService.log(
+                    String.format("Figurant '%s' already added to case №%s by user %s",
+                            request.getFio(), caseEntity.getNumber(), currentUserEmail),
+                    LogLevel.ERROR,
+                    LogAction.FIGURANT_ADDED,
+                    caseEntity.getNumber(),
+                    currentUserEmail
+            );
             throw new IllegalStateException("Figurant already exists in this case");
         }
 
@@ -522,6 +567,14 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new RuntimeException("Failed to retrieve saved figurant"));
 
         log.info("Figurant {} added to case {} by {}", request.getFio(), caseId, currentUserEmail);
+        logService.log(
+                String.format("Figurant '%s' added to case №%s by user %s",
+                        request.getFio(), caseEntity.getNumber(), currentUserEmail),
+                LogLevel.INFO,
+                LogAction.FIGURANT_ADDED,
+                caseEntity.getNumber(),
+                currentUserEmail
+        );
         return mapper.mapToFigurantResponse(saved);
     }
 
@@ -540,10 +593,26 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
 
         if (caseEntity.isOwner(userToRemove)) {
+            logService.log(
+                    String.format("User '%s' deleted from case №%s by user %s",
+                            userToRemove.getEmail(), caseEntity.getNumber(), currentUserEmail),
+                    LogLevel.ERROR,
+                    LogAction.USER_DELETE,
+                    caseEntity.getNumber(),
+                    currentUserEmail
+            );
             throw new IllegalStateException("Cannot remove the case owner");
         }
 
         if (!caseEntity.hasUser(userToRemove)) {
+            logService.log(
+                    String.format("User '%s' is not member from case №%s",
+                            userToRemove.getEmail(), caseEntity.getNumber()),
+                    LogLevel.ERROR,
+                    LogAction.USER_DELETE,
+                    caseEntity.getNumber(),
+                    currentUserEmail
+            );
             throw new IllegalStateException("User is not a member of this case");
         }
         String caseNumber = caseEntity.getNumber();
@@ -581,6 +650,14 @@ public class CaseServiceImpl implements CaseService {
         caseEntity.removeFigurant(figurant);
         caseRepository.save(caseEntity);
 
+        logService.log(
+                String.format("Figurant '%s' deleted from case №%s by user %s",
+                        figurant.getFio(), caseEntity.getNumber(), currentUserEmail),
+                LogLevel.INFO,
+                LogAction.FIGURANT_DELETED,
+                caseEntity.getNumber(),
+                currentUserEmail
+        );
         log.info("Figurant {} removed from case {} by {}", figurantId, caseId, currentUserEmail);
     }
 
@@ -705,7 +782,14 @@ public class CaseServiceImpl implements CaseService {
         deleteAllFiles(caseId, currentUserEmail);
 
         caseRepository.delete(caseEntity);
-
+        logService.log(
+                String.format("Case '%s' deleted by user %s",
+                        caseEntity.getNumber(), currentUserEmail),
+                LogLevel.INFO,
+                LogAction.CASE_DELETED,
+                caseEntity.getNumber(),
+                currentUserEmail
+        );
         log.info("Case {} deleted", caseId);
     }
 }

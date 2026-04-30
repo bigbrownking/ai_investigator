@@ -240,6 +240,13 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new RuntimeException("Message not found: " + messageId));
 
         message.setIsSelected(selected);
+        logService.log(
+                String.format("Message %s select in case %s", message.getContent(), caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.MESSAGE_SELECTED,
+                caseEntity.getNumber(),
+                user.getEmail()
+        );
         chatMessageRepository.save(message);
     }
 

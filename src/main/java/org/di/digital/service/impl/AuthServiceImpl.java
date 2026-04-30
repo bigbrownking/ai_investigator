@@ -33,6 +33,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final RegionRepository regionRepository;
     private final AdministrationRepository administrationRepository;
+    private final AddressRepository addressRepository;
     private final ProfessionRepository professionRepository;
     private final AppealRepository appealRepository;
     private final LogService logService;
@@ -170,6 +171,13 @@ public class AuthServiceImpl implements AuthService {
                             + request.getName() + " " + request.getSurname()
             );
         }
+        logService.log(
+                String.format("User registered as %s user", request.getIin()),
+                LogLevel.INFO,
+                LogAction.SIGNUP,
+                null,
+                user.getEmail()
+        );
         return "User registered successfully";
     }
 
@@ -239,7 +247,7 @@ public class AuthServiceImpl implements AuthService {
 
     @Override
     public JwtResponse login(LoginRequest request) {
-        User user = userRepository.findByEmail(request.getEmail())
+        User user = userRepository.findByIin(request.getIin())
                 .orElseThrow(() -> new RuntimeException("User not found"));
 
         if(!user.isActive()){
@@ -255,7 +263,7 @@ public class AuthServiceImpl implements AuthService {
         String refreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());
 
         logService.log(
-                String.format("User logged in %s user", request.getEmail()),
+                String.format("User logged in %s user", request.getIin()),
                 LogLevel.INFO,
                 LogAction.LOGIN,
                 null,

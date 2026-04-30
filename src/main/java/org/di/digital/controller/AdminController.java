@@ -3,6 +3,9 @@ package org.di.digital.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.SignUpRequest;
+import org.di.digital.dto.request.search.AppealSearchRequest;
+import org.di.digital.dto.request.search.CaseSearchRequest;
+import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.service.AdminService;
 import org.di.digital.service.AuthService;
@@ -29,23 +32,25 @@ public class AdminController {
     public ResponseEntity<Page<UserProfile>> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) Long regionId) {
-        return ResponseEntity.ok(adminService.getAllUsers(page, size, regionId));
+            @ModelAttribute UserSearchRequest userSearchRequest) {
+        return ResponseEntity.ok(adminService.getAllUsers(page, size, userSearchRequest));
     }
+
     @GetMapping("/users/{userId}/cases")
     public ResponseEntity<Page<CaseResponse>> getUserCases(
             @PathVariable Long userId,
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(adminService.getUserCases(userId, page, size));
+            @RequestParam(defaultValue = "20") int size,
+            @ModelAttribute CaseSearchRequest caseSearchRequest) {
+        return ResponseEntity.ok(adminService.getUserCases(userId, page, size, caseSearchRequest));
     }
 
     @GetMapping("/cases")
     public ResponseEntity<Page<CaseResponse>> getAllCases(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) Long regionId) {
-        return ResponseEntity.ok(adminService.getAllCases(page, size, regionId));
+            @ModelAttribute CaseSearchRequest caseSearchRequest) {
+        return ResponseEntity.ok(adminService.getAllCases(page, size, caseSearchRequest));
     }
     @GetMapping("/cases/{caseId}")
     public ResponseEntity<CaseResponse> getCaseDetail(@PathVariable Long caseId) {
@@ -66,8 +71,8 @@ public class AdminController {
     public ResponseEntity<Page<AppealDto>> getAllAppeals(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
-            @RequestParam(required = false) Long regionId) {
-        return ResponseEntity.ok(adminService.getAllAppeals(page, size, regionId));
+            @ModelAttribute AppealSearchRequest appealSearchRequest) {
+        return ResponseEntity.ok(adminService.getAllAppeals(page, size, appealSearchRequest));
     }
 
     @GetMapping("/map/stats")

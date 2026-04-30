@@ -9,6 +9,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.time.Duration;
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
 import java.util.function.Function;
 
@@ -77,6 +78,108 @@ public class StreamingServiceImpl implements StreamingService {
             Consumer<String> onComplete,
             Consumer<Throwable> onError
     ) {
-        stream(url, body, emitter, chunk -> chunk, onComplete, onError);
+        StringBuilder fullText = new StringBuilder();
+        AtomicBoolean isFirstChunk = new AtomicBoolean(true);
+
+        webClientBuilder.build()
+                .post()
+                .uri(url)
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .timeout(DEFAULT_TIMEOUT)
+                .doOnNext(chunk -> {
+                    try {
+                        if (chunk != null && !chunk.isEmpty()) {
+                            // Убираем лишние переносы строк в конце чанка
+                            String normalized = chunk.replaceAll("\n{2,}$", "\n");
+
+                            String toSend;
+                            if (isFirstChunk.getAndSet(false)) {
+                                toSend = normalized;
+                            } else {
+                                // Добавляем один перенос строки между чанками
+                                toSend = "\n" + normalized;
+                            }
+
+                            fullText.append(toSend);
+                            emitter.send(SseEmitter.event().data(toSend));
+                        }
+                    } catch (Exception e) {
+                        log.error("Error sending SSE chunk from {}: {}", url, e.getMessage());
+                    }
+                })
+                .doOnComplete(() -> {
+                    log.info("Streaming completed for url={}, total chars={}", url, fullText.length());
+                    if (onComplete != null) {
+                        onComplete.accept(fullText.toString());
+                    }
+                    emitter.complete();
+                })
+                .doOnError(error -> {
+                    log.error("Streaming error for url={}: ", url, error);
+                    if (onError != null) {
+                        onError.accept(error);
+                    }
+                    emitter.completeWithError(error);
+                })
+                .subscribe();
     }
+    public void stream(
+            String url,
+            Object body,
+            SseEmitter emitter,
+            Function<String, String> chunkExtractor,
+            Consumer<String> onComplete,
+            Consumer<Throwable> onError,
+            boolean addParagraphSeparator
+    ) {
+        StringBuilder fullText = new StringBuilder();
+        AtomicBoolean isFirstChunk = new AtomicBoolean(true);
+
+        webClientBuilder.build()
+                .post()
+                .uri(url)
+                .contentType(MediaType.APPLICATION_JSON)
+                .accept(MediaType.TEXT_EVENT_STREAM)
+                .bodyValue(body)
+                .retrieve()
+                .bodyToFlux(String.class)
+                .timeout(DEFAULT_TIMEOUT)
+                .doOnNext(chunk -> {
+                    try {
+                        String extracted = chunkExtractor.apply(chunk);
+                        if (extracted != null && !extracted.isEmpty()) {
+                            String toSend = extracted;
+
+                            if (addParagraphSeparator && !isFirstChunk.getAndSet(false)) {
+                                toSend = "\n" + extracted;
+                            }
+
+                            fullText.append(toSend);
+                            emitter.send(SseEmitter.event().data(toSend));
+                        }
+                    } catch (Exception e) {
+                        log.error("Error sending SSE chunk from {}: {}", url, e.getMessage());
+                    }
+                })
+                .doOnComplete(() -> {
+                    log.info("Streaming completed for url={}, total chars={}", url, fullText.length());
+                    if (onComplete != null) {
+                        onComplete.accept(fullText.toString());
+                    }
+                    emitter.complete();
+                })
+                .doOnError(error -> {
+                    log.error("Streaming error for url={}: ", url, error);
+                    if (onError != null) {
+                        onError.accept(error);
+                    }
+                    emitter.completeWithError(error);
+                })
+                .subscribe();
+    }
+
 }

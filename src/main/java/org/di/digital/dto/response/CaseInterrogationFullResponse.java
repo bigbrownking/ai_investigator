@@ -44,6 +44,7 @@ public class CaseInterrogationFullResponse {
     private String application;
     private String investigator;
     private String investigatorProfession;
+    private String investigatorAdministration;
     private String investigatorRegion;
     private CaseInterrogationProtocolResponse protocol;
     private List<CaseInterrogationQAResponse> qaList;

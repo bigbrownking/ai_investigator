@@ -45,14 +45,21 @@ public class DocumentFormatterServiceImpl implements DocumentFormatterService {
                 } else if (isQualificationSubtitle(cleanText)) {
                     XWPFParagraph p = document.createParagraph();
                     formatSubtitle(p, cleanText);
+                    addEmptyLine(document); // Пустая строка после подзаголовка
                 } else if (isCity(cleanText)) {
                     i = handleCityDateLine(paragraphs, i, document, cleanText);
+                    addEmptyLine(document); // Пустая строка после даты
                 } else if (isQualificationSectionHeader(cleanText)) {
+                    addEmptyLine(document); // Пустая строка перед заголовком секции
                     XWPFParagraph p = document.createParagraph();
                     formatSectionHeader(p, cleanText);
+                    addEmptyLine(document); // Пустая строка после заголовка секции
                 } else if (containsTrailingQualificationHeader(cleanText)) {
                     handleTrailingHeader(document, cleanText, QUALIFICATION_INLINE_HEADER);
                 } else if (isInvestigatorSignatureBlock(cleanText, paragraphs, i)) {
+                    // *** ИСПРАВЛЕНО: 2 пустые строки ПЕРЕД подписью ***
+                    addEmptyLine(document);
+                    addEmptyLine(document);
                     i = handleInvestigatorSignatureBlock(paragraphs, i, document);
                 } else {
                     XWPFParagraph p = document.createParagraph();
@@ -84,12 +91,18 @@ public class DocumentFormatterServiceImpl implements DocumentFormatterService {
                     formatTitle(p, cleanText);
                 } else if (isCity(cleanText)) {
                     i = handleCityDateLine(paragraphs, i, document, cleanText);
+                    addEmptyLine(document);
                 } else if (isIndictmentSectionHeader(cleanText)) {
+                    addEmptyLine(document);
                     XWPFParagraph p = document.createParagraph();
                     formatSectionHeader(p, cleanText);
+                    addEmptyLine(document);
                 } else if (containsTrailingIndictmentHeader(cleanText)) {
                     handleTrailingHeader(document, cleanText, INDICTMENT_INLINE_HEADER);
                 } else if (isInvestigatorSignatureBlock(cleanText, paragraphs, i)) {
+                    // *** ИСПРАВЛЕНО: 2 пустые строки ПЕРЕД подписью ***
+                    addEmptyLine(document);
+                    addEmptyLine(document);
                     i = handleInvestigatorSignatureBlock(paragraphs, i, document);
                 } else {
                     XWPFParagraph p = document.createParagraph();
@@ -155,11 +168,11 @@ public class DocumentFormatterServiceImpl implements DocumentFormatterService {
     }
 
     /**
-     * Блок подписи следователя — строка начинается со "Следователь"/"Дознаватель"
+     * Блок подписи следователя — строка начинается со "Следователь"/"Дознаватель"/"Старший следователь"
      * и до конца документа осталось мало непустых строк.
      */
     private boolean isInvestigatorSignatureBlock(String text, String[] paragraphs, int currentIndex) {
-        if (!(text.startsWith("Следователь") || text.startsWith("Дознаватель"))) {
+        if (!(text.startsWith("Следователь") || text.startsWith("Дознаватель") || text.startsWith("Старший следователь"))) {
             return false;
         }
         if (text.contains("рассмотрев") || text.contains("УСТАНОВИЛ") || text.contains("допросил")) {
@@ -222,28 +235,100 @@ public class DocumentFormatterServiceImpl implements DocumentFormatterService {
                 XWPFParagraph bodyPara = document.createParagraph();
                 formatRegularParagraph(bodyPara, body);
             }
+            addEmptyLine(document); // Пустая строка перед заголовком
             XWPFParagraph headerPara = document.createParagraph();
             formatSectionHeader(headerPara, header);
+            addEmptyLine(document); // Пустая строка после заголовка
         } else {
             XWPFParagraph p = document.createParagraph();
             formatRegularParagraph(p, text);
         }
     }
 
-    /** Блок подписи: 2 пустые строки + строки подписи. */
+    /**
+     * Блок подписи: строки подписи (без дополнительных отступов, они добавляются снаружи).
+     * *** ИСПРАВЛЕНО: убраны addEmptyLine отсюда - они теперь добавляются ПЕРЕД вызовом этого метода ***
+     */
     private int handleInvestigatorSignatureBlock(String[] paragraphs, int currentIndex,
                                                  XWPFDocument document) {
-        addEmptyLine(document);
-        addEmptyLine(document);
-
+        // Собираем все строки подписи
+        java.util.List<String> signatureLines = new java.util.ArrayList<>();
         int lastIndex = currentIndex;
+
         for (int j = currentIndex; j < paragraphs.length; j++) {
             String line = stripStars(paragraphs[j].trim());
             if (line.isEmpty()) continue;
-            formatSignatureLine(document, line);
+            signatureLines.add(line);
             lastIndex = j;
         }
+
+        if (signatureLines.isEmpty()) {
+            return lastIndex;
+        }
+
+        // Проверяем, нужно ли объединить последние две строки
+        // Если предпоследняя строка заканчивается на звание (майор СЭР, подполковник ЮС и т.д.)
+        // А последняя - это ФИО
+        if (signatureLines.size() >= 2) {
+            String secondLast = signatureLines.get(signatureLines.size() - 2);
+            String last = signatureLines.get(signatureLines.size() - 1);
+
+            // Проверяем: предпоследняя заканчивается на звание, последняя - это ФИО
+            if (endsWithRank(secondLast) && isFIO(last)) {
+                // Объединяем последние две строки
+                String combined = secondLast + " " + last;
+
+                // Выводим все строки кроме последних двух
+                for (int i = 0; i < signatureLines.size() - 2; i++) {
+                    formatSignatureLine(document, signatureLines.get(i));
+                }
+
+                // Выводим объединенную строку с табуляцией
+                formatSignatureLineWithTab(document, combined);
+
+                return lastIndex;
+            }
+        }
+
+        // Обычная логика: все строки кроме последней - слева, последняя - с табуляцией
+        for (int i = 0; i < signatureLines.size() - 1; i++) {
+            formatSignatureLine(document, signatureLines.get(i));
+        }
+
+        // Последняя строка - с табуляцией (звание слева, ФИО справа)
+        String lastLine = signatureLines.get(signatureLines.size() - 1);
+        formatSignatureLineWithTab(document, lastLine);
+
         return lastIndex;
+    }
+
+    /**
+     * Проверяет, заканчивается ли строка на звание/должность
+     * (майор СЭР, подполковник ЮС, старший следователь, следователь, дознаватель)
+     */
+    private boolean endsWithRank(String text) {
+        // Звания с СЭР/ЮС
+        if (text.matches(".*(?:майор|подполковник|полковник|капитан|лейтенант)\\s+(?:СЭР|ЮС)\\s*$")) {
+            return true;
+        }
+        // Звания с полным названием службы (майор службы экономических расследований и т.д.)
+        if (text.matches(".*(?:майор|подполковник|полковник|капитан|лейтенант)\\s+службы\\s+.+\\s*$")) {
+            return true;
+        }
+        // Должности следователя/дознавателя
+        return text.matches(".*(?:старший следователь|следователь|дознаватель)\\s*$");
+    }
+
+    /**
+     * Проверяет, является ли строка ФИО (Фамилия И.О. или И.О. Фамилия)
+     */
+    private boolean isFIO(String text) {
+        // Формат: Фамилия И.О.
+        if (text.matches("^[А-ЯЁ][а-яё]+\\s+[А-ЯЁ]\\.[А-ЯЁ]\\.\\s*$")) {
+            return true;
+        }
+        // Формат: И.О. Фамилия
+        return text.matches("^[А-ЯЁ]\\.[А-ЯЁ]\\.\\s+[А-ЯЁ][а-яё]+\\s*$");
     }
 
     // ─── Formatters ───────────────────────────────────────────────────────────
@@ -270,23 +355,22 @@ public class DocumentFormatterServiceImpl implements DocumentFormatterService {
     }
 
     /**
-     * Город слева, дата справа на ОДНОЙ строке.
-     * Используем один параграф с табуляцией для выравнивания даты справа.
+     * Город слева, дата справа на ОДНОЙ строке с табуляцией.
      */
     private void formatCityDateLine(XWPFDocument document, String city, String date) {
         XWPFParagraph para = document.createParagraph();
         para.setAlignment(ParagraphAlignment.LEFT);
         para.setSpacingBefore(0);
         para.setSpacingAfter(0);
-        para.setSpacingBetween(1.0);
+        setLineSpacing(para);
 
         // Добавляем табуляцию справа для даты
         CTPPr pPr = para.getCTP().isSetPPr() ? para.getCTP().getPPr() : para.getCTP().addNewPPr();
         CTTabs tabs = pPr.isSetTabs() ? pPr.getTabs() : pPr.addNewTabs();
         CTTabStop tabStop = tabs.addNewTab();
         tabStop.setVal(STTabJc.RIGHT);
-        // Позиция табуляции = ширина страницы минус правое поле = 9326 dxa (от левого края)
-        tabStop.setPos(BigInteger.valueOf(9326));
+        // Позиция табуляции справа (ширина страницы A4 минус правое поле)
+        tabStop.setPos(BigInteger.valueOf(9360)); // ~16.5см от левого края
 
         // Город (слева, жирный)
         XWPFRun cityRun = para.createRun();
@@ -319,7 +403,8 @@ public class DocumentFormatterServiceImpl implements DocumentFormatterService {
 
     private void formatRegularParagraph(XWPFParagraph paragraph, String text) {
         paragraph.setAlignment(ParagraphAlignment.BOTH);
-        paragraph.setIndentationFirstLine(720);
+        // ИСПРАВЛЕНО: 36pt вместо 720 twips (50.4pt)
+        paragraph.setIndentationFirstLine(convertPtToTwips(36));
         setLineSpacing(paragraph);
         XWPFRun run = paragraph.createRun();
         run.setText(text);
@@ -338,6 +423,78 @@ public class DocumentFormatterServiceImpl implements DocumentFormatterService {
         r.setFontSize(14);
     }
 
+    /**
+     * Форматирует последнюю строку подписи с табуляцией для ФИО справа.
+     * Например: "старший следователь\t\t\t\t\tК.К. Жайлаубаев"
+     * Разделяем строку на: всё до последнего ФИО (слева) и ФИО (справа)
+     */
+    private void formatSignatureLineWithTab(XWPFDocument document, String text) {
+        XWPFParagraph para = document.createParagraph();
+        para.setAlignment(ParagraphAlignment.LEFT);
+        para.setIndentationFirstLine(0);
+        setLineSpacing(para);
+
+        // Добавляем табуляцию справа
+        CTPPr pPr = para.getCTP().isSetPPr() ? para.getCTP().getPPr() : para.getCTP().addNewPPr();
+        CTTabs tabs = pPr.isSetTabs() ? pPr.getTabs() : pPr.addNewTabs();
+        CTTabStop tabStop = tabs.addNewTab();
+        tabStop.setVal(STTabJc.RIGHT);
+        tabStop.setPos(BigInteger.valueOf(9360));
+
+        // Ищем ФИО в конце строки
+        // Формат 1: Фамилия И.О.
+        Pattern fioPattern1 = Pattern.compile("^(.+?)\\s+([А-ЯЁ][а-яё]+\\s+[А-ЯЁ]\\.[А-ЯЁ]\\.)$");
+        // Формат 2: И.О. Фамилия
+        Pattern fioPattern2 = Pattern.compile("^(.+?)\\s+([А-ЯЁ]\\.[А-ЯЁ]\\.\\s+[А-ЯЁ][а-яё]+)$");
+
+        Matcher matcher1 = fioPattern1.matcher(text);
+        Matcher matcher2 = fioPattern2.matcher(text);
+
+        if (matcher1.matches()) {
+            String leftPart = matcher1.group(1).trim();  // звание, должность и т.д.
+            String fio = matcher1.group(2).trim();        // ФИО
+
+            // Левая часть (звание и т.д.)
+            XWPFRun leftRun = para.createRun();
+            leftRun.setText(leftPart);
+            leftRun.setFontFamily("Times New Roman");
+            leftRun.setFontSize(14);
+
+            // Табуляция
+            leftRun.addTab();
+
+            // ФИО справа
+            XWPFRun fioRun = para.createRun();
+            fioRun.setText(fio);
+            fioRun.setFontFamily("Times New Roman");
+            fioRun.setFontSize(14);
+        } else if (matcher2.matches()) {
+            String leftPart = matcher2.group(1).trim();  // звание, должность и т.д.
+            String fio = matcher2.group(2).trim();        // ФИО
+
+            // Левая часть (звание и т.д.)
+            XWPFRun leftRun = para.createRun();
+            leftRun.setText(leftPart);
+            leftRun.setFontFamily("Times New Roman");
+            leftRun.setFontSize(14);
+
+            // Табуляция
+            leftRun.addTab();
+
+            // ФИО справа
+            XWPFRun fioRun = para.createRun();
+            fioRun.setText(fio);
+            fioRun.setFontFamily("Times New Roman");
+            fioRun.setFontSize(14);
+        } else {
+            // Если паттерн не подошел, просто выводим как есть
+            XWPFRun run = para.createRun();
+            run.setText(text);
+            run.setFontFamily("Times New Roman");
+            run.setFontSize(14);
+        }
+    }
+
     // ─── Page setup ───────────────────────────────────────────────────────────
 
     private void setPageMargins(XWPFDocument doc) {
@@ -353,9 +510,17 @@ public class DocumentFormatterServiceImpl implements DocumentFormatterService {
 
     private void setLineSpacing(XWPFParagraph p) {
         CTPPr pPr = p.getCTP().isSetPPr() ? p.getCTP().getPPr() : p.getCTP().addNewPPr();
+
         CTSpacing spacing = pPr.isSetSpacing() ? pPr.getSpacing() : pPr.addNewSpacing();
         spacing.setLineRule(STLineSpacingRule.AUTO);
         spacing.setLine(BigInteger.valueOf(360)); // 1.5 интервал
+        spacing.setBefore(BigInteger.valueOf(0)); // Перед: 0 пт
+        spacing.setAfter(BigInteger.valueOf(0));  // После: 0 пт
+
+        // "Не добавлять интервал между абзацами одного стиля"
+        if (!pPr.isSetContextualSpacing()) {
+            pPr.addNewContextualSpacing();
+        }
     }
 
     private void addEmptyLine(XWPFDocument doc) {
@@ -365,6 +530,14 @@ public class DocumentFormatterServiceImpl implements DocumentFormatterService {
         r.setFontSize(14);
         r.setFontFamily("Times New Roman");
         r.setText("");
+    }
+
+    /**
+     * Конвертирует пункты (pt) в twips (1/20 пункта).
+     * Apache POI использует twips для измерения отступов.
+     */
+    private int convertPtToTwips(double pt) {
+        return (int) (pt * 20);
     }
 
     // ─── Output ───────────────────────────────────────────────────────────────

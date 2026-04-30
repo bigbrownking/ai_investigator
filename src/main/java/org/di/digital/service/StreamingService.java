@@ -17,6 +17,15 @@ public interface StreamingService {
             Consumer<String> onComplete,
             Consumer<Throwable> onError
     );
+    void stream(
+            String url,
+            Object body,
+            SseEmitter emitter,
+            Function<String, String> chunkExtractor,
+            Consumer<String> onComplete,
+            Consumer<Throwable> onError,
+            boolean addParagraphSeparator
+    );
 
     void streamRaw(
             String url,

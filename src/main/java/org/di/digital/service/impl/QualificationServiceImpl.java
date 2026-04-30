@@ -54,7 +54,7 @@ public class QualificationServiceImpl implements QualificationService {
         executor.execute(() -> {
             RequestContextHolder.setRequestAttributes(requestAttributes);
             try {
-                streamQualification(caseNumber, emitter, email);
+                streamQualification(caseNumber, emitter, email, requestAttributes);
             } finally {
                 RequestContextHolder.resetRequestAttributes();
             }
@@ -62,13 +62,20 @@ public class QualificationServiceImpl implements QualificationService {
         return emitter;
     }
 
-    private void streamQualification(String caseNumber, SseEmitter emitter, String userEmail) {
+    private void streamQualification(String caseNumber, SseEmitter emitter, String userEmail, RequestAttributes requestAttributes) {
 
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
         if (!entity.isAtLeastOneFileProcessed()) {
             String message = MessageConstant.NO_FILE_PROCESSED.format(caseNumber);
             log.warn(message);
+            logService.log(
+                    String.format("No file processed for qualification request in case %s", caseNumber),
+                    LogLevel.ERROR,
+                    LogAction.NO_FILE_PROCESSED,
+                    caseNumber,
+                    userEmail
+            );
             emitter.completeWithError(new IllegalStateException(message));
             return;
         }
@@ -78,29 +85,47 @@ public class QualificationServiceImpl implements QualificationService {
                 emitter,
                 this::extractChunk,
                 fullText -> {
-                    saveQualification(caseNumber, fullText);
-                    caseService.updateCaseActivity(caseNumber, CaseActivityType.QUALIFICATION_GENERATED.name());
-                    log.info("Qualification streaming completed for case {}", caseNumber);
+                    RequestContextHolder.setRequestAttributes(requestAttributes);
+                    try {
+                        saveQualification(caseNumber, fullText);
+                        caseService.updateCaseActivity(caseNumber, CaseActivityType.QUALIFICATION_GENERATED.getDescription());
+                        log.info("Qualification streaming completed for case {}", caseNumber);
+                        logService.log(
+                                String.format("Getting case qualification by %s user in case %s", userEmail, caseNumber),
+                                LogLevel.INFO,
+                                LogAction.QUALIFICATION,
+                                caseNumber,
+                                userEmail
+                        );
+                    }finally {
+                        RequestContextHolder.resetRequestAttributes();
+                    }
                 },
                 error -> {
-                    log.error("Qualification streaming error for case {}", caseNumber, error);
-                    if (error instanceof WebClientResponseException.BadRequest) {
-                        emitter.completeWithError(new IllegalStateException(
-                                "Квалификация деяния не может быть сгенерирована, поскольку в материалах дела " +
-                                        "отсутствуют необходимые документы: ПОСТАНОВЛЕНИЕ о признании лица в качестве " +
-                                        "подозреваемого либо ПРОТОКОЛ задержания лица, подозреваемого в совершении " +
-                                        "уголовного правонарушения."));
-                    } else {
-                        emitter.completeWithError(error);
+                    RequestContextHolder.setRequestAttributes(requestAttributes);
+                    try {
+                        log.error("Qualification streaming error for case {}", caseNumber, error);
+                        if (error instanceof WebClientResponseException.BadRequest) {
+                            logService.log(
+                                    String.format("No required files found in case %s", caseNumber),
+                                    LogLevel.ERROR,
+                                    LogAction.NO_SUCH_FILE,
+                                    caseNumber,
+                                    userEmail
+                            );
+                            emitter.completeWithError(new IllegalStateException(
+                                    "Квалификация деяния не может быть сгенерирована, поскольку в материалах дела " +
+                                            "отсутствуют необходимые документы: ПОСТАНОВЛЕНИЕ о признании лица в качестве " +
+                                            "подозреваемого либо ПРОТОКОЛ задержания лица, подозреваемого в совершении " +
+                                            "уголовного правонарушения."));
+                        } else {
+                            emitter.completeWithError(error);
+                        }
                     }
+                    finally {
+                            RequestContextHolder.resetRequestAttributes();
+                        }
                 }
-        );
-        logService.log(
-                String.format("Getting case qualification by %s user in case %s", userEmail, caseNumber),
-                LogLevel.INFO,
-                LogAction.QUALIFICATION,
-                caseNumber,
-                userEmail
         );
     }
 

@@ -1,4 +1,4 @@
-package org.di.digital.service;
+package org.di.digital.service.export;
 
 import org.di.digital.dto.response.CaseInterrogationFullResponse;
 

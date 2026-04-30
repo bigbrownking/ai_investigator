@@ -2,6 +2,9 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.search.AppealSearchRequest;
+import org.di.digital.dto.request.search.CaseSearchRequest;
+import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.AppealDto;
 import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.UserProfile;
@@ -12,11 +15,15 @@ import org.di.digital.model.enums.AppealStatus;
 import org.di.digital.repository.AppealRepository;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.UserRepository;
+import org.di.digital.repository.search.AppealSpecifications;
+import org.di.digital.repository.search.CaseSpecifications;
+import org.di.digital.repository.search.UserSpecifications;
 import org.di.digital.service.RegAdminService;
 import org.di.digital.util.Mapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -34,8 +41,8 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final UserRepository userRepository;
     private final Mapper mapper;
 
-    @Override
-    public Page<AppealDto> getMyRegionAppeals(Long adminId, int page, int size) {
+     @Override
+    public Page<AppealDto> getMyRegionAppeals(Long adminId, int page, int size, AppealSearchRequest req) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
@@ -44,12 +51,15 @@ public class RegAdminServiceImpl implements RegAdminService {
         }
 
         Pageable pageable = PageRequest.of(page, size);
-        return appealRepository.findByRegionId(admin.getRegion().getId(), pageable)
+        Specification<Appeal> spec = AppealSpecifications.buildForRegion(
+                admin.getRegion().getId(), req
+        );
+        return appealRepository.findAll(spec, pageable)
                 .map(mapper::toAppealDto);
     }
 
     @Override
-    public Page<UserProfile> getMyRegionUsers(Long adminId, int page, int size) {
+    public Page<UserProfile> getMyRegionUsers(Long adminId, int page, int size, UserSearchRequest req) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
@@ -58,13 +68,17 @@ public class RegAdminServiceImpl implements RegAdminService {
         }
 
         Pageable pageable = PageRequest.of(page, size);
-        return userRepository.findByRegionId(admin.getRegion().getId(), pageable)
+        Specification<User> spec = UserSpecifications.buildForRegion(
+                admin.getRegion().getId(), req
+        );
+
+        return userRepository.findAll(spec, pageable)
                 .map(mapper::mapToUserProfileResponse);
     }
 
 
     @Override
-    public Page<CaseResponse> getUserCases(Long adminId, Long userId, int page, int size) {
+    public Page<CaseResponse> getUserCases(Long adminId, Long userId, int page, int size, CaseSearchRequest req) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
@@ -76,7 +90,9 @@ public class RegAdminServiceImpl implements RegAdminService {
         }
 
         Pageable pageable = PageRequest.of(page, size);
-        return caseRepository.findByUserId(userId, pageable)
+        Specification<Case> spec = CaseSpecifications.build(req)
+                .and(CaseSpecifications.hasOwner(userId));
+        return caseRepository.findAll(spec, pageable)
                 .map(mapper::mapToCaseResponse);
     }
     @Override
@@ -117,7 +133,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CaseResponse> getMyRegionCases(Long adminId, int page, int size) {
+    public Page<CaseResponse> getMyRegionCases(Long adminId, int page, int size, CaseSearchRequest req) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
@@ -126,7 +142,10 @@ public class RegAdminServiceImpl implements RegAdminService {
         }
 
         Pageable pageable = PageRequest.of(page, size);
-        return caseRepository.findByOwnerRegionId(admin.getRegion().getId(), pageable)
+        Specification<Case> spec = CaseSpecifications.buildForRegion(
+                admin.getRegion().getId(), req
+        );
+        return caseRepository.findAll(spec, pageable)
                 .map(mapper::mapToCaseResponse);
     }
 

@@ -19,6 +19,7 @@ public class CaseInterrogationProtocol {
     @GeneratedValue(strategy = jakarta.persistence.GenerationType.IDENTITY)
     private Long id;
 
+    private String sexId;
     private String fio;
     private String dateOfBirth;
     private String birthPlace;
@@ -35,11 +36,23 @@ public class CaseInterrogationProtocol {
     private String address;
     private String contactPhone;
     private String contactEmail;
-    private String military;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "protocol", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CaseInterrogationMilitaryRecord> militaries = new ArrayList<>();
+
     private String other;
-    private String relation;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "protocol", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CaseInterrogationRelationRecord> relationRecords = new ArrayList<>();
+
     private String technical;
-    private String criminalRecord;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "protocol", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CaseInterrogationCriminalRecord> criminals = new ArrayList<>();
+
     private String iinOrPassport;
 
 

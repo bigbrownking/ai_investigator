@@ -63,7 +63,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         executor.execute(() -> {
             RequestContextHolder.setRequestAttributes(requestAttributes);
             try {
-                streamIndictment(caseNumber, emitter, email);
+                streamIndictment(caseNumber, emitter, email, requestAttributes);
             } finally {
                 RequestContextHolder.resetRequestAttributes();
             }
@@ -79,7 +79,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         executor.execute(() -> {
             RequestContextHolder.setRequestAttributes(requestAttributes);
             try {
-                completeIndictment(caseNumber, emitter, email);
+                completeIndictment(caseNumber, emitter, email, requestAttributes);
             } finally {
                 RequestContextHolder.resetRequestAttributes();
             }
@@ -87,7 +87,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         return emitter;
     }
 
-    private void streamIndictment(String caseNumber, SseEmitter emitter, String email) {
+    private void streamIndictment(String caseNumber, SseEmitter emitter, String email, RequestAttributes requestAttributes) {
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
 
@@ -97,6 +97,13 @@ public class IndictmentServiceImpl implements IndictmentService {
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(caseNumber);
             log.warn(message);
+            logService.log(
+                    String.format("No qualification file in case %s", caseNumber),
+                    LogLevel.ERROR,
+                    LogAction.NO_QUALIFICATION,
+                    caseNumber,
+                    user.getEmail()
+            );
             emitter.completeWithError(new IllegalStateException(message));
             return;
         }
@@ -107,6 +114,13 @@ public class IndictmentServiceImpl implements IndictmentService {
         if (!isAllProcessed) {
             String message = MessageConstant.ALL_FILES_PROCESSED.format(caseNumber);
             log.warn(message);
+            logService.log(
+                    String.format("No file processed for indictment request in case %s", caseNumber),
+                    LogLevel.ERROR,
+                    LogAction.NO_FILE_PROCESSED,
+                    caseNumber,
+                    user.getEmail()
+            );
             emitter.completeWithError(new IllegalStateException(message));
             return;
         }
@@ -116,22 +130,27 @@ public class IndictmentServiceImpl implements IndictmentService {
                 emitter,
                 this::extractChunk,
                 fullText -> {
-                    saveIndictment(caseNumber, fullText, false);
-                    caseService.updateCaseActivity(caseNumber, CaseActivityType.INDICTMENT_GENERATED.name());
-                    log.info("Indictment streaming completed for case {}", caseNumber);
+                    RequestContextHolder.setRequestAttributes(requestAttributes);
+                    try {
+                        saveIndictment(caseNumber, fullText, false);
+                        caseService.updateCaseActivity(caseNumber, CaseActivityType.INDICTMENT_GENERATED.getDescription());
+                        log.info("Indictment streaming completed for case {}", caseNumber);
+                        logService.log(
+                                String.format("Getting case indictment by %s user in case %s", email, caseNumber),
+                                LogLevel.INFO,
+                                LogAction.INDICTMENT,
+                                caseNumber,
+                                email
+                        );
+                    }finally {
+                        RequestContextHolder.resetRequestAttributes();
+                    }
                 },
                 error -> log.error("Indictment streaming error for case {}", caseNumber, error)
         );
-        logService.log(
-                String.format("Getting case indictment by %s user in case %s", email, caseNumber),
-                LogLevel.INFO,
-                LogAction.INDICTMENT,
-                caseNumber,
-                email
-        );
     }
 
-    private void completeIndictment(String caseNumber, SseEmitter emitter, String email) {
+    private void completeIndictment(String caseNumber, SseEmitter emitter, String email, RequestAttributes requestAttributes) {
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
 
@@ -141,6 +160,13 @@ public class IndictmentServiceImpl implements IndictmentService {
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(caseNumber);
             log.warn(message);
+            logService.log(
+                    String.format("No qualification file in case %s", caseNumber),
+                    LogLevel.ERROR,
+                    LogAction.NO_QUALIFICATION,
+                    caseNumber,
+                    user.getEmail()
+            );
             emitter.completeWithError(new IllegalStateException(message));
             return;
         }
@@ -151,6 +177,13 @@ public class IndictmentServiceImpl implements IndictmentService {
         if (!isAllProcessed) {
             String message = MessageConstant.ALL_FILES_PROCESSED.format(caseNumber);
             log.warn(message);
+            logService.log(
+                    String.format("No file processed for indictment request in case %s", caseNumber),
+                    LogLevel.ERROR,
+                    LogAction.NO_FILE_PROCESSED,
+                    caseNumber,
+                    user.getEmail()
+            );
             emitter.completeWithError(new IllegalStateException(message));
             return;
         }
@@ -159,6 +192,13 @@ public class IndictmentServiceImpl implements IndictmentService {
         if (!isAllInterrogationClosed) {
             String message = MessageConstant.ALL_INTERROGATION_PROCESSED.format(caseNumber);
             log.warn(message);
+            logService.log(
+                    String.format("No interrogations closed for indictment request in case %s", caseNumber),
+                    LogLevel.ERROR,
+                    LogAction.NO_INTERROGATION_CLOSED,
+                    caseNumber,
+                    user.getEmail()
+            );
             emitter.completeWithError(new IllegalStateException(message));
             return;
         }
@@ -168,18 +208,23 @@ public class IndictmentServiceImpl implements IndictmentService {
                 emitter,
                 this::extractChunk,
                 fullText -> {
-                    saveIndictment(caseNumber, fullText, true);
-                    caseService.updateCaseActivity(caseNumber, CaseActivityType.INDICTMENT_GENERATED.name());
-                    log.info("Indictment streaming completed for case {}", caseNumber);
+                    RequestContextHolder.setRequestAttributes(requestAttributes);
+                    try {
+                        saveIndictment(caseNumber, fullText, true);
+                        caseService.updateCaseActivity(caseNumber, CaseActivityType.INDICTMENT_GENERATED.getDescription());
+                        log.info("Indictment streaming completed for case {}", caseNumber);
+                        logService.log(
+                                String.format("Getting case final indictment by %s user in case %s", email, caseNumber),
+                                LogLevel.INFO,
+                                LogAction.INDICTMENT_FINAL,
+                                caseNumber,
+                                email
+                        );
+                    }finally {
+                        RequestContextHolder.resetRequestAttributes();
+                    }
                 },
                 error -> log.error("Indictment streaming error for case {}", caseNumber, error)
-        );
-        logService.log(
-                String.format("Getting case final indictment by %s user in case %s", email, caseNumber),
-                LogLevel.INFO,
-                LogAction.INDICTMENT_FINAL,
-                caseNumber,
-                email
         );
     }
 

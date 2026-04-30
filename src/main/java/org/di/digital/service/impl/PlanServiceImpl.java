@@ -6,8 +6,11 @@ import org.di.digital.dto.response.CaseFileResponse;
 import org.di.digital.model.Case;
 import org.di.digital.model.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.enums.LogAction;
+import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.repository.CaseRepository;
+import org.di.digital.service.LogService;
 import org.di.digital.service.MinioService;
 import org.di.digital.service.PlanService;
 import org.di.digital.service.impl.queue.TaskQueueService;
@@ -25,6 +28,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.stream.Collectors;
 
 import static org.di.digital.util.UrlBuilder.planGeneratorUrl;
 
@@ -37,7 +41,7 @@ public class PlanServiceImpl implements PlanService {
     private final MinioService minioService;
     private final WebClient.Builder webClientBuilder;
     private final TaskQueueService taskQueueService;
-
+    private final LogService logService;
     private final Mapper mapper;
 
     @Value("${plan.generator.host}")
@@ -56,7 +60,14 @@ public class PlanServiceImpl implements PlanService {
                 .toList();
 
         if (planSourceFiles.isEmpty()) {
-            throw new RuntimeException("No source files attached for plan generation in case: " + caseId);
+            logService.log(
+                    String.format("No source files attached for plan generation in case %s", caseEntity.getNumber()),
+                    LogLevel.ERROR,
+                    LogAction.PLAN_GENERATION,
+                    caseEntity.getNumber(),
+                    email
+            );
+            throw new IllegalStateException("No source files attached for plan generation in case: " + caseId);
         }
 
         String url = planGeneratorUrl(planHost, planPort);
@@ -124,6 +135,13 @@ public class PlanServiceImpl implements PlanService {
             CaseFile saved = caseFileRepository.save(planFile);
 
             log.info("Investigation plan generated and saved for case: {}", caseId);
+            logService.log(
+                    String.format("Plan generated in case %s", caseEntity.getNumber()),
+                    LogLevel.INFO,
+                    LogAction.NO_FILE_PROCESSED,
+                    caseEntity.getNumber(),
+                    email
+            );
             return mapper.mapToCaseFileResponse(saved);
 
         } catch (Exception e) {
@@ -193,6 +211,15 @@ public class PlanServiceImpl implements PlanService {
             savedFiles.add(mapper.mapToCaseFileResponse(saved));
         }
 
+        logService.log(
+                String.format("Uploading plan files [%s]  by user %s in case №%s",
+                        files.stream().map(MultipartFile::getOriginalFilename).collect(Collectors.joining(", ")),
+                        email, caseEntity.getNumber()),
+                LogLevel.INFO,
+                LogAction.FILE_UPLOAD,
+                caseEntity.getNumber(),
+                email
+        );
         log.info("Added {} plan source files for case: {}", savedFiles.size(), caseId);
         return savedFiles;
     }

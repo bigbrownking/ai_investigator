@@ -15,10 +15,11 @@ public class AppealDto {
     private Long userId;
     private String userName;
     private String userSurname;
+    private String userFathername;
     private String userEmail;
     private Long regionId;
     private String regionName;
-    private AppealStatus status;
+    private String status;
     private LocalDateTime createdAt;
     private LocalDateTime reviewedAt;
 }

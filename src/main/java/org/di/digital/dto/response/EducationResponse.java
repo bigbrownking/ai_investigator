@@ -10,5 +10,5 @@ import lombok.*;
 public class EducationResponse {
     private Long id;
     private String type;
-    private String edu;
+    private String about;
 }

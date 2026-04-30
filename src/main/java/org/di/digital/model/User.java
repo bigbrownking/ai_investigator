@@ -44,20 +44,17 @@ public class User {
     @Column(unique = true)
     private String email;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "profession_id")
     private Profession profession;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "region_id")
     private Region region;
 
-    @ManyToOne(fetch = FetchType.LAZY)
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "administration_id")
     private Administration administration;
-
-    @Column(name = "street")
-    private String street;
 
     @NotBlank
     private String password;
