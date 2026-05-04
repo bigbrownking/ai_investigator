@@ -7,10 +7,12 @@ import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
+import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.AdminService;
 import org.di.digital.service.AuthService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -103,4 +105,25 @@ public class AdminController {
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(adminService.getRegionSummary(regionId, page, size));
     }
+    @PutMapping("/appeals/{id}/approve")
+    public ResponseEntity<Void> approve(@PathVariable Long id, Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        adminService.approveAppeal(id, userDetails.getId());
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/appeals/{id}/reject")
+    public ResponseEntity<Void> reject(@PathVariable Long id, Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        adminService.rejectAppeal(id, userDetails.getId());
+        return ResponseEntity.ok().build();
+    }
+    @GetMapping("/logs/user/{email}")
+    public ResponseEntity<Page<LogDto>> getUserLogs(
+            @PathVariable String email,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(adminService.getUserLogs(email, page, size));
+    }
+
 }

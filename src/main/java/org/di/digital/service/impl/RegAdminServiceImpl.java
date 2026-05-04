@@ -7,6 +7,7 @@ import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.AppealDto;
 import org.di.digital.dto.response.CaseResponse;
+import org.di.digital.dto.response.LogDto;
 import org.di.digital.dto.response.UserProfile;
 import org.di.digital.model.Appeal;
 import org.di.digital.model.Case;
@@ -14,6 +15,7 @@ import org.di.digital.model.User;
 import org.di.digital.model.enums.AppealStatus;
 import org.di.digital.repository.AppealRepository;
 import org.di.digital.repository.CaseRepository;
+import org.di.digital.repository.LogRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
@@ -39,6 +41,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final AppealRepository appealRepository;
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
+    private final LogRepository logRepository;
     private final Mapper mapper;
 
      @Override
@@ -96,12 +99,22 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .map(mapper::mapToCaseResponse);
     }
     @Override
+    @Transactional
     public void approveAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
+        if (admin.getRegion() == null) {
+            throw new AccessDeniedException("Admin has no region assigned");
+        }
+
         Appeal appeal = appealRepository.findById(appealId)
                 .orElseThrow(() -> new RuntimeException("Appeal not found"));
+
+        if (appeal.getRegion() == null ||
+                !appeal.getRegion().getId().equals(admin.getRegion().getId())) {
+            throw new AccessDeniedException("This appeal does not belong to your region");
+        }
 
         appeal.setStatus(AppealStatus.APPROVED);
         appeal.setReviewedBy(admin);
@@ -116,12 +129,22 @@ public class RegAdminServiceImpl implements RegAdminService {
     }
 
     @Override
+    @Transactional
     public void rejectAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
+        if (admin.getRegion() == null) {
+            throw new AccessDeniedException("Admin has no region assigned");
+        }
+
         Appeal appeal = appealRepository.findById(appealId)
                 .orElseThrow(() -> new RuntimeException("Appeal not found"));
+
+        if (appeal.getRegion() == null ||
+                !appeal.getRegion().getId().equals(admin.getRegion().getId())) {
+            throw new AccessDeniedException("This appeal does not belong to your region");
+        }
 
         appeal.setStatus(AppealStatus.REJECTED);
         appeal.setReviewedBy(admin);
@@ -209,5 +232,26 @@ public class RegAdminServiceImpl implements RegAdminService {
             throw new AccessDeniedException("This case does not belong to your region");
         }
         return caseEntity.getQualification();
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public Page<LogDto> getMyRegionUserLogs(Long adminId, String email, int page, int size) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+        if (admin.getRegion() == null) {
+            throw new RuntimeException("Admin has no region assigned");
+        }
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        if (user.getRegion() == null ||
+                !user.getRegion().getId().equals(admin.getRegion().getId())) {
+            throw new AccessDeniedException("User is not in your region");
+        }
+
+        return logRepository.findByEmail(email, PageRequest.of(page, size))
+                .map(mapper::toLogDto);
     }
 }

@@ -3,6 +3,7 @@ package org.di.digital.service.export.kz;
 import org.apache.poi.xwpf.usermodel.*;
 import org.di.digital.dto.response.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.CaseInterrogationProtocolResponse;
+import org.di.digital.dto.response.InvolvedPersonsResponse;
 import org.di.digital.model.User;
 import org.di.digital.service.export.BaseInterrogationDocBuilder;
 import org.di.digital.util.LocalizationHelper;
@@ -216,6 +217,16 @@ public abstract class KazBaseBuilder extends BaseInterrogationDocBuilder {
     }
 
     // ── Закрывающие блоки ────────────────────────────────────────────────────
+    protected void addInvolvedPersonsSignaturesKaz(XWPFDocument doc, CaseInterrogationFullResponse data) {
+        if (data.getInvolvedPersons() == null || data.getInvolvedPersons().isEmpty()) return;
+        for (InvolvedPersonsResponse person : data.getInvolvedPersons()) {
+            String roleLabel = safe(person.getType());
+            String fio = person.getAbout() != null && !person.getAbout().isBlank()
+                    ? person.getAbout() : "";
+            addInlineSignatureLine(doc, roleLabel, fio);
+        }
+        addEmptyLine(doc);
+    }
 
     protected void addClosingSectionKaz(XWPFDocument doc, CaseInterrogationFullResponse data,
                                         String roleGenitive, String roleLabel, String fio) {
@@ -264,6 +275,8 @@ public abstract class KazBaseBuilder extends BaseInterrogationDocBuilder {
         addInlineSignatureLine(doc, roleLabel, fio);
         addEmptyLine(doc);
 
+        addInvolvedPersonsSignaturesKaz(doc, data);
+
         addInvestigatorBlock(doc, "Жауап алды, хаттаманы жасады:",
                 data.getInvestigatorProfession(), formatFio(data.getInvestigator()));
     }
@@ -302,6 +315,8 @@ public abstract class KazBaseBuilder extends BaseInterrogationDocBuilder {
         addInlineSignatureLine(doc, "Маман(дар)", "");
         addInlineSignatureLine(doc, "Аудармашы", "");
         addEmptyLine(doc);
+
+        addInvolvedPersonsSignaturesKaz(doc, data);
 
         addInvestigatorBlock(doc, "Жауап алды, хаттаманы жасады:",
                 data.getInvestigatorProfession(), formatFio(data.getInvestigator()));

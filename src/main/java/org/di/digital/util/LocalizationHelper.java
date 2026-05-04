@@ -8,6 +8,7 @@ import org.springframework.util.StringUtils;
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
+import java.util.List;
 import java.util.Locale;
 import java.util.stream.Collectors;
 
@@ -86,12 +87,21 @@ public class LocalizationHelper {
         return "г." + formattedName;
     }
     public String formatToRussianDate(String dateStr) {
-        if (dateStr == null || dateStr.isEmpty()) return dateStr;
+        if (dateStr == null || dateStr.isBlank()) return dateStr;
 
-        LocalDate date = LocalDate.parse(dateStr);
+        DateTimeFormatter outputFormatter = DateTimeFormatter.ofPattern("d MMMM yyyy 'года'", new Locale("ru"));
 
-        DateTimeFormatter formatter = DateTimeFormatter.ofPattern("d MMMM yyyy 'года'", new Locale("ru"));
+        if (dateStr.matches("\\d{1,2} .+ \\d{4}.*")) {
+            return dateStr;
+        }
 
-        return date.format(formatter);
+        for (String pattern : List.of("yyyy-MM-dd", "yyyy/MM/dd", "dd.MM.yyyy")) {
+            try {
+                LocalDate date = LocalDate.parse(dateStr.trim(), DateTimeFormatter.ofPattern(pattern));
+                return date.format(outputFormatter);
+            } catch (Exception ignored) {}
+        }
+
+        return dateStr;
     }
 }

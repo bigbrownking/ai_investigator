@@ -189,7 +189,10 @@ public class Mapper {
                     .theme(user.getSettings().getTheme().getTheme())
                     .build();
         }
-
+        Address sterr = null;
+        if(user.getRegion() != null && !user.getRegion().getAddresses().isEmpty()){
+            sterr = user.getRegion().getAddresses().get(0);
+        }
         return UserProfile.builder()
                 .id(user.getId())
                 .iin(user.getIin())
@@ -203,7 +206,7 @@ public class Mapper {
                 .email(user.getEmail())
                 .active(user.isActive())
                 .settings(settingsDto)
-                .street(localizationHelper.getLocalizedName(user.getRegion().getAddresses().get(0), language))
+                .street(localizationHelper.getLocalizedName(sterr, language))
                 .createdCaseCount(user.getCases() != null ? user.getCases().size() : 0)
                 .build();
     }
@@ -254,6 +257,16 @@ public class Mapper {
             fio = localizationHelper.toTitleCase(interrogation.getProtocol().getFio());
         }
 
+        List<InvolvedPersonsResponse> involvedPersons = interrogation.getInvolvedPersons() != null
+                ? interrogation.getInvolvedPersons().stream()
+                .map(e -> InvolvedPersonsResponse.builder()
+                        .id(e.getId())
+                        .type(e.getType())
+                        .about(e.getAbout())
+                        .build())
+                .toList()
+                : List.of();
+
         List<CaseInterrogationQAResponse> qaList = null;
         if (interrogation.getQaList() != null && !interrogation.getQaList().isEmpty()) {
             qaList = interrogation.getQaList().stream()
@@ -301,7 +314,7 @@ public class Mapper {
                 .role(interrogation.getRole())
                 .date(interrogation.getDate())
                 .involved(interrogation.getInvolved())
-                .involvedPersons(interrogation.getInvolvedPersons())
+                .involvedPersons(involvedPersons)
                 .testimony(interrogation.getTestimony())
                 .confession(interrogation.getConfession())
                 .confessionText(interrogation.getConfessionText())
@@ -401,6 +414,18 @@ public class Mapper {
         return AdministrationDto.builder()
                 .id(administration.getId())
                 .name(administration.getRuName())
+                .build();
+    }
+    public LogDto toLogDto(Log log) {
+        return LogDto.builder()
+                .id(log.getId())
+                .timestamp(log.getTimestamp())
+                .level(log.getLevel().name())
+                .action(log.getAction().getDescription())
+                .description(log.getDescription())
+                .caseNumber(log.getCaseNumber())
+                .email(log.getEmail())
+                .ipAddress(log.getIpAddress())
                 .build();
     }
 }

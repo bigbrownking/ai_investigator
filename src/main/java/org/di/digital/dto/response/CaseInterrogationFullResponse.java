@@ -31,7 +31,7 @@ public class CaseInterrogationFullResponse {
     private String role;
     private LocalDate date;
     private String involved;
-    private String involvedPersons;
+    private List<InvolvedPersonsResponse> involvedPersons;
     private String testimony;
     private String confession;
     private String confessionText;

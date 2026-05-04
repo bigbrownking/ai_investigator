@@ -3,6 +3,7 @@ package org.di.digital.service.export.ru;
 import org.apache.poi.xwpf.usermodel.*;
 import org.di.digital.dto.response.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.CaseInterrogationProtocolResponse;
+import org.di.digital.dto.response.InvolvedPersonsResponse;
 import org.di.digital.model.User;
 import org.di.digital.service.export.BaseInterrogationDocBuilder;
 import org.di.digital.util.LocalizationHelper;
@@ -191,7 +192,16 @@ public abstract class RuBaseBuilder extends BaseInterrogationDocBuilder {
     }
 
     // ── Закрывающие блоки ────────────────────────────────────────────────────
-
+    protected void addInvolvedPersonsSignatures(XWPFDocument doc, CaseInterrogationFullResponse data) {
+        if (data.getInvolvedPersons() == null || data.getInvolvedPersons().isEmpty()) return;
+        for (InvolvedPersonsResponse person : data.getInvolvedPersons()) {
+            String roleLabel = safe(person.getType());
+            String fio = person.getAbout() != null && !person.getAbout().isBlank()
+                    ? person.getAbout() : "";
+            addInlineSignatureLine(doc, roleLabel, fio);
+        }
+        addEmptyLine(doc);
+    }
     protected void addClosingSection(XWPFDocument doc, CaseInterrogationFullResponse data,
                                      String roleGenitive, String roleLabel, String fio) {
         addJustifiedParagraph(doc,
@@ -241,6 +251,8 @@ public abstract class RuBaseBuilder extends BaseInterrogationDocBuilder {
         addInlineSignatureLine(doc, roleLabel, fio);
         addEmptyLine(doc);
 
+        addInvolvedPersonsSignatures(doc, data);
+
         addInvestigatorBlock(doc, "Допросил, протокол составил:",
                 data.getInvestigatorProfession(), formatFio(data.getInvestigator()));
     }
@@ -279,6 +291,8 @@ public abstract class RuBaseBuilder extends BaseInterrogationDocBuilder {
         addInlineSignatureLine(doc, "Специалист(ы)", "");
         addInlineSignatureLine(doc, "Переводчик", "");
         addEmptyLine(doc);
+
+        addInvolvedPersonsSignatures(doc, data);
 
         addInvestigatorBlock(doc, "Допросил, протокол составил:",
                 data.getInvestigatorProfession(), formatFio(data.getInvestigator()));
@@ -429,7 +443,7 @@ public abstract class RuBaseBuilder extends BaseInterrogationDocBuilder {
                     + "За отказ от дачи показаний и дачу заведомо ложных показаний потерпевший несет уголовную ответственность.";
 
     public static final String RIGHTS_ST78 =
-            "Свидетель имеет право:\n"
+            "Свидетель имеет право: "
                     + "1) отказаться от дачи показаний, которые могут повлечь для него самого, его супруга (супруги) или близких "
                     + "родственников преследование за совершение уголовно наказуемого деяния или административного правонарушения; "
                     + "2) давать показания на своем родном языке или языке, которым владеет; "
@@ -437,19 +451,18 @@ public abstract class RuBaseBuilder extends BaseInterrogationDocBuilder {
                     + "4) заявлять отвод переводчику; "
                     + "5) собственноручной записи показаний в протоколе допроса; "
                     + "6) приносить жалобы на действия дознавателя, следователя, прокурора и суда, заявлять ходатайства, "
-                    + "в том числе о принятии мер безопасности.\n\n"
-                    + "Свидетель имеет право давать показания в присутствии своего адвоката.\n\n"
-                    + "Свидетелю обеспечивается возмещение расходов, понесенных им при производстве по уголовному делу.\n\n"
-                    + "Свидетель обязан:\n"
+                    + "в том числе о принятии мер безопасности. "
+                    + "Свидетель имеет право давать показания в присутствии своего адвоката. "
+                    + "Свидетелю обеспечивается возмещение расходов, понесенных им при производстве по уголовному делу. "
+                    + "Свидетель обязан: "
                     + "1) явиться по вызову дознавателя, следователя, прокурора и суда; "
                     + "2) правдиво сообщить все известное по делу и ответить на поставленные вопросы; "
                     + "3) не разглашать сведения об обстоятельствах, известных ему по делу, если он был предупрежден об этом; "
-                    + "4) соблюдать установленный порядок при производстве следственных действий и во время судебного заседания.\n\n"
+                    + "4) соблюдать установленный порядок при производстве следственных действий и во время судебного заседания. "
                     + "За дачу ложных показаний, отказ от дачи показаний свидетель несет уголовную ответственность, "
-                    + "предусмотренную ст.ст.420, 421 УК РК.\n\n"
-                    + "Свидетелю разъяснено право отказаться от дачи показаний, уличающих в совершении уголовного правонарушения "
-                    + "его самого, супруга (супруги), близких родственников.";
-
+                    + "предусмотренную Уголовным кодексом Республики Казахстан. "
+                    + "За уклонение от дачи показаний или неявку без уважительных причин по вызову органа, ведущего уголовный процесс, "
+                    + "на свидетеля может быть наложено денежное взыскание в порядке, установленном статьей 160 настоящего Кодекса.";
     public static final String RIGHTS_ST64 =
             "Подозреваемый имеет право:\n"
                     + "1) получить разъяснение принадлежащих прав; 2) знать, в чем подозревается; "

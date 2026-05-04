@@ -35,8 +35,11 @@ public class CaseInterrogation {
     private String notificationDate;
     private String state;
     private String involved;
-    @Column(columnDefinition = "TEXT")
-    private String involvedPersons;
+
+    @Builder.Default
+    @OneToMany(mappedBy = "interrogation", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<CaseInterrogationInvolvedPersons> involvedPersons = new ArrayList<>();
+
     private String confession;
     @Column(columnDefinition = "TEXT")
     private String confessionText;

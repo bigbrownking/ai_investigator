@@ -51,6 +51,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final CaseInterrogationMilitaryRepository caseInterrogationMilitaryRepository;
     private final CaseInterrogationCriminalRepository caseInterrogationCriminalRepository;
     private final CaseInterrogationRelationRepository caseInterrogationRelationRepository;
+    private final CaseInterrogationInvolvedPersonsRepository caseInterrogationInvolvedPersonsRepository;
     private final InterrogationChatRepository interrogationChatRepository;
     private final CaseChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
@@ -368,7 +369,26 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             case "notificationDate" -> interrogation.setNotificationDate(request.getValue());
             case "testimony" -> interrogation.setTestimony(request.getValue());
             case "involved" -> interrogation.setInvolved(request.getValue());
-            case "involvedPersons" -> interrogation.setInvolvedPersons(request.getValue());
+
+            case "involvedPersons" -> {
+                CaseInterrogationInvolvedPersons involvedPersons;
+                Long involvedPersonsId = request.getId();
+                if (involvedPersonsId != null) {
+                    involvedPersons = caseInterrogationInvolvedPersonsRepository.findById(involvedPersonsId)
+                            .orElseThrow(() -> new RuntimeException("Involved persons not found: " + involvedPersonsId));
+                    involvedPersons.setAbout(request.getAbout());
+                    involvedPersons.setType(request.getType());
+                } else {
+                    involvedPersons = CaseInterrogationInvolvedPersons.builder()
+                            .type(request.getType())
+                            .about(request.getAbout())
+                            .interrogation(interrogation)
+                            .build();
+                    interrogation.getInvolvedPersons().add(involvedPersons);
+                }
+
+            }
+
             case "confession" -> interrogation.setConfession(request.getValue());
             case "confessionText" -> interrogation.setConfessionText(request.getValue());
             case "language" -> interrogation.setLanguage(request.getValue());

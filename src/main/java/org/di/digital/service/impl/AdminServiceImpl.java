@@ -7,14 +7,12 @@ import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
+import org.di.digital.model.Appeal;
 import org.di.digital.model.Case;
 import org.di.digital.model.Region;
 import org.di.digital.model.User;
 import org.di.digital.model.enums.AppealStatus;
-import org.di.digital.repository.AppealRepository;
-import org.di.digital.repository.CaseRepository;
-import org.di.digital.repository.RegionRepository;
-import org.di.digital.repository.UserRepository;
+import org.di.digital.repository.*;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
 import org.di.digital.service.AdminService;
@@ -27,6 +25,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.di.digital.repository.search.CaseSpecifications.hasOwner;
@@ -41,6 +40,7 @@ public class AdminServiceImpl implements AdminService {
     private final CaseRepository caseRepository;
     private final AppealRepository appealRepository;
     private final RegionRepository regionRepository;
+    private final LogRepository logRepository;
     private final Mapper mapper;
     private final LocalizationHelper localizationHelper;
 
@@ -186,5 +186,51 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
     }
 
+    @Override
+    @Transactional
+    public void approveAppeal(Long appealId, Long adminId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+        Appeal appeal = appealRepository.findById(appealId)
+                .orElseThrow(() -> new RuntimeException("Appeal not found"));
+
+        appeal.setStatus(AppealStatus.APPROVED);
+        appeal.setReviewedBy(admin);
+        appeal.setReviewedAt(LocalDateTime.now());
+        appealRepository.save(appeal);
+
+        User user = appeal.getUser();
+        user.setActive(true);
+        userRepository.save(user);
+
+        log.info("Appeal {} approved by admin {}", appealId, adminId);
+    }
+
+    @Override
+    @Transactional
+    public void rejectAppeal(Long appealId, Long adminId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+        Appeal appeal = appealRepository.findById(appealId)
+                .orElseThrow(() -> new RuntimeException("Appeal not found"));
+
+        appeal.setStatus(AppealStatus.REJECTED);
+        appeal.setReviewedBy(admin);
+        appeal.setReviewedAt(LocalDateTime.now());
+        appealRepository.save(appeal);
+
+        log.info("Appeal {} rejected by admin {}", appealId, adminId);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<LogDto> getUserLogs(String email, int page, int size) {
+        userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+        return logRepository.findByEmail(email, PageRequest.of(page, size))
+                .map(mapper::toLogDto);
+    }
 }
 

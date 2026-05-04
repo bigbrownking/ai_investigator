@@ -64,10 +64,17 @@ public class RuWitnessBuilder extends RuBaseBuilder implements InterrogationProt
         addJustifiedParagraph(doc,
                 "Свидетель " + fio
                         + " предупрежден(а) об уголовной ответственности за заведомо ложные показания "
-                        + "и за отказ от дачи показаний, предусмотренными ст.ст.420, 421 УК РК.");
+                        + "и за отказ от дачи показаний, в суде либо в ходе досудебного расследования, предусмотренными ст.ст.420, 421 УК РК.");
         addEmptyLine(doc);
         addInlineSignatureLine(doc, "Свидетель", fio);
         addEmptyLine(doc);
+
+        addJustifiedParagraph(doc,
+                "Свидетелю разъяснено право отказаться от дачи показаний, уличающих в совершении уголовного правонарушения его самого, супруга (супруги), близких родственников.\n");
+        addEmptyLine(doc);
+        addInlineSignatureLine(doc, "Свидетель", fio);
+        addEmptyLine(doc);
+
 
         addLanguageBlock(doc, data, "Свидетелю", fio);
         addJustifiedParagraph(doc,

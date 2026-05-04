@@ -7,18 +7,16 @@ import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.AppealDto;
 import org.di.digital.dto.response.CaseResponse;
+import org.di.digital.dto.response.LogDto;
 import org.di.digital.dto.response.UserProfile;
-import org.di.digital.model.Appeal;
-import org.di.digital.model.User;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.RegAdminService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.List;
+import static org.di.digital.util.UserUtil.getCurrentUser;
 
 @RestController
 @Slf4j
@@ -100,5 +98,13 @@ public class RegAdminController {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         regAdminService.rejectAppeal(id, userDetails.getId());
         return ResponseEntity.ok().build();
+    }
+    @GetMapping("/logs/user/{email}")
+    public ResponseEntity<Page<LogDto>> getMyRegionUserLogs(
+            @PathVariable String email,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        Long adminId = getCurrentUser().getId();
+        return ResponseEntity.ok(regAdminService.getMyRegionUserLogs(adminId, email, page, size));
     }
 }

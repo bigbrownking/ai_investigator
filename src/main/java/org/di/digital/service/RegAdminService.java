@@ -5,6 +5,7 @@ import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.AppealDto;
 import org.di.digital.dto.response.CaseResponse;
+import org.di.digital.dto.response.LogDto;
 import org.di.digital.dto.response.UserProfile;
 import org.springframework.data.domain.Page;
 
@@ -20,4 +21,5 @@ public interface RegAdminService {
     CaseResponse getMyRegionCaseDetail(Long adminId, Long caseId);
     String getMyRegionCaseIndictment(Long adminId, Long caseId);
     String getMyRegionCaseQualification(Long adminId, Long caseId);
+    Page<LogDto> getMyRegionUserLogs(Long adminId, String email, int page, int size);
 }
