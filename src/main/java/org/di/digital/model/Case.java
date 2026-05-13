@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.enums.CaseFileStatusEnum;
-import org.di.digital.model.enums.CaseInterrogationStatusEnum;
+import org.di.digital.model.interrogation.CaseInterrogation;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -156,5 +156,10 @@ public class Case {
     public boolean isAtLeastOneFileProcessed() {
         return files.stream()
                 .anyMatch(f -> CaseFileStatusEnum.COMPLETED.equals(f.getStatus()));
+    }
+    public long audioUsedCount() {
+        return interrogations.stream()
+                .filter(CaseInterrogation::isAudioUsed)
+                .count();
     }
 }

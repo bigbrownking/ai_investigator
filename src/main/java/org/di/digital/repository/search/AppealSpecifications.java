@@ -41,8 +41,8 @@ public class AppealSpecifications {
             query.distinct(true);
             Join<Object, Object> join = root.join("region", JoinType.LEFT);
             return cb.or(
-                    cb.like(cb.lower(join.get("ruName")), like(region)),
-                    cb.like(cb.lower(join.get("kzName")), like(region))
+                    cb.like(cb.lower(join.get("ruName")), region.toLowerCase()),
+                    cb.like(cb.lower(join.get("kzName")), region.toLowerCase())
             );
         };
     }

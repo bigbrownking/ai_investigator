@@ -15,5 +15,6 @@ public class CaseInterrogationApplicationFileResponse {
     private String downloadUrl;
     private String contentType;
     private Long fileSize;
+    private Integer pages;
     private String uploadedAt;
 }

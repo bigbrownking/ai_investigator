@@ -79,9 +79,9 @@ public class CaseSpecifications {
             query.distinct(true);
             Join<Object, Object> owner = root.join("owner", JoinType.LEFT);
             return cb.or(
-                    cb.like(cb.lower(owner.get("name")), like(ownerName)),
-                    cb.like(cb.lower(owner.get("surname")), like(ownerName)),
-                    cb.like(cb.lower(owner.get("fathername")), like(ownerName))
+                    cb.like(cb.lower(owner.get("name")), ownerName.toLowerCase()),
+                    cb.like(cb.lower(owner.get("surname")), ownerName.toLowerCase()),
+                    cb.like(cb.lower(owner.get("fathername")), ownerName.toLowerCase())
             );
         };
     }
@@ -93,8 +93,8 @@ public class CaseSpecifications {
             Join<Object, Object> owner = root.join("owner", JoinType.LEFT);
             Join<Object, Object> regionJoin = owner.join("region", JoinType.LEFT);
             return cb.or(
-                    cb.like(cb.lower(regionJoin.get("ruName")), like(region)),
-                    cb.like(cb.lower(regionJoin.get("kzName")), like(region))
+                    cb.like(cb.lower(regionJoin.get("ruName")), region.toLowerCase()),
+                    cb.like(cb.lower(regionJoin.get("kzName")), region.toLowerCase())
             );
         };
     }

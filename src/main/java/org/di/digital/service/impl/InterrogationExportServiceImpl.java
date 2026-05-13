@@ -6,10 +6,10 @@ import org.di.digital.dto.response.CaseInterrogationFullResponse;
 import org.di.digital.model.User;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
-import org.di.digital.service.export.InterrogationExportService;
+import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.service.LogService;
-import org.di.digital.service.export.BaseInterrogationDocBuilder;
-import org.di.digital.service.export.InterrogationProtocolBuilder;
+import org.di.digital.service.export.interrogation.BaseInterrogationDocBuilder;
+import org.di.digital.service.export.interrogation.InterrogationProtocolBuilder;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;

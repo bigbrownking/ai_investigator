@@ -1,7 +1,7 @@
 package org.di.digital.util;
 
 import lombok.experimental.UtilityClass;
-import org.di.digital.model.CaseInterrogationQA;
+import org.di.digital.model.interrogation.CaseInterrogationQA;
 
 import java.util.HashMap;
 import java.util.List;
@@ -35,7 +35,8 @@ public class RequestBodyBuilder {
     }
 
 
-    public static Map<String, Object> interrogationBody(String fio, String role, List<CaseInterrogationQA> qaList) {
+    public static Map<String, Object> interrogationBody(String fio, String role,
+                                                        String language, List<CaseInterrogationQA> qaList) {
         String prior_qa_text = qaList == null || qaList.isEmpty() ? "" :
                 qaList.stream()
                         .map(qa -> "Вопрос: " + qa.getQuestion() + " Ответ: " + qa.getAnswer())
@@ -43,6 +44,7 @@ public class RequestBodyBuilder {
         Map<String, Object> body = new HashMap<>();
         body.put("fio", fio);
         body.put("role", role);
+        body.put("language", language);
         body.put("prior_qa_text", prior_qa_text);
         return body;
     }

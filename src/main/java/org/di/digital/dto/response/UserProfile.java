@@ -17,11 +17,14 @@ public class UserProfile {
     private String email;
     private String role;
     private String profession;
+    private String rank;
     private String administration;
     private String region;
     private String street;
     private UserSettingsDto settings;
     private int createdCaseCount;
     private boolean active;
+    private boolean online;
+    private String lastSeenAt;
 }
 

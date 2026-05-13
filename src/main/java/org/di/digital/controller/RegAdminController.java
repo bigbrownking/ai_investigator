@@ -5,10 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
-import org.di.digital.dto.response.AppealDto;
-import org.di.digital.dto.response.CaseResponse;
-import org.di.digital.dto.response.LogDto;
-import org.di.digital.dto.response.UserProfile;
+import org.di.digital.dto.response.*;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.RegAdminService;
 import org.springframework.data.domain.Page;
@@ -45,7 +42,7 @@ public class RegAdminController {
         return ResponseEntity.ok(regAdminService.getMyRegionUsers(userDetails.getId(), page, size, userSearchRequest));
     }
     @GetMapping("/cases")
-    public ResponseEntity<Page<CaseResponse>> getRegionCases(
+    public ResponseEntity<CasePageResponse> getRegionCases(
             Authentication authentication,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -77,7 +74,7 @@ public class RegAdminController {
     }
 
     @GetMapping("/users/{userId}/cases")
-    public ResponseEntity<Page<CaseResponse>> getUserCases(
+    public ResponseEntity<CasePageResponse> getUserCases(
             @PathVariable Long userId,
             Authentication authentication,
             @RequestParam(defaultValue = "0") int page,

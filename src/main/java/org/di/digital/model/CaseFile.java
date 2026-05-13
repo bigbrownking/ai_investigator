@@ -36,6 +36,9 @@ public class CaseFile {
     @Enumerated(EnumType.STRING)
     private CaseFileStatusEnum status;
 
+    @Column(name = "pages")
+    private Integer pages;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "case_id", nullable = false)
     private Case caseEntity;

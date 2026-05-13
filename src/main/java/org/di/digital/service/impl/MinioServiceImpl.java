@@ -8,7 +8,7 @@ import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.CaseFile;
-import org.di.digital.model.CaseInterrogationApplicationFile;
+import org.di.digital.model.interrogation.CaseInterrogationApplicationFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.service.MinioService;
 import org.springframework.beans.factory.annotation.Value;

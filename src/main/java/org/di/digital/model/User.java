@@ -21,7 +21,9 @@ import java.util.Set;
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-@Table(name = "users")
+@Table(name = "users", indexes = {
+        @Index(name = "idx_last_seen_at", columnList = "last_seen_at")
+})
 @EntityListeners(AuditingEntityListener.class)
 public class User {
 
@@ -49,6 +51,10 @@ public class User {
     private Profession profession;
 
     @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "rank_id")
+    private Rank rank;
+
+    @ManyToOne(fetch = FetchType.EAGER)
     @JoinColumn(name = "region_id")
     private Region region;
 
@@ -69,6 +75,9 @@ public class User {
     @LastModifiedDate
     @Column(name = "updated_date")
     private LocalDateTime updatedDate;
+
+    @Column(name = "last_seen_at")
+    private LocalDateTime lastSeenAt;
 
     @OneToOne(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private UserSettings settings;
@@ -93,4 +102,9 @@ public class User {
     @Builder.Default
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CaseChat> chats = new ArrayList<>();
+
+    public boolean isOnline(int ttl) {
+        return lastSeenAt != null &&
+                lastSeenAt.isAfter(LocalDateTime.now().minusMinutes(ttl));
+    }
 }

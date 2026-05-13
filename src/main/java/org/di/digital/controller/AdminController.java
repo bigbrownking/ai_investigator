@@ -39,7 +39,7 @@ public class AdminController {
     }
 
     @GetMapping("/users/{userId}/cases")
-    public ResponseEntity<Page<CaseResponse>> getUserCases(
+    public ResponseEntity<CasePageResponse> getUserCases(
             @PathVariable Long userId,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
@@ -48,12 +48,13 @@ public class AdminController {
     }
 
     @GetMapping("/cases")
-    public ResponseEntity<Page<CaseResponse>> getAllCases(
+    public ResponseEntity<CasePageResponse> getAllCases(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @ModelAttribute CaseSearchRequest caseSearchRequest) {
         return ResponseEntity.ok(adminService.getAllCases(page, size, caseSearchRequest));
     }
+
     @GetMapping("/cases/{caseId}")
     public ResponseEntity<CaseResponse> getCaseDetail(@PathVariable Long caseId) {
         return ResponseEntity.ok(adminService.getCaseDetail(caseId));
@@ -125,5 +126,4 @@ public class AdminController {
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(adminService.getUserLogs(email, page, size));
     }
-
 }

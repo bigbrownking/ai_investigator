@@ -4,9 +4,16 @@ import lombok.RequiredArgsConstructor;
 import org.di.digital.dto.response.*;
 import org.di.digital.model.*;
 import org.di.digital.model.enums.UserSettingsLanguage;
+import org.di.digital.model.interrogation.CaseInterrogation;
+import org.di.digital.model.interrogation.CaseInterrogationApplicationFile;
+import org.di.digital.model.interrogation.CaseInterrogationProtocol;
+import org.di.digital.model.interrogation.CaseInterrogationQA;
 import org.di.digital.service.MinioService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import java.time.LocalDateTime;
+import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -19,6 +26,9 @@ public class Mapper {
     private final MinioService minioService;
     private final LocalizationHelper localizationHelper;
 
+    @Value("${last.seen.ttl}")
+    private int ttl;
+
     public CaseInterrogationResponse mapToInterrogationResponse(CaseInterrogation interrogation) {
         return CaseInterrogationResponse.builder()
                 .id(interrogation.getId())
@@ -29,6 +39,7 @@ public class Mapper {
                 .date(String.valueOf(interrogation.getDate()))
                 .status(interrogation.getStatus().name())
                 .isDop(interrogation.getIsDop())
+                .audioUsed(interrogation.isAudioUsed())
                 .build();
     }
     public CaseInterrogationQAResponse mapToInterrogationQAResponse(CaseInterrogationQA caseInterrogationQA){
@@ -83,11 +94,13 @@ public class Mapper {
                 .toList()
                 : List.of();
         String genderCorrectedStatus = formatMartialStatus(protocol);
+        String citizenShip = localizationHelper.toTitleCase(protocol.getCitizenship());
+
         return CaseInterrogationProtocolResponse.builder()
                 .fio(localizationHelper.toTitleCase(protocol.getFio()))
                 .dateOfBirth(localizationHelper.formatToRussianDate(protocol.getDateOfBirth()))
                 .birthPlace(localizationHelper.toTitleCase(protocol.getBirthPlace()))
-                .citizenship("гражданин Республики "+ localizationHelper.toTitleCase(protocol.getCitizenship()))
+                .citizenship(citizenShip != null ? "гражданин Республики "+ citizenShip : null)
                 .nationality(localizationHelper.toTitleCase(protocol.getNationality()))
                 .educations(educations)
                 .martialStatus(genderCorrectedStatus)
@@ -135,6 +148,12 @@ public class Mapper {
                 .title(caseEntity.getTitle())
                 .number(caseEntity.getNumber())
                 .status(caseEntity.isStatus())
+                .totalDocuments(caseEntity.getFiles().size())
+                .audioUsed(caseEntity.audioUsedCount())
+                .totalPages(caseEntity.getFiles().stream()
+                        .filter(f -> f.getPages() != null)
+                        .mapToInt(CaseFile::getPages)
+                        .sum())
                 .files(caseEntity.getFiles().stream()
                         .sorted(Comparator
                                 .comparing(CaseFile::getTom, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -202,13 +221,32 @@ public class Mapper {
                 .role(roles)
                 .administration(localizationHelper.getLocalizedName(user.getAdministration(), language))
                 .profession(localizationHelper.getLocalizedName(user.getProfession(), language))
+                .rank(user.getRank() != null ? user.getRank().getName() : null)
                 .region(localizationHelper.getLocalizedName(user.getRegion(), language))
                 .email(user.getEmail())
                 .active(user.isActive())
+                .online(user.isOnline(ttl))
                 .settings(settingsDto)
                 .street(localizationHelper.getLocalizedName(sterr, language))
                 .createdCaseCount(user.getCases() != null ? user.getCases().size() : 0)
+                .lastSeenAt(formatLastSeen(user.getLastSeenAt()))
                 .build();
+    }
+    public static String formatLastSeen(LocalDateTime lastSeenAt) {
+        if (lastSeenAt == null) return null;
+
+        long minutes = ChronoUnit.MINUTES.between(lastSeenAt, LocalDateTime.now());
+
+        if (minutes < 1) return "только что";
+        if (minutes < 60) return "был(а) в сети " + minutes + " мин. назад";
+
+        long hours = ChronoUnit.HOURS.between(lastSeenAt, LocalDateTime.now());
+        if (hours < 24) return "был(а) в сети " + hours + " ч. назад";
+
+        long days = ChronoUnit.DAYS.between(lastSeenAt, LocalDateTime.now());
+        if (days < 30) return "был(а) в сети " + days + " дн. назад";
+
+        return "был(а) в сети давно";
     }
 
     public FigurantResponse mapToFigurantResponse(CaseFigurant figurant) {
@@ -305,6 +343,7 @@ public class Mapper {
                 .addrezz(address)
                 .notificationNumber(interrogation.getNotificationNumber())
                 .notificationDate(interrogation.getNotificationDate())
+                .lawyer(interrogation.getLawyer())
                 .state(interrogation.getState())
                 .caseNumberState(interrogation.getCaseNumberState())
                 .caseNumber(caseNumber)
@@ -351,10 +390,12 @@ public class Mapper {
                 .previewUrl(minioService.generatePresignedUrlForPreview(f.getFileUrl()))
                 .downloadUrl(minioService.generatePresignedUrlForDownload(f.getFileUrl(), f.getOriginalFileName()))
                 .uploadedAt(String.valueOf(f.getUploadedAt()))
+                .completedAt(String.valueOf(f.getCompletedAt()))
                 .isQualification(f.isQualification())
                 .isPlan(f.isPlan())
                 .isPlanComponent(f.isPlanComponent())
                 .tom(f.getTom())
+                .pages(f.getPages() != null ? f.getPages() : 0)
                 .build();
     }
 
@@ -367,6 +408,7 @@ public class Mapper {
                 .downloadUrl(minioService.generatePresignedUrlForDownload(file.getFileUrl(), file.getOriginalFileName()))
                 .contentType(file.getContentType())
                 .fileSize(file.getFileSize())
+                .pages(file.getPages() != null ? file.getPages() : 0)
                 .uploadedAt(String.valueOf(file.getUploadedAt()))
                 .build();
     }
@@ -389,6 +431,9 @@ public class Mapper {
                 .userSurname(appeal.getUser().getSurname())
                 .userFathername(appeal.getUser().getFathername())
                 .userEmail(appeal.getUser().getEmail())
+                .profession(appeal.getUser().getProfession() != null ? appeal.getUser().getProfession().getRuName() : null)
+                .rank(appeal.getUser().getRank() != null ? appeal.getUser().getRank().getName() : null)
+                .administration(appeal.getUser().getAdministration() != null ? appeal.getUser().getAdministration().getRuName() : null)
                 .regionId(appeal.getRegion() != null ? appeal.getRegion().getId() : null)
                 .regionName(localizationHelper.getLocalizedName(appeal.getRegion(), getCurrentUser().getSettings().getLanguage()))
                 .status(appeal.getStatus().getDescription())
@@ -400,6 +445,12 @@ public class Mapper {
         return ProfessionDto.builder()
                 .id(profession.getId())
                 .name(profession.getRuName())
+                .build();
+    }
+    public RankDto toRankDto(Rank rank){
+        return RankDto.builder()
+                .id(rank.getId())
+                .name(rank.getName())
                 .build();
     }
 
@@ -426,6 +477,25 @@ public class Mapper {
                 .caseNumber(log.getCaseNumber())
                 .email(log.getEmail())
                 .ipAddress(log.getIpAddress())
+                .build();
+    }
+    public CaseListResponse mapToCaseListResponse(Case c) {
+        return CaseListResponse.builder()
+                .id(c.getId())
+                .title(c.getTitle())
+                .number(c.getNumber())
+                .status(c.isStatus())
+                .totalDocuments(c.getFiles().size())
+                .totalPages(c.getFiles().stream()
+                        .filter(f -> f.getPages() != null)
+                        .mapToInt(CaseFile::getPages)
+                        .sum())
+                .totalInterrogations(c.getInterrogations().size())
+                .audioInterrogations(c.audioUsedCount())
+                .createdDate(c.getCreatedDate())
+                .lastActivityDate(c.getLastActivityDate())
+                .lastActivityType(c.getLastActivityType())
+                .ownerEmail(c.getOwner() != null ? c.getOwner().getEmail() : null)
                 .build();
     }
 }

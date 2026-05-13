@@ -12,6 +12,7 @@ import java.time.LocalDateTime;
 public class TranscriptionResultMessage {
     private Long interrogationId;
     private Long qaId;
+    private Long recordId;
     private String caseNumber;
     private TranscriptionStatus status;
     private String transcribedText;

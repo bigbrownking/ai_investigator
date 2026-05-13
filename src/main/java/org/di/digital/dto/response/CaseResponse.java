@@ -16,6 +16,9 @@ public class CaseResponse {
     private String title;
     private String number;
     private boolean status;
+    private long totalPages;
+    private long totalDocuments;
+    private long audioUsed;
 
     private List<CaseUserResponse> users;
 

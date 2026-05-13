@@ -75,14 +75,15 @@ public class UserSpecifications {
                         : null;
     }
 
+    // TODO use id instead of name
     private static Specification<User> hasProfession(String profession) {
         return (root, query, cb) -> {
             if (!StringUtils.hasText(profession)) return null;
             query.distinct(true);
             Join<Object, Object> join = root.join("profession", JoinType.LEFT);
             return cb.or(
-                    cb.like(cb.lower(join.get("ruName")), like(profession)),
-                    cb.like(cb.lower(join.get("kzName")), like(profession))
+                    cb.equal(cb.lower(join.get("ruName")), profession.toLowerCase()),
+                    cb.equal(cb.lower(join.get("kzName")), profession.toLowerCase())
             );
         };
     }
@@ -93,8 +94,8 @@ public class UserSpecifications {
             query.distinct(true);
             Join<Object, Object> join = root.join("administration", JoinType.LEFT);
             return cb.or(
-                    cb.like(cb.lower(join.get("ruName")), like(administration)),
-                    cb.like(cb.lower(join.get("kzName")), like(administration))
+                    cb.equal(cb.lower(join.get("ruName")), administration.toLowerCase()),
+                    cb.equal(cb.lower(join.get("kzName")), administration.toLowerCase())
             );
         };
     }
@@ -105,8 +106,8 @@ public class UserSpecifications {
             query.distinct(true);
             Join<Object, Object> join = root.join("region", JoinType.LEFT);
             return cb.or(
-                    cb.like(cb.lower(join.get("ruName")), like(region)),
-                    cb.like(cb.lower(join.get("kzName")), like(region))
+                    cb.equal(cb.lower(join.get("ruName")), region.toLowerCase()),
+                    cb.equal(cb.lower(join.get("kzName")), region.toLowerCase())
             );
         };
     }

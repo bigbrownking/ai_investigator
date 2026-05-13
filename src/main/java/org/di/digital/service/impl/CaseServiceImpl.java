@@ -23,6 +23,7 @@ import org.di.digital.service.LogService;
 import org.di.digital.service.MinioService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
+import org.di.digital.util.PageCounter;
 import org.di.digital.util.UrlBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
@@ -55,6 +56,7 @@ public class CaseServiceImpl implements CaseService {
     private final TaskQueueService taskQueueService;
     private final LogService logService;
     private final Mapper mapper;
+    private final PageCounter pageCounter;
     private final CaseFileRepository caseFileRepository;
 
     @Value("${qualification.model.host}")
@@ -67,9 +69,9 @@ public class CaseServiceImpl implements CaseService {
     @Transactional
     public CaseResponse createCase(CreateCaseRequest request, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
-        if(caseRepository.existsByNumber(request.getNumber())){
+        if (caseRepository.existsByNumber(request.getNumber())) {
             logService.log(
                     String.format("Case already exists: %s", request.getNumber()),
                     LogLevel.ERROR,
@@ -91,7 +93,6 @@ public class CaseServiceImpl implements CaseService {
                 .build();
 
         newCase.addUser(user);
-
         Case savedCase = caseRepository.save(newCase);
 
         if (request.getFiles() != null && !request.getFiles().isEmpty()) {
@@ -103,6 +104,17 @@ public class CaseServiceImpl implements CaseService {
                 }
             }
         }
+
+        savedCase.getFiles().forEach(caseFile -> {
+            try {
+                Integer pages = pageCounter.countPagesByUrl(caseFile.getFileUrl(), caseFile.getContentType());
+                if (pages != null) {
+                    caseFile.setPages(pages);
+                }
+            } catch (Exception e) {
+                log.warn("Could not count pages for file {}: {}", caseFile.getOriginalFileName(), e.getMessage());
+            }
+        });
 
         caseRepository.flush();
 
@@ -121,7 +133,7 @@ public class CaseServiceImpl implements CaseService {
         log.info("Case created with id: {} for user: {}", savedCase.getId(), email);
 
         logService.log(
-                String.format("Case %s created by user %s",caseNumber, email),
+                String.format("Case %s created by user %s", caseNumber, email),
                 LogLevel.INFO,
                 LogAction.CASE_CREATED,
                 caseNumber,
@@ -135,15 +147,15 @@ public class CaseServiceImpl implements CaseService {
     @Transactional
     public CaseResponse editCase(Long caseId, EditCaseRequest request, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
         if (!caseEntity.isOwner(user)) {
-            throw new AccessDeniedException("Only the case owner can edit this case");
+            throw new AccessDeniedException("Только создатель дела может редактировать его");
         }
 
         String oldNumber = caseEntity.getNumber();
@@ -255,7 +267,7 @@ public class CaseServiceImpl implements CaseService {
         validateUserAccess(caseEntity, user);
 
         if (!caseEntity.isOwner(user)) {
-            throw new AccessDeniedException("Access denied: Only case owner can change status");
+            throw new AccessDeniedException("Только создатель дела может изменять его статус");
         }
 
         caseEntity.setStatus(status);
@@ -328,6 +340,18 @@ public class CaseServiceImpl implements CaseService {
                 log.error("Failed to upload file: {} to case: {}", originalName, caseId, e);
             }
         }
+
+        uploadedFiles.forEach(caseFile -> {
+            try {
+                Integer pages = pageCounter.countPagesByUrl(caseFile.getFileUrl(), caseFile.getContentType());
+                if (pages != null) {
+                    caseFile.setPages(pages);
+                }
+            } catch (Exception e) {
+                log.warn("Could not count pages for file {}: {}", caseFile.getOriginalFileName(), e.getMessage());
+            }
+        });
+
         List<CaseFile> savedFiles = caseFileRepository.saveAllAndFlush(uploadedFiles);
 
         savedFiles.forEach(caseFile -> {
@@ -354,6 +378,7 @@ public class CaseServiceImpl implements CaseService {
                 caseNumber,
                 email
         );
+
         return savedFiles.stream()
                 .map(mapper::mapToCaseFileResponse)
                 .toList();

@@ -10,6 +10,7 @@ import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.service.*;
+import org.di.digital.service.export.DocumentFormatterService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;

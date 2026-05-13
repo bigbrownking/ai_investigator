@@ -8,7 +8,7 @@ import org.di.digital.dto.notification.InterrogationNotification;
 import org.di.digital.dto.notification.InterrogationNotificationStatus;
 import org.di.digital.model.Case;
 import org.di.digital.model.CaseFile;
-import org.di.digital.model.CaseInterrogation;
+import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.repository.CaseRepository;

@@ -56,7 +56,7 @@ public class UserUtil {
                     caseEntity.getNumber(),
                     user.getEmail()
             );
-            throw new AccessDeniedException("You don't have permission to access this case");
+            throw new AccessDeniedException("У вас нет доступа к этому делу");
         }
     }
 }

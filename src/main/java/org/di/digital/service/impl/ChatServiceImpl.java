@@ -92,9 +92,9 @@ public class ChatServiceImpl implements ChatService {
     public void streamCaseChatResponseWithHistory(String caseNumber, ChatRequest request,
                                                   String userEmail, SseEmitter emitter) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseNumber));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
@@ -162,9 +162,9 @@ public class ChatServiceImpl implements ChatService {
     @Transactional(readOnly = true)
     public CaseChatHistoryResponse getChatHistoryByCaseNumber(String caseNumber, String userEmail, int page, int size) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseNumber));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
         return getChatHistory(caseEntity.getId(), user.getId(), page, size);
     }
@@ -187,9 +187,9 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public void clearChatHistoryByCaseNumber(String caseNumber, String userEmail) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseNumber));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
         clearChatHistory(caseEntity.getId(), user.getId());
 

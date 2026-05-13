@@ -10,8 +10,8 @@ import java.util.List;
 
 public interface AdminService {
     Page<UserProfile> getAllUsers(int page, int size, UserSearchRequest userSearchRequest);
-    Page<CaseResponse> getAllCases(int page, int size, CaseSearchRequest caseSearchRequest);
-    Page<CaseResponse> getUserCases(Long userId, int page, int size, CaseSearchRequest caseSearchRequest);
+    CasePageResponse getAllCases(int page, int size, CaseSearchRequest caseSearchRequest);
+    CasePageResponse getUserCases(Long userId, int page, int size, CaseSearchRequest caseSearchRequest);
     AdminStatsDto getStats();
     void activateUser(Long userId);
     void deactivateUser(Long userId);

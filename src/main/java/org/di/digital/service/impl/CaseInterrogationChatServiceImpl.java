@@ -10,9 +10,12 @@ import org.di.digital.dto.response.CaseChatMessageDto;
 import org.di.digital.model.*;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
+import org.di.digital.model.interrogation.CaseInterrogation;
+import org.di.digital.model.interrogation.CaseInterrogationChat;
+import org.di.digital.model.interrogation.CaseInterrogationQA;
 import org.di.digital.repository.CaseChatMessageRepository;
 import org.di.digital.repository.CaseRepository;
-import org.di.digital.repository.InterrogationChatRepository;
+import org.di.digital.repository.interrogation.CaseInterrogationChatRepository;
 import org.di.digital.repository.UserRepository;
 import org.di.digital.service.CaseInterrogationChatService;
 import org.di.digital.service.LogService;
@@ -38,7 +41,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
 
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
-    private final InterrogationChatRepository interrogationChatRepository;
+    private final CaseInterrogationChatRepository caseInterrogationChatRepository;
     private final CaseChatMessageRepository chatMessageRepository;
     private final ObjectMapper objectMapper;
     private final StreamingService streamingService;
@@ -56,16 +59,16 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                                                 ChatRequest request, String userEmail,
                                                 SseEmitter emitter) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
 
         CaseInterrogationChat chat = getOrCreateChat(interrogation);
 
@@ -91,9 +94,10 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
 
         List<CaseInterrogationQA> qaList = interrogation.getQaList();
 
+        String language = interrogation.getLanguage().equals("русском") ? "russian" : "kazakh";
         streamingService.stream(
                 interrogationQuestionsUrl(pythonHost, interrogationChatPort, caseEntity.getNumber()),
-                interrogationBody(interrogation.getFio(), interrogation.getRole(), qaList),
+                interrogationBody(interrogation.getFio(), interrogation.getRole(),language, qaList),
                 emitter,
                 this::extractInterrogationChunk,
                 fullText -> {
@@ -147,12 +151,12 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     public CaseChatHistoryResponse getChatHistory(Long caseId, Long interrogationId,
                                                   String userEmail, int page, int size) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
-        CaseInterrogationChat chat = interrogationChatRepository
+        CaseInterrogationChat chat = caseInterrogationChatRepository
                 .findByInterrogationId(interrogationId).orElse(null);
         if (chat == null) {
             return CaseChatHistoryResponse.builder()
@@ -180,18 +184,18 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     @Transactional
     public void clearChatHistory(Long caseId, Long interrogationId, String userEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
-        CaseInterrogationChat chat = interrogationChatRepository.findByInterrogationId(interrogationId)
-                .orElseThrow(() -> new RuntimeException("Chat not found for interrogation: " + interrogationId));
+        CaseInterrogationChat chat = caseInterrogationChatRepository.findByInterrogationId(interrogationId)
+                .orElseThrow(() -> new RuntimeException("Чат для допроса не найден: " + interrogationId));
 
         chatMessageRepository.deleteAllByInterrogationChatId(chat.getId());
         chat.getMessages().clear();
-        interrogationChatRepository.save(chat);
+        caseInterrogationChatRepository.save(chat);
 
         logService.log(
                 String.format("Cleared interrogation chat by %s user to case %s", userEmail, caseNumber),
@@ -205,15 +209,15 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
 
     @Transactional
     protected CaseInterrogationChat getOrCreateChat(CaseInterrogation interrogation) {
-        return interrogationChatRepository.findByInterrogationId(interrogation.getId())
+        return caseInterrogationChatRepository.findByInterrogationId(interrogation.getId())
                 .orElseGet(() -> {
                     CaseInterrogationChat newChat = CaseInterrogationChat.builder()
                             .interrogation(interrogation)
                             .active(true)
                             .build();
                     log.info("Creating new chat for interrogation {}", interrogation.getId());
-                    CaseInterrogationChat saved = interrogationChatRepository.save(newChat);
-                    interrogationChatRepository.flush();
+                    CaseInterrogationChat saved = caseInterrogationChatRepository.save(newChat);
+                    caseInterrogationChatRepository.flush();
                     return saved;
                 });
     }

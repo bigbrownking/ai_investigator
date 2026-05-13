@@ -31,6 +31,7 @@ public enum LogAction {
     CASE_UPDATED("Обновление дела"),
     AUDIO_UPLOADED("Загрузка айдио"),
     INTERROGATION_COMPLETED("Завершение допроса"),
+    USER_UPDATED("Обновление данных пользователя"),
     NO_FILE_PROCESSED("Ни одного обработанного файла"),
     NO_INTERROGATION_CLOSED("Не все допросы завершены"),
     NO_QUALIFICATION("Нет квалификации"),

@@ -11,6 +11,7 @@ public class SignUpRequest {
     private String surname;
     private String fathername;
     private Long professionId;
+    private Long rankId;
     private Long administrationId;
     private Long regionId;
 }

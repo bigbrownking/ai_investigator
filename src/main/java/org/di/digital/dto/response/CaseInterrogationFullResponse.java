@@ -1,7 +1,6 @@
 package org.di.digital.dto.response;
 
 import lombok.*;
-import org.di.digital.model.CaseInterrogationQA;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -22,6 +21,7 @@ public class CaseInterrogationFullResponse {
     private String addrezz;
     private String notificationNumber;
     private String notificationDate;
+    private String lawyer;
     private String caseNumberState;
     private String state;
     private String caseNumber;

@@ -17,6 +17,9 @@ public class AppealDto {
     private String userSurname;
     private String userFathername;
     private String userEmail;
+    private String profession;
+    private String rank;
+    private String administration;
     private Long regionId;
     private String regionName;
     private String status;

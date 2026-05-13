@@ -16,4 +16,5 @@ public class CaseInterrogationResponse {
     private String date;
     private String status;
     private Boolean isDop;
+    private boolean audioUsed;
 }

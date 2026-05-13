@@ -44,7 +44,7 @@ public class RoundRobinScheduler {
                     task.getCaseNumber());
 
             CaseFile caseFile = caseFileRepository.findById(task.getCaseFileId())
-                    .orElseThrow(() -> new RuntimeException("CaseFile not found: " + task.getCaseFileId()));
+                    .orElseThrow(() -> new RuntimeException("Файл не найден: " + task.getCaseFileId()));
 
             caseFile.setStatus(CaseFileStatusEnum.PENDING);
             caseFileRepository.save(caseFile);

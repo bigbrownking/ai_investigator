@@ -4,12 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.fl.FLAddress;
 import org.di.digital.model.fl.FLRecord;
-import org.di.digital.repository.FLAddressRepository;
-import org.di.digital.repository.FLRecordRepository;
+import org.di.digital.repository.fl.FLAddressRepository;
+import org.di.digital.repository.fl.FLRecordRepository;
 import org.di.digital.service.FLService;
 import org.springframework.stereotype.Service;
-
-import java.util.List;
 
 @Slf4j
 @Service

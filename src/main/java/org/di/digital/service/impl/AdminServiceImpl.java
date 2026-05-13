@@ -1,18 +1,16 @@
 package org.di.digital.service.impl;
 
-import jakarta.persistence.criteria.CriteriaBuilder;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
-import org.di.digital.model.Appeal;
-import org.di.digital.model.Case;
-import org.di.digital.model.Region;
-import org.di.digital.model.User;
+import org.di.digital.model.*;
 import org.di.digital.model.enums.AppealStatus;
 import org.di.digital.repository.*;
+import org.di.digital.repository.interrogation.CaseInterrogationRepository;
+import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
 import org.di.digital.service.AdminService;
@@ -21,6 +19,7 @@ import org.di.digital.util.Mapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -41,41 +40,96 @@ public class AdminServiceImpl implements AdminService {
     private final AppealRepository appealRepository;
     private final RegionRepository regionRepository;
     private final LogRepository logRepository;
+    private final CaseInterrogationRepository caseInterrogationRepository;
+    private final CaseFileRepository caseFileRepository;
     private final Mapper mapper;
     private final LocalizationHelper localizationHelper;
 
     @Override
     public Page<UserProfile> getAllUsers(int page, int size, UserSearchRequest req) {
-        Pageable pageable = PageRequest.of(page, size);
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate"));
         Specification<User> spec = UserSpecifications.build(req);
         return userRepository.findAll(spec, pageable)
                 .map(mapper::mapToUserProfileResponse);
     }
+
     @Override
     @Transactional(readOnly = true)
-    public Page<CaseResponse> getUserCases(Long userId, int page, int size, CaseSearchRequest req) {
+    public CasePageResponse getUserCases(Long userId, int page, int size, CaseSearchRequest req) {
         userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userId));
 
-        Pageable pageable = PageRequest.of(page, size);
         Specification<Case> spec = CaseSpecifications.build(req)
                 .and(hasOwner(userId));
-        return caseRepository.findAll(spec, pageable)
-                .map(mapper::mapToCaseResponse);
+
+        Page<CaseListResponse> casePage = caseRepository
+                .findAll(spec, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate")))
+                .map(mapper::mapToCaseListResponse);
+
+        List<Case> allFiltered = caseRepository.findAll(spec);
+
+        long totalDocuments = allFiltered.stream()
+                .mapToLong(c -> c.getFiles().size())
+                .sum();
+
+        long totalPages = allFiltered.stream()
+                .mapToLong(c -> c.getFiles().stream()
+                        .mapToLong(f -> f.getPages() != null ? f.getPages() : 0)
+                        .sum())
+                .sum();
+
+        long totalInterrogations = allFiltered.stream()
+                .mapToLong(c -> c.getInterrogations().size())
+                .sum();
+
+        long audioInterrogations = allFiltered.stream()
+                .mapToLong(Case::audioUsedCount)
+                .sum();
+
+        return CasePageResponse.builder()
+                .cases(casePage)
+                .totalDocuments(totalDocuments)
+                .totalPages(totalPages)
+                .totalInterrogations(totalInterrogations)
+                .audioInterrogations(audioInterrogations)
+                .build();
     }
 
     @Override
-    public Page<CaseResponse> getAllCases(int page, int size, CaseSearchRequest req) {
-        Pageable pageable = PageRequest.of(page, size);
+    public CasePageResponse getAllCases(int page, int size, CaseSearchRequest req) {
         Specification<Case> spec = CaseSpecifications.build(req);
-        return caseRepository.findAll(spec, pageable)
-                .map(mapper::mapToCaseResponse);
+
+        Page<CaseListResponse> casePage = caseRepository
+                .findAll(spec, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate")))
+                .map(mapper::mapToCaseListResponse);
+
+        List<Case> allFiltered = caseRepository.findAll(spec);
+
+        long totalDocuments = allFiltered.stream()
+                .mapToLong(c -> c.getFiles().size())
+                .sum();
+
+        long totalInterrogations = allFiltered.stream()
+                .mapToLong(c -> c.getInterrogations().size())
+                .sum();
+
+        long audioInterrogations = allFiltered.stream()
+                .mapToLong(Case::audioUsedCount)
+                .sum();
+
+        return CasePageResponse.builder()
+                .cases(casePage)
+                .totalDocuments(totalDocuments)
+                .totalInterrogations(totalInterrogations)
+                .audioInterrogations(audioInterrogations)
+                .build();
     }
 
     @Override
     public Page<AppealDto> getAllAppeals(int page, int size, AppealSearchRequest req) {
-        Pageable pageable = PageRequest.of(page, size);
-        return appealRepository.findAll(pageable)
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        Specification<Appeal> spec = AppealSpecifications.build(req);
+        return appealRepository.findAll(spec, pageable)
                 .map(mapper::toAppealDto);
     }
 
@@ -88,7 +142,11 @@ public class AdminServiceImpl implements AdminService {
         long pendingAppeals = appealRepository.countByStatus(AppealStatus.PENDING);
         long approvedAppeals = appealRepository.countByStatus(AppealStatus.APPROVED);
         long rejectedAppeals = appealRepository.countByStatus(AppealStatus.REJECTED);
-
+        long totalInterrogations = caseInterrogationRepository.count();
+        long totalQualifications = caseRepository.countByQualificationIsNotEmpty();
+        long totalIndictments = caseRepository.countByIndictmentIsNotEmpty();
+        long totalAudios = caseInterrogationRepository.countWithAudio();
+        long totalPages = caseFileRepository.countPages();
         return AdminStatsDto.builder()
                 .totalUsers(totalUsers)
                 .activeUsers(activeUsers)
@@ -97,13 +155,18 @@ public class AdminServiceImpl implements AdminService {
                 .pendingAppeals(pendingAppeals)
                 .approvedAppeals(approvedAppeals)
                 .rejectedAppeals(rejectedAppeals)
+                .totalInterrogations(totalInterrogations)
+                .totalAudios(totalAudios)
+                .totalPages(totalPages)
+                .totalQualifications(totalQualifications)
+                .totalIndictments(totalIndictments)
                 .build();
     }
 
     @Override
     public void activateUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userId));
         user.setActive(true);
         userRepository.save(user);
         log.info("User {} activated by admin", userId);
@@ -112,7 +175,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public void deactivateUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userId));
         user.setActive(false);
         userRepository.save(user);
         log.info("User {} deactivated by admin", userId);
@@ -136,7 +199,7 @@ public class AdminServiceImpl implements AdminService {
         Pageable pageable = PageRequest.of(page, size);
 
         Region region = regionRepository.findById(regionId)
-                .orElseThrow(() -> new RuntimeException("Region not found: " + regionId));
+                .orElseThrow(() -> new RuntimeException("Регион не найден: " + regionId));
 
         RegionStatsDto stats = RegionStatsDto.builder()
                 .regionId(region.getId())
@@ -169,31 +232,31 @@ public class AdminServiceImpl implements AdminService {
     public CaseResponse getCaseDetail(Long caseId) {
         return caseRepository.findById(caseId)
                 .map(mapper::mapToCaseResponse)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
     }
 
     @Override
     public String getCaseQualification(Long caseId) {
         return caseRepository.findById(caseId)
                 .map(Case::getQualification)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
     }
 
     @Override
     public String getCaseIndictment(Long caseId) {
         return caseRepository.findById(caseId)
                 .map(Case::getIndictment)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
     }
 
     @Override
     @Transactional
     public void approveAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Admin not found"));
+                .orElseThrow(() -> new RuntimeException("Админ не найден"));
 
         Appeal appeal = appealRepository.findById(appealId)
-                .orElseThrow(() -> new RuntimeException("Appeal not found"));
+                .orElseThrow(() -> new RuntimeException("Обращение не найдено"));
 
         appeal.setStatus(AppealStatus.APPROVED);
         appeal.setReviewedBy(admin);
@@ -211,10 +274,10 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void rejectAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Admin not found"));
+                .orElseThrow(() -> new RuntimeException("Админ не найден"));
 
         Appeal appeal = appealRepository.findById(appealId)
-                .orElseThrow(() -> new RuntimeException("Appeal not found"));
+                .orElseThrow(() -> new RuntimeException("Обращение не найдено"));
 
         appeal.setStatus(AppealStatus.REJECTED);
         appeal.setReviewedBy(admin);
@@ -228,7 +291,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public Page<LogDto> getUserLogs(String email, int page, int size) {
         userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
         return logRepository.findByEmail(email, PageRequest.of(page, size))
                 .map(mapper::toLogDto);
     }

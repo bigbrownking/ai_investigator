@@ -5,10 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
-import org.di.digital.dto.response.AppealDto;
-import org.di.digital.dto.response.CaseResponse;
-import org.di.digital.dto.response.LogDto;
-import org.di.digital.dto.response.UserProfile;
+import org.di.digital.dto.response.*;
 import org.di.digital.model.Appeal;
 import org.di.digital.model.Case;
 import org.di.digital.model.User;
@@ -81,7 +78,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
 
     @Override
-    public Page<CaseResponse> getUserCases(Long adminId, Long userId, int page, int size, CaseSearchRequest req) {
+    public CasePageResponse getUserCases(Long adminId, Long userId, int page, int size, CaseSearchRequest req) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
@@ -92,11 +89,21 @@ public class RegAdminServiceImpl implements RegAdminService {
             throw new RuntimeException("User is not in your region");
         }
 
-        Pageable pageable = PageRequest.of(page, size);
         Specification<Case> spec = CaseSpecifications.build(req)
                 .and(CaseSpecifications.hasOwner(userId));
-        return caseRepository.findAll(spec, pageable)
-                .map(mapper::mapToCaseResponse);
+
+        Page<CaseListResponse> casePage = caseRepository
+                .findAll(spec, PageRequest.of(page, size))
+                .map(mapper::mapToCaseListResponse);
+
+        List<Case> allFiltered = caseRepository.findAll(spec);
+
+        return CasePageResponse.builder()
+                .cases(casePage)
+                .totalDocuments(allFiltered.stream().mapToLong(c -> c.getFiles().size()).sum())
+                .totalInterrogations(allFiltered.stream().mapToLong(c -> c.getInterrogations().size()).sum())
+                .audioInterrogations(allFiltered.stream().mapToLong(Case::audioUsedCount).sum())
+                .build();
     }
     @Override
     @Transactional
@@ -105,7 +112,7 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
         if (admin.getRegion() == null) {
-            throw new AccessDeniedException("Admin has no region assigned");
+            throw new AccessDeniedException("У администратора нет назначенного региона");
         }
 
         Appeal appeal = appealRepository.findById(appealId)
@@ -113,7 +120,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         if (appeal.getRegion() == null ||
                 !appeal.getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new AccessDeniedException("This appeal does not belong to your region");
+            throw new AccessDeniedException("Это обращение не принадлежит вашему региону");
         }
 
         appeal.setStatus(AppealStatus.APPROVED);
@@ -135,7 +142,7 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
         if (admin.getRegion() == null) {
-            throw new AccessDeniedException("Admin has no region assigned");
+            throw new AccessDeniedException("У администратора нет назначенного региона");
         }
 
         Appeal appeal = appealRepository.findById(appealId)
@@ -143,7 +150,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         if (appeal.getRegion() == null ||
                 !appeal.getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new AccessDeniedException("This appeal does not belong to your region");
+            throw new AccessDeniedException("Это обращение не принадлежит вашему региону");
         }
 
         appeal.setStatus(AppealStatus.REJECTED);
@@ -156,7 +163,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<CaseResponse> getMyRegionCases(Long adminId, int page, int size, CaseSearchRequest req) {
+    public CasePageResponse getMyRegionCases(Long adminId, int page, int size, CaseSearchRequest req) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
@@ -164,13 +171,24 @@ public class RegAdminServiceImpl implements RegAdminService {
             throw new RuntimeException("Admin has no region assigned");
         }
 
-        Pageable pageable = PageRequest.of(page, size);
         Specification<Case> spec = CaseSpecifications.buildForRegion(
                 admin.getRegion().getId(), req
         );
-        return caseRepository.findAll(spec, pageable)
-                .map(mapper::mapToCaseResponse);
+
+        Page<CaseListResponse> casePage = caseRepository
+                .findAll(spec, PageRequest.of(page, size))
+                .map(mapper::mapToCaseListResponse);
+
+        List<Case> allFiltered = caseRepository.findAll(spec);
+
+        return CasePageResponse.builder()
+                .cases(casePage)
+                .totalDocuments(allFiltered.stream().mapToLong(c -> c.getFiles().size()).sum())
+                .totalInterrogations(allFiltered.stream().mapToLong(c -> c.getInterrogations().size()).sum())
+                .audioInterrogations(allFiltered.stream().mapToLong(Case::audioUsedCount).sum())
+                .build();
     }
+
 
     @Override
     @Transactional(readOnly = true)
@@ -188,7 +206,7 @@ public class RegAdminServiceImpl implements RegAdminService {
         if (caseEntity.getOwner() == null ||
                 caseEntity.getOwner().getRegion() == null ||
                 !caseEntity.getOwner().getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new AccessDeniedException("This case does not belong to your region");
+            throw new AccessDeniedException("Это дело не принадлежит вашему региону");
         }
 
         return mapper.mapToCaseResponse(caseEntity);
@@ -200,7 +218,7 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
         if (admin.getRegion() == null) {
-            throw new RuntimeException("Admin has no region assigned");
+            throw new RuntimeException("У администратора нет назначенного региона");
         }
 
         Case caseEntity = caseRepository.findById(caseId)
@@ -209,7 +227,7 @@ public class RegAdminServiceImpl implements RegAdminService {
         if (caseEntity.getOwner() == null ||
                 caseEntity.getOwner().getRegion() == null ||
                 !caseEntity.getOwner().getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new AccessDeniedException("This case does not belong to your region");
+            throw new AccessDeniedException("Это дело не принадлежит вашему региону");
         }
         return caseEntity.getIndictment();
     }
@@ -220,7 +238,7 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .orElseThrow(() -> new RuntimeException("Admin not found"));
 
         if (admin.getRegion() == null) {
-            throw new RuntimeException("Admin has no region assigned");
+            throw new RuntimeException("У администратора нет назначенного региона");
         }
 
         Case caseEntity = caseRepository.findById(caseId)
@@ -229,7 +247,7 @@ public class RegAdminServiceImpl implements RegAdminService {
         if (caseEntity.getOwner() == null ||
                 caseEntity.getOwner().getRegion() == null ||
                 !caseEntity.getOwner().getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new AccessDeniedException("This case does not belong to your region");
+            throw new AccessDeniedException("Это дело не принадлежит вашему региону");
         }
         return caseEntity.getQualification();
     }
@@ -248,7 +266,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         if (user.getRegion() == null ||
                 !user.getRegion().getId().equals(admin.getRegion().getId())) {
-            throw new AccessDeniedException("User is not in your region");
+            throw new AccessDeniedException("Этот пользователь не принадлежит вашему региону");
         }
 
         return logRepository.findByEmail(email, PageRequest.of(page, size))

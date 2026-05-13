@@ -2,6 +2,7 @@ package org.di.digital.model;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.di.digital.model.interrogation.CaseInterrogationChat;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 

@@ -68,4 +68,8 @@ public interface CaseRepository extends JpaRepository<Case, Long>, JpaSpecificat
 
     @Query("SELECT COUNT(*) FROM Case c WHERE c.owner.region.id = :regionId")
     long countByRegionId(Long regionId);
+    @Query("SELECT COUNT(c) FROM Case c WHERE c.qualification IS NOT NULL AND c.qualification <> ''")
+    long countByQualificationIsNotEmpty();
+    @Query("SELECT COUNT(c) FROM Case c WHERE c.indictment IS NOT NULL AND c.qualification <> ''")
+    long countByIndictmentIsNotEmpty();
 }

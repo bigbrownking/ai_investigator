@@ -16,4 +16,9 @@ public interface CaseFileRepository extends JpaRepository<CaseFile, Long> {
     List<CaseFile> findByCaseEntityNumber(@Param("caseNumber") String caseNumber);
 
     boolean existsByCaseEntityIdAndStatusNotIn(Long caseId, List<CaseFileStatusEnum> statuses);
+    @Query("SELECT f FROM CaseFile f WHERE f.pages IS NULL")
+    List<CaseFile> findFilesWithoutPages();
+
+    @Query("SELECT COUNT(f) FROM CaseFile f WHERE f.pages IS NULL")
+    Long countPages();
 }

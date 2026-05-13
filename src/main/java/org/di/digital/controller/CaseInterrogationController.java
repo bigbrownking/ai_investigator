@@ -7,7 +7,7 @@ import org.di.digital.dto.request.EditAudioTranscribedTextRequest;
 import org.di.digital.dto.request.UpdateProtocolFieldRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.service.CaseInterrogationService;
-import org.di.digital.service.export.InterrogationExportService;
+import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -122,13 +122,14 @@ public class CaseInterrogationController {
     public ResponseEntity<QAResponse> uploadAudio(
             @PathVariable Long caseId,
             @PathVariable Long interrogationId,
+            @RequestParam(required = false) Long qaId,
             @RequestParam String question,
             @RequestParam("file") MultipartFile file,
             Authentication authentication
     ) {
         log.info("Uploading audio for interrogation: {}, case: {}", interrogationId, caseId);
         QAResponse response = caseInterrogationService.uploadAudioAndEnqueue(
-                caseId, interrogationId, question, file, authentication.getName()
+                caseId, interrogationId, qaId, question, file, authentication.getName()
         );
         return ResponseEntity.accepted().body(response);
     }
@@ -137,6 +138,7 @@ public class CaseInterrogationController {
     public ResponseEntity<OtherAudioResponse> uploadOtherAudio(
             @PathVariable Long caseId,
             @PathVariable Long interrogationId,
+            @RequestParam(required = false) Long otherAudioId,
             @RequestParam String fieldName,
             @RequestParam("file") MultipartFile file,
             @RequestParam(defaultValue = "ru") String language,
@@ -144,7 +146,7 @@ public class CaseInterrogationController {
     ) {
         log.info("Uploading audio for interrogation: {}, case: {}", interrogationId, caseId);
         OtherAudioResponse response = caseInterrogationService.uploadOtherAudioAndEnqueue(
-                caseId, interrogationId, fieldName, file, language, authentication.getName()
+                caseId, interrogationId, otherAudioId, fieldName, file, language, authentication.getName()
         );
         return ResponseEntity.accepted().body(response);
     }

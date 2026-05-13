@@ -4,12 +4,14 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.AdministrationDto;
 import org.di.digital.dto.response.ProfessionDto;
+import org.di.digital.dto.response.RankDto;
 import org.di.digital.dto.response.RegionDto;
 import org.di.digital.model.enums.UserSettingsDetalizationLevel;
 import org.di.digital.model.enums.UserSettingsLanguage;
 import org.di.digital.model.enums.UserSettingsTheme;
 import org.di.digital.repository.AdministrationRepository;
 import org.di.digital.repository.ProfessionRepository;
+import org.di.digital.repository.RankRepository;
 import org.di.digital.repository.RegionRepository;
 import org.di.digital.util.Mapper;
 import org.springframework.http.ResponseEntity;
@@ -30,6 +32,7 @@ public class DictionaryController {
     private final RegionRepository regionRepository;
     private final AdministrationRepository administrationRepository;
     private final ProfessionRepository professionRepository;
+    private final RankRepository rankRepository;
     private final Mapper mapper;
 
     @GetMapping("/languages")
@@ -84,5 +87,10 @@ public class DictionaryController {
     @GetMapping("/professions")
     public ResponseEntity<List<ProfessionDto>> getProfessions() {
         return ResponseEntity.ok(professionRepository.findAll().stream().map(mapper::toProfessionDto).collect(Collectors.toList()));
+    }
+
+    @GetMapping("/ranks")
+    public ResponseEntity<List<RankDto>> getRanks() {
+        return ResponseEntity.ok(rankRepository.findAll().stream().map(mapper::toRankDto).collect(Collectors.toList()));
     }
 }

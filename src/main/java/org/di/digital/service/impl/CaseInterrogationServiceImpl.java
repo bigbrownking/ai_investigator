@@ -13,7 +13,9 @@ import org.di.digital.model.enums.*;
 import org.di.digital.model.fl.FLAddress;
 import org.di.digital.model.fl.FLDocument;
 import org.di.digital.model.fl.FLRecord;
+import org.di.digital.model.interrogation.*;
 import org.di.digital.repository.*;
+import org.di.digital.repository.interrogation.*;
 import org.di.digital.service.CaseInterrogationService;
 import org.di.digital.service.FLService;
 import org.di.digital.service.LogService;
@@ -22,12 +24,12 @@ import org.di.digital.service.impl.queue.AudioQueueService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.LocalizationHelper;
 import org.di.digital.util.Mapper;
+import org.di.digital.util.PageCounter;
 import org.di.digital.util.UrlBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.springframework.web.client.RestTemplate;
 import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.reactive.function.client.WebClient;
 
@@ -52,7 +54,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final CaseInterrogationCriminalRepository caseInterrogationCriminalRepository;
     private final CaseInterrogationRelationRepository caseInterrogationRelationRepository;
     private final CaseInterrogationInvolvedPersonsRepository caseInterrogationInvolvedPersonsRepository;
-    private final InterrogationChatRepository interrogationChatRepository;
+    private final CaseInterrogationChatRepository caseInterrogationChatRepository;
     private final CaseChatMessageRepository chatMessageRepository;
     private final UserRepository userRepository;
     private final MinioService minioService;
@@ -63,6 +65,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final Mapper mapper;
     private final WebClient.Builder webClientBuilder;
     private final LocalizationHelper localizationHelper;
+    private final PageCounter pageCounter;
 
 
     @Value("${qualification.model.host}")
@@ -74,10 +77,10 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     @Transactional(readOnly = true)
     public List<CaseInterrogationResponse> searchInterrogations(Long caseId, String role, String fio, Boolean isDop, LocalDate date, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -93,10 +96,10 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     @Transactional
     public CaseInterrogationFullResponse addInterrogation(Long caseId, AddInterrogationRequest request, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -111,7 +114,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         String caseNumber = caseEntity.getNumber();
         LocalDateTime now = LocalDateTime.now();
 
-        InterrogationTimerSession session = InterrogationTimerSession.builder()
+        CaseInterrogationTimerSession session = CaseInterrogationTimerSession.builder()
                 .startedAt(now)
                 .build();
 
@@ -222,10 +225,10 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     @Override
     public void deleteInterrogation(Long caseId, Long interrogationId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -233,7 +236,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Interrogation not found with id: " + interrogationId));
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
         caseEntity.removeInterrogation(interrogation);
         caseRepository.save(caseEntity);
         log.info("Interrogation removed from case: {}", caseId);
@@ -251,7 +254,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     public void updateProtocolField(Long caseId, Long interrogationId,
                                     UpdateProtocolFieldRequest request, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
 
 
         CaseInterrogationProtocol protocol = interrogation.getProtocol();
@@ -271,7 +274,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Long eduId = request.getId();
                 if (eduId != null) {
                     education = caseInterrogationEducationRepository.findById(eduId)
-                            .orElseThrow(() -> new RuntimeException("Education not found: " + eduId));
+                            .orElseThrow(() -> new RuntimeException("Образование не найдено: " + eduId));
                     education.setAbout(request.getAbout());
                     education.setType(request.getType());
                 } else {
@@ -294,7 +297,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Long militaryId = request.getId();
                 if (militaryId != null) {
                     militaryRecord = caseInterrogationMilitaryRepository.findById(militaryId)
-                            .orElseThrow(() -> new RuntimeException("Military not found: " + militaryId));
+                            .orElseThrow(() -> new RuntimeException("Воинский учет не найден: " + militaryId));
                     militaryRecord.setAbout(request.getAbout());
                     militaryRecord.setType(request.getType());
                 } else {
@@ -311,7 +314,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Long criminalId = request.getId();
                 if (criminalId != null) {
                     criminalRecord = caseInterrogationCriminalRepository.findById(criminalId)
-                            .orElseThrow(() -> new RuntimeException("Criminal not found: " + criminalId));
+                            .orElseThrow(() -> new RuntimeException("Судимость не найдена: " + criminalId));
                     criminalRecord.setAbout(request.getAbout());
                     criminalRecord.setType(request.getType());
                 } else {
@@ -330,7 +333,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Long relationId = request.getId();
                 if (relationId != null) {
                     relationRecord = caseInterrogationRelationRepository.findById(relationId)
-                            .orElseThrow(() -> new RuntimeException("Relation not found: " + relationId));
+                            .orElseThrow(() -> new RuntimeException("Отношение не найдено: " + relationId));
                     relationRecord.setAbout(request.getAbout());
                     relationRecord.setType(request.getType());
                 } else {
@@ -351,10 +354,11 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     public void updateOtherField(Long caseId, Long interrogationId,
                                  UpdateProtocolFieldRequest request, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
 
         switch (request.getField()) {
             case "city" -> interrogation.setCity(request.getValue());
+            case "lawyer" -> interrogation.setLawyer(request.getValue());
             case "personTranslator" -> interrogation.setPersonTranslator(request.getValue());
             case "personSpecialist" -> interrogation.setPersonSpecialist(request.getValue());
             case "personYear" -> interrogation.setPersonYear(request.getValue());
@@ -375,7 +379,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Long involvedPersonsId = request.getId();
                 if (involvedPersonsId != null) {
                     involvedPersons = caseInterrogationInvolvedPersonsRepository.findById(involvedPersonsId)
-                            .orElseThrow(() -> new RuntimeException("Involved persons not found: " + involvedPersonsId));
+                            .orElseThrow(() -> new RuntimeException("Вовлеченные люди не найдены: " + involvedPersonsId));
                     involvedPersons.setAbout(request.getAbout());
                     involvedPersons.setType(request.getType());
                 } else {
@@ -404,47 +408,72 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     }
 
     @Transactional
-    public QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, String question,
-                                            MultipartFile file, String email) {
+    public QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, Long qaId,
+                                            String question, MultipartFile file, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
 
         String audioUrl = minioService.uploadAudio(file, caseEntity.getNumber(), interrogation.getFio());
 
-        int orderIndex = interrogation.getQaList().size();
+        CaseInterrogationQA qa;
 
-        CaseInterrogationQA qa = CaseInterrogationQA.builder()
-                .question(question)
+        if (qaId != null) {
+            qa = interrogation.getQaList().stream()
+                    .filter(q -> q.getId().equals(qaId))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Вопрос/ответ не найден: " + qaId));
+            qa.setStatus(QAStatusEnum.TRANSCRIBING);
+        } else {
+            int orderIndex = interrogation.getQaList().size();
+            qa = CaseInterrogationQA.builder()
+                    .question(question)
+                    .answer(null)
+                    .status(QAStatusEnum.TRANSCRIBING)
+                    .orderIndex(orderIndex)
+                    .isEdited(false)
+                    .createdAt(LocalDateTime.now())
+                    .interrogation(interrogation)
+                    .audioRecords(new ArrayList<>())
+                    .build();
+            interrogation.getQaList().add(qa);
+        }
+
+        CaseInterrogationAudioRecord record = CaseInterrogationAudioRecord.builder()
                 .audioFileUrl(audioUrl)
+                .transcribedText(null)
                 .status(QAStatusEnum.TRANSCRIBING)
-                .orderIndex(orderIndex)
-                .isEdited(false)
                 .createdAt(LocalDateTime.now())
-                .interrogation(interrogation)
+                .qa(qa)
                 .build();
+        qa.getAudioRecords().add(record);
 
-        interrogation.getQaList().add(qa);
         CaseInterrogation savedInterrogation = caseInterrogationRepository.save(interrogation);
 
-        Long qaId = savedInterrogation.getQaList().stream()
-                .filter(q -> q.getOrderIndex() == orderIndex)
+        CaseInterrogationQA savedQa = savedInterrogation.getQaList().stream()
+                .filter(q -> qaId != null ? q.getId().equals(qaId) : q.getQuestion().equals(question))
+                .findFirst()
+                .orElseThrow();
+
+        Long recordId = savedQa.getAudioRecords().stream()
+                .filter(r -> r.getAudioFileUrl().equals(audioUrl))
                 .findFirst()
                 .orElseThrow()
                 .getId();
 
         audioQueueService.sendAudioForProcessing(AudioProcessingMessage.builder()
                 .interrogationId(interrogationId)
-                .qaId(qaId)
+                .qaId(savedQa.getId())
+                .recordId(recordId)
                 .caseNumber(caseEntity.getNumber())
                 .audioFileUrl(audioUrl)
                 .originalFileName(file.getOriginalFilename())
@@ -460,11 +489,12 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 caseEntity.getNumber(),
                 email
         );
+
         return QAResponse.builder()
-                .id(qaId)
-                .question(question)
-                .answer(null)
-                .orderIndex(orderIndex)
+                .id(savedQa.getId())
+                .question(savedQa.getQuestion())
+                .answer(savedQa.getAnswer())
+                .orderIndex(savedQa.getOrderIndex())
                 .edited(false)
                 .status(QAStatusEnum.TRANSCRIBING)
                 .build();
@@ -473,46 +503,72 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
     @Override
     @Transactional
-    public OtherAudioResponse uploadOtherAudioAndEnqueue(Long caseId, Long interrogationId, String fieldName,
-                                                         MultipartFile file, String language, String email) {
+    public OtherAudioResponse uploadOtherAudioAndEnqueue(Long caseId, Long interrogationId, Long otherAudioId,
+                                                         String fieldName, MultipartFile file,
+                                                         String language, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
 
         String audioUrl = minioService.uploadAudio(file, caseEntity.getNumber(), interrogation.getFio());
 
-        int orderIndex = interrogation.getOtherAudios().size();
+        CaseInterrogationOtherAudio otherAudio;
 
-        CaseInterrogationOtherAudio text = CaseInterrogationOtherAudio.builder()
-                .text(null)
+        if (otherAudioId != null) {
+            otherAudio = interrogation.getOtherAudios().stream()
+                    .filter(o -> o.getId().equals(otherAudioId))
+                    .findFirst()
+                    .orElseThrow(() -> new RuntimeException("Айдио не найдено: " + otherAudioId));
+            otherAudio.setStatus(QAStatusEnum.TRANSCRIBING);
+        } else {
+            int orderIndex = interrogation.getOtherAudios().size();
+            otherAudio = CaseInterrogationOtherAudio.builder()
+                    .text(null)
+                    .fieldName(fieldName)
+                    .status(QAStatusEnum.TRANSCRIBING)
+                    .orderIndex(orderIndex)
+                    .createdAt(LocalDateTime.now())
+                    .interrogation(interrogation)
+                    .audioRecords(new ArrayList<>())
+                    .build();
+            interrogation.getOtherAudios().add(otherAudio);
+        }
+
+        CaseInterrogationAudioRecord record = CaseInterrogationAudioRecord.builder()
                 .audioFileUrl(audioUrl)
+                .transcribedText(null)
                 .status(QAStatusEnum.TRANSCRIBING)
-                .orderIndex(orderIndex)
                 .createdAt(LocalDateTime.now())
-                .interrogation(interrogation)
+                .otherAudio(otherAudio)
                 .build();
+        otherAudio.getAudioRecords().add(record);
 
-        interrogation.getOtherAudios().add(text);
         CaseInterrogation savedInterrogation = caseInterrogationRepository.save(interrogation);
 
-        Long otherId = savedInterrogation.getOtherAudios().stream()
-                .filter(q -> q.getOrderIndex() == orderIndex)
+        CaseInterrogationOtherAudio savedOther = savedInterrogation.getOtherAudios().stream()
+                .filter(o -> otherAudioId != null ? o.getId().equals(otherAudioId) : o.getFieldName().equals(fieldName))
+                .findFirst()
+                .orElseThrow();
+
+        Long recordId = savedOther.getAudioRecords().stream()
+                .filter(r -> r.getAudioFileUrl().equals(audioUrl))
                 .findFirst()
                 .orElseThrow()
                 .getId();
 
         audioQueueService.sendAudioForProcessing(AudioProcessingMessage.builder()
                 .interrogationId(interrogationId)
-                .qaId(otherId)
+                .qaId(savedOther.getId())
+                .recordId(recordId)
                 .caseNumber(caseEntity.getNumber())
                 .audioFileUrl(audioUrl)
                 .originalFileName(file.getOriginalFilename())
@@ -528,10 +584,11 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 caseEntity.getNumber(),
                 email
         );
+
         return OtherAudioResponse.builder()
-                .id(otherId)
-                .fieldName(fieldName)
-                .text(null)
+                .id(savedOther.getId())
+                .fieldName(savedOther.getFieldName())
+                .text(savedOther.getText())
                 .status(QAStatusEnum.TRANSCRIBING)
                 .build();
     }
@@ -540,25 +597,25 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     @Transactional
     public QAResponse editTranscribedText(Long caseId, Long interrogationId, EditAudioTranscribedTextRequest request, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
         validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
-            throw new RuntimeException("Interrogation does not belong to case: " + caseId);
+            throw new RuntimeException("Допрос не принадлежит делу: " + caseId);
         }
 
         CaseInterrogationQA qa = interrogation.getQaList().stream()
                 .filter(q -> q.getId().equals(request.getQaId()))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("QA not found: " + request.getQaId()));
+                .orElseThrow(() -> new RuntimeException("Вопрос/ответ не найден: " + request.getQaId()));
 
         qa.setAnswer(request.getAnswer());
 
-        boolean assistantReplied = interrogationChatRepository.findByInterrogationId(interrogationId)
+        boolean assistantReplied = caseInterrogationChatRepository.findByInterrogationId(interrogationId)
                 .map(chat -> chat.getMessages().stream()
                         .anyMatch(m -> m.getRole() == MessageRole.ASSISTANT && m.isComplete()))
                 .orElse(false);
@@ -566,7 +623,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         qa.setIsEdited(assistantReplied);
 
         if (assistantReplied) {
-            interrogationChatRepository.findByInterrogationId(interrogationId)
+            caseInterrogationChatRepository.findByInterrogationId(interrogationId)
                     .ifPresent(chat -> {
                         chatMessageRepository.findByInterrogationChatId(chat.getId(), PageRequest.of(0, Integer.MAX_VALUE))
                                 .getContent()
@@ -598,17 +655,17 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     @Transactional(readOnly = true)
     public List<QAResponse> getQAList(Long caseId, Long interrogationId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
 
         return interrogation.getQaList().stream()
                 .map(mapper::mapToQAResponse)
@@ -619,15 +676,15 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     @Transactional(readOnly = true)
     public CaseInterrogationFullResponse getDetailed(long caseId, long interrogationId, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
         validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
-            throw new RuntimeException("Interrogation does not belong to case: " + caseId);
+            throw new RuntimeException("Допрос не принадлежит делу: " + caseId);
         }
 
         return mapper.mapToInterrogationFullResponse(interrogation, user);
@@ -636,15 +693,15 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     @Override
     public void completeInterrogation(long caseId, long interrogationId, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
         validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
-            throw new RuntimeException("Interrogation does not belong to case: " + caseId);
+            throw new RuntimeException("Допрос не принадлежит делу: " + caseId);
         }
 
         String caseNumber = interrogation.getCaseEntity().getNumber();
@@ -652,9 +709,9 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
         if (interrogation.getStartedAt() != null) {
             if (!Boolean.TRUE.equals(interrogation.getIsPaused())) {
-                InterrogationTimerSession lastSession = interrogation.getTimerSessions().stream()
+                CaseInterrogationTimerSession lastSession = interrogation.getTimerSessions().stream()
                         .filter(s -> s.getPausedAt() == null)
-                        .max(Comparator.comparing(InterrogationTimerSession::getStartedAt))
+                        .max(Comparator.comparing(CaseInterrogationTimerSession::getStartedAt))
                         .orElse(null);
 
                 if (lastSession != null) {
@@ -689,7 +746,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 caseId, interrogationId, action, email);
 
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new RuntimeException("Interrogation not found: " + interrogationId));
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
 
         log.info("Interrogation loaded: id={}, startedAt={}, finishedAt={}, accumulatedSeconds={}, timerSessionsSize={}",
                 interrogation.getId(),
@@ -699,12 +756,12 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 interrogation.getTimerSessions() == null ? "NULL" : interrogation.getTimerSessions().size());
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
         validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
-            throw new RuntimeException("Interrogation does not belong to case: " + caseId);
+            throw new RuntimeException("Допрос не принадлежит делу: " + caseId);
         }
 
         LocalDateTime now = LocalDateTime.now();
@@ -715,7 +772,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                     && interrogation.getStatus() != CaseInterrogationStatusEnum.COMPLETED;
 
             if (isRunning) {
-                throw new IllegalStateException("Timer is already running");
+                throw new IllegalStateException("Таймер уже запущен");
             }
 
             if (interrogation.getStartedAt() == null) {
@@ -724,7 +781,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
             interrogation.setIsPaused(false);
 
-            InterrogationTimerSession session = InterrogationTimerSession.builder()
+            CaseInterrogationTimerSession session = CaseInterrogationTimerSession.builder()
                     .interrogation(interrogation)
                     .startedAt(now)
                     .build();
@@ -736,13 +793,13 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                     || interrogation.getStatus() == CaseInterrogationStatusEnum.COMPLETED;
 
             if (isNotRunning) {
-                throw new IllegalStateException("Timer is not running");
+                throw new IllegalStateException("Таймер не запущен");
             }
 
-            InterrogationTimerSession lastSession = interrogation.getTimerSessions().stream()
+            CaseInterrogationTimerSession lastSession = interrogation.getTimerSessions().stream()
                     .filter(s -> s.getPausedAt() == null)
-                    .max(Comparator.comparing(InterrogationTimerSession::getStartedAt))
-                    .orElseThrow(() -> new IllegalStateException("No active timer session found"));
+                    .max(Comparator.comparing(CaseInterrogationTimerSession::getStartedAt))
+                    .orElseThrow(() -> new IllegalStateException("Нет активной сессии таймера для паузы"));
 
             lastSession.setPausedAt(now);
 
@@ -814,6 +871,15 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                         caseEntity.getNumber(),
                         interrogation.getFio()
                 );
+                try {
+                    Integer pages = pageCounter.countPagesByUrl(appFile.getFileUrl(), appFile.getContentType());
+                    if (pages != null) {
+                        appFile.setPages(pages);
+                    }
+                } catch (Exception e) {
+                    log.warn("Could not count pages for application file {}: {}", appFile.getOriginalFileName(), e.getMessage());
+                }
+
                 appFile.addInterrogation(interrogation);
                 uploadedFiles.add(appFile);
                 existingInInterrogation.add(originalName);
@@ -839,7 +905,16 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                         originalName, interrogationId, e);
             }
         }
-
+        uploadedCaseFiles.forEach(caseFile -> {
+            try {
+                Integer pages = pageCounter.countPagesByUrl(caseFile.getFileUrl(), caseFile.getContentType());
+                if (pages != null) {
+                    caseFile.setPages(pages);
+                }
+            } catch (Exception e) {
+                log.warn("Could not count pages for file {}: {}", caseFile.getOriginalFileName(), e.getMessage());
+            }
+        });
         caseInterrogationRepository.saveAndFlush(interrogation);
 
         for (CaseFile caseFile : uploadedCaseFiles) {

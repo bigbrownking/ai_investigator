@@ -33,7 +33,7 @@ public class AuthServiceImpl implements AuthService {
     private final RoleRepository roleRepository;
     private final RegionRepository regionRepository;
     private final AdministrationRepository administrationRepository;
-    private final AddressRepository addressRepository;
+    private final RankRepository rankRepository;
     private final ProfessionRepository professionRepository;
     private final AppealRepository appealRepository;
     private final LogService logService;
@@ -65,7 +65,7 @@ public class AuthServiceImpl implements AuthService {
         String rawPassword = request.getPassword();
 
         Role userRole = roleRepository.findByName("ADMIN")
-                .orElseThrow(() -> new RuntimeException("Default role not found"));
+                .orElseThrow(() -> new RuntimeException("Роль не найдена"));
 
         User user = User.builder()
                 .email(request.getEmail())
@@ -108,24 +108,30 @@ public class AuthServiceImpl implements AuthService {
         String rawPassword = decryptAndValidatePassword(request.getPassword());
 
         Role userRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new RuntimeException("Default role not found"));
+                .orElseThrow(() -> new RuntimeException("Роль не найдена"));
 
         Region region = null;
         if (request.getRegionId() != null) {
             region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new RuntimeException("Region not found"));
+                    .orElseThrow(() -> new RuntimeException("Регион не найден"));
         }
 
         Profession profession = null;
         if (request.getProfessionId() != null) {
             profession = professionRepository.findById(request.getProfessionId())
-                    .orElseThrow(() -> new RuntimeException("Profession not found"));
+                    .orElseThrow(() -> new RuntimeException("Профессия не найдена"));
+        }
+
+        Rank rank = null;
+        if (request.getRankId() != null) {
+            rank = rankRepository.findById(request.getRankId())
+                    .orElseThrow(() -> new RuntimeException("Звание не найдено"));
         }
 
         Administration administration = null;
         if (request.getAdministrationId() != null) {
             administration = administrationRepository.findById(request.getAdministrationId())
-                    .orElseThrow(() -> new RuntimeException("Administration not found"));
+                    .orElseThrow(() -> new RuntimeException("Управление не найдено"));
         }
 
         User user = User.builder()
@@ -136,6 +142,7 @@ public class AuthServiceImpl implements AuthService {
                 .fathername(request.getFathername())
                 .region(region)
                 .profession(profession)
+                .rank(rank)
                 .administration(administration)
                 .password(passwordEncoder.encode(rawPassword))
                 .roles(new HashSet<>() {{
@@ -192,24 +199,24 @@ public class AuthServiceImpl implements AuthService {
         String rawPassword = decryptAndValidatePassword(request.getPassword());
 
         Role userRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new RuntimeException("Default role not found"));
+                .orElseThrow(() -> new RuntimeException("Роль не найдена"));
 
         Region region = null;
         if (request.getRegionId() != null) {
             region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new RuntimeException("Region not found"));
+                    .orElseThrow(() -> new RuntimeException("Регион не найден"));
         }
 
         Profession profession = null;
         if (request.getProfessionId() != null) {
             profession = professionRepository.findById(request.getProfessionId())
-                    .orElseThrow(() -> new RuntimeException("Profession not found"));
+                    .orElseThrow(() -> new RuntimeException("Профессия не найдена"));
         }
 
         Administration administration = null;
         if (request.getAdministrationId() != null) {
             administration = administrationRepository.findById(request.getAdministrationId())
-                    .orElseThrow(() -> new RuntimeException("Administration not found"));
+                    .orElseThrow(() -> new RuntimeException("Управление не найдено"));
         }
 
         User user = User.builder()
@@ -248,7 +255,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public JwtResponse login(LoginRequest request) {
         User user = userRepository.findByIin(request.getIin())
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Пользователь с таким ИИН не найден: " + request.getIin()));
 
         if(!user.isActive()){
             throw new IllegalStateException("Пользователь еще не был подтвержден админом");
@@ -256,7 +263,7 @@ public class AuthServiceImpl implements AuthService {
         String rawPassword = rsaDecryptor.decrypt(request.getPassword());
 
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
-            throw new RuntimeException("Invalid credentials");
+            throw new RuntimeException("Вы ввели неправильный пароль");
         }
 
         String token = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
@@ -291,7 +298,7 @@ public class AuthServiceImpl implements AuthService {
         String username = jwtTokenUtil.getUsernameFromJwtToken(refreshToken);
 
         User user = userRepository.findByEmail(username)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + username));
 
         String newAccessToken = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
         String newRefreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());

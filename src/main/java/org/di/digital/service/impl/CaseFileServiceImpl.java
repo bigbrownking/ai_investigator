@@ -21,7 +21,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     @Override
     public CaseFile markAsCompleted(Long caseFileId, String result, Long processingDurationSeconds) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
-                .orElseThrow(() -> new RuntimeException("File not found: " + caseFileId));
+                .orElseThrow(() -> new RuntimeException("Файл не найден: " + caseFileId));
 
         caseFile.setStatus(CaseFileStatusEnum.COMPLETED);
         caseFile.setCompletedAt(LocalDateTime.now());
@@ -37,7 +37,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     @Override
     public CaseFile markAsFailed(Long caseFileId, String errorMessage) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
-                .orElseThrow(() -> new RuntimeException("File not found: " + caseFileId));
+                .orElseThrow(() -> new RuntimeException("Файл не найден: " + caseFileId));
 
         caseFile.setStatus(CaseFileStatusEnum.FAILED);
         caseFile.setCompletedAt(LocalDateTime.now());
@@ -53,7 +53,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     @Override
     public void markAsProcessing(Long caseFileId) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
-                .orElseThrow(() -> new RuntimeException("File not found: " + caseFileId));
+                .orElseThrow(() -> new RuntimeException("Файл не найден: " + caseFileId));
 
         caseFile.setStatus(CaseFileStatusEnum.PROCESSING);
         caseFile.setCompletedAt(LocalDateTime.now());

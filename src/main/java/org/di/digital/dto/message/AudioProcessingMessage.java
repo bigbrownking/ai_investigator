@@ -10,6 +10,7 @@ import lombok.*;
 public class AudioProcessingMessage {
     private Long interrogationId;
     private Long qaId;
+    private Long recordId;
     private String caseNumber;
     private String audioFileUrl;
     private String originalFileName;
