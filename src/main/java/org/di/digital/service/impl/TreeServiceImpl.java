@@ -48,10 +48,10 @@ public class TreeServiceImpl implements TreeService {
 
     @Override
     @Transactional
-    public TreeDataResponse fetchAndSaveAllModules(Long caseId, String userEmail) {
-        log.info("Fetching all tree modules for case: {}, user: {}", caseId, userEmail);
+    public TreeDataResponse fetchAndSaveAllModules(String caseNumber, String userEmail) {
+        log.info("Fetching all tree modules for case: {}, user: {}", caseNumber, userEmail);
 
-        Case caseEntity = validateAndGetCase(caseId, userEmail);
+        Case caseEntity = validateAndGetCase(caseNumber, userEmail);
         List<TreeModuleResponse> modules = new ArrayList<>();
 
         for (TreeModuleType moduleType : TreeModuleType.values()) {
@@ -59,17 +59,17 @@ public class TreeServiceImpl implements TreeService {
                 TreeModuleResponse module = fetchAndSaveModuleInternal(caseEntity, moduleType);
                 modules.add(module);
             } catch (Exception e) {
-                log.error("Failed to fetch module: {} for case: {}", moduleType, caseId, e);
+                log.error("Failed to fetch module: {} for case: {}", moduleType, caseNumber, e);
                 // Сохраняем информацию об ошибке
                 saveErrorModule(caseEntity, moduleType, e.getMessage());
             }
         }
 
         log.info("Successfully fetched {} out of {} modules for case: {}",
-                modules.size(), TreeModuleType.values().length, caseId);
+                modules.size(), TreeModuleType.values().length, caseNumber);
 
         return TreeDataResponse.builder()
-                .caseId(caseId)
+                .caseId(caseEntity.getId())
                 .caseNumber(caseEntity.getNumber())
                 .modules(modules)
                 .fetchedAt(LocalDateTime.now())
@@ -78,19 +78,19 @@ public class TreeServiceImpl implements TreeService {
 
     @Override
     @Transactional
-    public TreeModuleResponse fetchAndSaveModule(Long caseId, TreeModuleType moduleType, String userEmail) {
-        log.info("Fetching tree module: {} for case: {}, user: {}", moduleType, caseId, userEmail);
+    public TreeModuleResponse fetchAndSaveModule(String caseNumber, TreeModuleType moduleType, String userEmail) {
+        log.info("Fetching tree module: {} for case: {}, user: {}", moduleType, caseNumber, userEmail);
 
-        Case caseEntity = validateAndGetCase(caseId, userEmail);
+        Case caseEntity = validateAndGetCase(caseNumber, userEmail);
         return fetchAndSaveModuleInternal(caseEntity, moduleType);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public TreeDataResponse getLatestModules(Long caseId, String userEmail) {
-        log.info("Getting latest tree modules for case: {}, user: {}", caseId, userEmail);
+    public TreeDataResponse getLatestModules(String caseNumber, String userEmail) {
+        log.info("Getting latest tree modules for case: {}, user: {}", caseNumber, userEmail);
 
-        Case caseEntity = validateAndGetCase(caseId, userEmail);
+        Case caseEntity = validateAndGetCase(caseNumber, userEmail);
         List<TreeData> latestModules = treeDataRepository.findLatestModulesByCaseEntity(caseEntity);
 
         List<TreeModuleResponse> modules = latestModules.stream()
@@ -98,7 +98,7 @@ public class TreeServiceImpl implements TreeService {
                 .collect(Collectors.toList());
 
         return TreeDataResponse.builder()
-                .caseId(caseId)
+                .caseId(caseEntity.getId())
                 .caseNumber(caseEntity.getNumber())
                 .modules(modules)
                 .fetchedAt(latestModules.isEmpty() ? null : latestModules.get(0).getFetchedAt())
@@ -107,24 +107,24 @@ public class TreeServiceImpl implements TreeService {
 
     @Override
     @Transactional(readOnly = true)
-    public TreeModuleResponse getLatestModule(Long caseId, TreeModuleType moduleType, String userEmail) {
-        log.info("Getting latest tree module: {} for case: {}, user: {}", moduleType, caseId, userEmail);
+    public TreeModuleResponse getLatestModule(String caseNumber, TreeModuleType moduleType, String userEmail) {
+        log.info("Getting latest tree module: {} for case: {}, user: {}", moduleType, caseNumber, userEmail);
 
-        Case caseEntity = validateAndGetCase(caseId, userEmail);
+        Case caseEntity = validateAndGetCase(caseNumber, userEmail);
         TreeData treeData = treeDataRepository
                 .findFirstByCaseEntityAndModuleTypeOrderByVersionDesc(caseEntity, moduleType)
                 .orElseThrow(() -> new IllegalStateException(
-                        String.format("Module %s not found for case %d", moduleType, caseId)));
+                        String.format("Module %s not found for case %s", moduleType, caseNumber)));
 
         return mapToModuleResponse(treeData);
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<TreeModuleResponse> getModuleHistory(Long caseId, TreeModuleType moduleType, String userEmail) {
-        log.info("Getting history for module: {} of case: {}, user: {}", moduleType, caseId, userEmail);
+    public List<TreeModuleResponse> getModuleHistory(String caseNumber, TreeModuleType moduleType, String userEmail) {
+        log.info("Getting history for module: {} of case: {}, user: {}", moduleType, caseNumber, userEmail);
 
-        Case caseEntity = validateAndGetCase(caseId, userEmail);
+        Case caseEntity = validateAndGetCase(caseNumber, userEmail);
         List<TreeData> history = treeDataRepository
                 .findByCaseEntityAndModuleTypeOrderByVersionDesc(caseEntity, moduleType);
 
@@ -135,24 +135,24 @@ public class TreeServiceImpl implements TreeService {
 
     @Override
     @Transactional
-    public TreeDataResponse refreshAllModules(Long caseId, String userEmail) {
-        log.info("Refreshing all tree modules for case: {}, user: {}", caseId, userEmail);
-        return fetchAndSaveAllModules(caseId, userEmail);
+    public TreeDataResponse refreshAllModules(String caseNumber, String userEmail) {
+        log.info("Refreshing all tree modules for case: {}, user: {}", caseNumber, userEmail);
+        return fetchAndSaveAllModules(caseNumber, userEmail);
     }
 
     @Override
     @Transactional
-    public void cleanupOldVersions(Long caseId, int keepVersions) {
-        log.info("Cleaning up old versions for case: {}, keeping: {} versions", caseId, keepVersions);
+    public void cleanupOldVersions(String caseNumber, int keepVersions) {
+        log.info("Cleaning up old versions for case: {}, keeping: {} versions", caseNumber, keepVersions);
 
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+        Case caseEntity = caseRepository.findByNumber(caseNumber)
+                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
 
         for (TreeModuleType moduleType : TreeModuleType.values()) {
             treeDataRepository.deleteOldVersions(caseEntity, moduleType, keepVersions);
         }
 
-        log.info("Cleanup completed for case: {}", caseId);
+        log.info("Cleanup completed for case: {}", caseNumber);
     }
 
     // ==================== PRIVATE METHODS ====================
@@ -160,7 +160,7 @@ public class TreeServiceImpl implements TreeService {
     private TreeModuleResponse fetchAndSaveModuleInternal(Case caseEntity, TreeModuleType moduleType) {
         String url = TreeUrlBuilder.buildModuleUrl(pythonHost, treePort, caseEntity.getNumber(), moduleType);
 
-        log.debug("Fetching from URL: {}", url);
+        log.info("Fetching module: {} from URL: {}", moduleType, url);
 
         try {
             String jsonResponse = webClientBuilder.build()
@@ -177,10 +177,14 @@ public class TreeServiceImpl implements TreeService {
                     })
                     .block();
 
+            if (jsonResponse == null) {
+                throw new IllegalStateException("API returned null response");
+            }
+
             // Валидация JSON
             validateJson(jsonResponse);
 
-            // Сохранение в БД
+            // Сохраняем в БД
             TreeData treeData = saveTreeData(caseEntity, moduleType, jsonResponse, true, null);
 
             log.info("Successfully fetched and saved module: {} for case: {}", moduleType, caseEntity.getId());
@@ -188,7 +192,7 @@ public class TreeServiceImpl implements TreeService {
             return mapToModuleResponse(treeData);
 
         } catch (Exception e) {
-            log.error("Error fetching module: {} for case: {}", moduleType, caseEntity.getId(), e);
+            log.error("Error fetching module: {} from URL: {} - {}", moduleType, url, e.getMessage(), e);
             throw new RuntimeException("Failed to fetch module: " + moduleType, e);
         }
     }
@@ -232,9 +236,9 @@ public class TreeServiceImpl implements TreeService {
         }
     }
 
-    private Case validateAndGetCase(Long caseId, String userEmail) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+    private Case validateAndGetCase(String caseNumber, String userEmail) {
+        Case caseEntity = caseRepository.findByNumber(caseNumber)
+                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
 
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
@@ -246,7 +250,7 @@ public class TreeServiceImpl implements TreeService {
                 .anyMatch(role -> "ADMIN".equals(role.getName()));
 
         if (!isOwner && !isMember && !isAdmin) {
-            throw new AccessDeniedException("Access denied to case: " + caseId);
+            throw new AccessDeniedException("Access denied to case: " + caseNumber);
         }
 
         return caseEntity;

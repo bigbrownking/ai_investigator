@@ -11,35 +11,35 @@ public interface TreeService {
     /**
      * Загрузить ВСЕ модули для дела из внешнего API и сохранить в БД
      */
-    TreeDataResponse fetchAndSaveAllModules(Long caseId, String userEmail);
+    TreeDataResponse fetchAndSaveAllModules(String caseNumber, String userEmail);
 
     /**
      * Загрузить КОНКРЕТНЫЙ модуль для дела
      */
-    TreeModuleResponse fetchAndSaveModule(Long caseId, TreeModuleType moduleType, String userEmail);
+    TreeModuleResponse fetchAndSaveModule(String caseNumber, TreeModuleType moduleType, String userEmail);
 
     /**
      * Получить все сохраненные модули для дела (последние версии)
      */
-    TreeDataResponse getLatestModules(Long caseId, String userEmail);
+    TreeDataResponse getLatestModules(String caseNumber, String userEmail);
 
     /**
      * Получить конкретный модуль (последняя версия)
      */
-    TreeModuleResponse getLatestModule(Long caseId, TreeModuleType moduleType, String userEmail);
+    TreeModuleResponse getLatestModule(String caseNumber, TreeModuleType moduleType, String userEmail);
 
     /**
      * Получить историю версий модуля
      */
-    List<TreeModuleResponse> getModuleHistory(Long caseId, TreeModuleType moduleType, String userEmail);
+    List<TreeModuleResponse> getModuleHistory(String caseNumber, TreeModuleType moduleType, String userEmail);
 
     /**
      * Обновить данные (перезагрузить из API)
      */
-    TreeDataResponse refreshAllModules(Long caseId, String userEmail);
+    TreeDataResponse refreshAllModules(String caseNumber, String userEmail);
 
     /**
      * Удалить старые версии (cleanup)
      */
-    void cleanupOldVersions(Long caseId, int keepVersions);
+    void cleanupOldVersions(String caseNumber, int keepVersions);
 }

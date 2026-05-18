@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.enums.TreeModuleType;
+import org.hibernate.annotations.ColumnTransformer;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -37,6 +38,9 @@ public class TreeData {
     @Column(name = "module_type", nullable = false, length = 50)
     private TreeModuleType moduleType;
 
+    @ColumnTransformer(
+        read = "json_data::text",
+        write = "CAST(? AS jsonb)")
     @Column(name = "json_data", columnDefinition = "JSONB")
     private String jsonData;
 

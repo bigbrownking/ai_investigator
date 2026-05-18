@@ -4,6 +4,7 @@ import org.di.digital.model.Case;
 import org.di.digital.model.TreeData;
 import org.di.digital.model.enums.TreeModuleType;
 import org.springframework.data.jpa.repository.JpaRepository;
+import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
@@ -55,6 +56,7 @@ public interface TreeDataRepository extends JpaRepository<TreeData, Long> {
     /**
      * Удалить старые версии (оставить только N последних)
      */
+    @Modifying
     @Query("""
         DELETE FROM TreeData td
         WHERE td.caseEntity = :caseEntity
