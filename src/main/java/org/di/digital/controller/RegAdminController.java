@@ -9,10 +9,15 @@ import org.di.digital.dto.response.*;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.RegAdminService;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
+import java.nio.charset.StandardCharsets;
+
+import static java.net.URLEncoder.encode;
 import static org.di.digital.util.UserUtil.getCurrentUser;
 
 @RestController
@@ -103,5 +108,35 @@ public class RegAdminController {
             @RequestParam(defaultValue = "20") int size) {
         Long adminId = getCurrentUser().getId();
         return ResponseEntity.ok(regAdminService.getMyRegionUserLogs(adminId, email, page, size));
+    }
+
+    @GetMapping("/interrogations/{id}")
+    public ResponseEntity<CaseInterrogationFullResponse> getInterrogationDetail(
+            @PathVariable Long id, Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionInterrogationDetail(userDetails.getId(), id));
+    }
+
+    @GetMapping("/interrogations/{id}/download")
+    public ResponseEntity<byte[]> downloadInterrogation(
+            @PathVariable Long id, Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        CaseInterrogationFullResponse data = regAdminService.getMyRegionInterrogationDetail(userDetails.getId(), id);
+        byte[] docx = regAdminService.downloadMyRegionInterrogation(userDetails.getId(), id);
+
+        String filename = "допрос_" + id + "_" + data.getFio().replace(" ", "_") + ".docx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + encode(filename, StandardCharsets.UTF_8))
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .body(docx);
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<RegionStatsDto> getStats(Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionStats(userDetails.getId()));
     }
 }

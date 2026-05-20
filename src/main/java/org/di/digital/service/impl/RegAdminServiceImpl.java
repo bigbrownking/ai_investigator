@@ -10,18 +10,26 @@ import org.di.digital.model.Appeal;
 import org.di.digital.model.Case;
 import org.di.digital.model.User;
 import org.di.digital.model.enums.AppealStatus;
+import org.di.digital.model.interrogation.CaseInterrogation;
+import org.di.digital.model.support.Review;
 import org.di.digital.repository.AppealRepository;
 import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.LogRepository;
 import org.di.digital.repository.UserRepository;
+import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
+import org.di.digital.repository.support.ReviewRepository;
+import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.service.RegAdminService;
+import org.di.digital.service.export.interrogation.InterrogationExportService;
+import org.di.digital.util.LocalizationHelper;
 import org.di.digital.util.Mapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
@@ -29,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+
+import static org.di.digital.util.UserUtil.getCurrentUser;
 
 @Slf4j
 @Service
@@ -39,6 +49,9 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final LogRepository logRepository;
+    private final CaseInterrogationRepository caseInterrogationRepository;
+    private final LocalizationHelper localizationHelper;
+    private final InterrogationExportService interrogationExportService;
     private final Mapper mapper;
 
      @Override
@@ -271,5 +284,57 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         return logRepository.findByEmail(email, PageRequest.of(page, size))
                 .map(mapper::toLogDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CaseInterrogationFullResponse getMyRegionInterrogationDetail(Long adminId, Long interrogationId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+        if (admin.getRegion() == null) {
+            throw new RuntimeException("Admin has no region assigned");
+        }
+
+        CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
+
+        User owner = interrogation.getCaseEntity().getOwner();
+        if (owner == null || owner.getRegion() == null ||
+                !owner.getRegion().getId().equals(admin.getRegion().getId())) {
+            throw new AccessDeniedException("Этот допрос не принадлежит вашему региону");
+        }
+
+        return mapper.mapToInterrogationFullResponse(interrogation, owner);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] downloadMyRegionInterrogation(Long adminId, Long interrogationId) {
+        CaseInterrogationFullResponse data = getMyRegionInterrogationDetail(adminId, interrogationId);
+        return interrogationExportService.exportToDocx(data);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public RegionStatsDto getMyRegionStats(Long adminId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new RuntimeException("Admin not found"));
+
+        if (admin.getRegion() == null) {
+            throw new RuntimeException("Admin has no region assigned");
+        }
+
+        Long regionId = admin.getRegion().getId();
+
+        return RegionStatsDto.builder()
+                .regionId(regionId)
+                .regionName(localizationHelper.getLocalizedName(admin.getRegion(), getCurrentUser().getSettings().getLanguage()))
+                .mapCode(admin.getRegion().getMapCode())
+                .totalUsers(userRepository.countByRegionId(regionId))
+                .activeUsers(userRepository.countByRegionIdAndActiveTrue(regionId))
+                .totalCases(caseRepository.countByRegionId(regionId))
+                .pendingAppeals(appealRepository.countByRegionIdAndStatus(regionId, AppealStatus.PENDING))
+                .build();
     }
 }

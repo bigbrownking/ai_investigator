@@ -51,18 +51,11 @@ public class CaseChat {
     @OrderBy("createdDate ASC")
     private List<CaseChatMessage> messages = new ArrayList<>();
 
-    /**
-     * Add message to chat and update last message timestamp
-     */
     public void addMessage(CaseChatMessage message) {
         messages.add(message);
         message.setChat(this);
         this.lastMessageAt = LocalDateTime.now();
     }
-
-    /**
-     * Get message count
-     */
     public int getMessageCount() {
         return messages.size();
     }

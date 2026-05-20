@@ -105,6 +105,16 @@ public class NotificationService {
     }
 
     @Transactional(readOnly = true)
+    public void notifyFileQueued(String caseNumber, CaseFile caseFile) {
+        sendCaseNotificationToAllUsers(
+                caseNumber,
+                "Файл повторно добавлен в очередь: " + caseFile.getOriginalFileName(),
+                caseFile.getId(),
+                caseFile.getOriginalFileName()
+        );
+    }
+
+    @Transactional(readOnly = true)
     public void notifyFilePending(String caseNumber, CaseFile caseFile) {
         sendCaseNotificationToAllUsers(
                 caseNumber,

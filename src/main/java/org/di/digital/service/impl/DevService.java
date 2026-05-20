@@ -2,9 +2,10 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.TaskQueue;
+import org.bson.Document;
+import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.TaskStatus;
-import org.di.digital.repository.TaskQueueRepository;
+import org.di.digital.repository.queue.TaskQueueRepository;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
@@ -12,7 +13,6 @@ import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
 import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
-import org.bson.Document;
 
 import java.util.List;
 import java.util.Map;

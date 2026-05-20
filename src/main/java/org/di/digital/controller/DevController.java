@@ -2,7 +2,7 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.TaskQueue;
+import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.TaskStatus;
 import org.di.digital.service.impl.DevService;
 import org.springframework.http.ResponseEntity;

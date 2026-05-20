@@ -19,9 +19,15 @@ public interface AdminService {
     List<RegionStatsDto> getRegionMapStats();
     RegionSummaryDto getRegionSummary(Long regionId, int page, int size);
     CaseResponse getCaseDetail(Long caseId);
+    CaseInterrogationFullResponse getInterrogationDetail(Long interrogationId);
+    byte[] downloadInterrogation(Long interrogationId);
     String getCaseIndictment(Long caseId);
     String getCaseQualification(Long caseId);
     void approveAppeal(Long appealId, Long adminId);
     void rejectAppeal(Long appealId, Long adminId);
     Page<LogDto> getUserLogs(String email, int page, int size);
+    Page<SupportTicketDto> getAllSupportTickets(int page, int size);
+    SupportTicketDto getSupportTicketDetail(Long id);
+    Page<ReviewDto> getAllReviews(int page, int size);
+    ReviewDto getReviewDetail(Long id);
 }

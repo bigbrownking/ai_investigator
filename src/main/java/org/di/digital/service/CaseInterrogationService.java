@@ -8,6 +8,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 public interface CaseInterrogationService {
     CaseInterrogationFullResponse addInterrogation(Long caseId, AddInterrogationRequest request, String email);
@@ -29,7 +30,9 @@ public interface CaseInterrogationService {
 
     void controlTimer(Long caseId, Long interrogationId, String action, String username);
 
-    List<CaseInterrogationApplicationFileResponse> uploadApplicationFiles(Long caseId, Long interrogationId, List<MultipartFile> files, String email);
+    List<CaseInterrogationApplicationFileResponse> uploadApplicationFiles(
+            Long caseId, Long interrogationId, List<MultipartFile> files,
+            Map<String, String> displayNames, String email);
     void deleteApplicationFile(Long caseId, Long interrogationId, Long fileId, String email);
 
 }

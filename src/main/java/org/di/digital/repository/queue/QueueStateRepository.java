@@ -1,6 +1,6 @@
-package org.di.digital.repository;
+package org.di.digital.repository.queue;
 
-import org.di.digital.model.QueueState;
+import org.di.digital.model.queue.QueueState;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 

@@ -767,14 +767,6 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         LocalDateTime now = LocalDateTime.now();
 
         if ("start".equals(action)) {
-            boolean isRunning = interrogation.getStartedAt() != null
-                    && !Boolean.TRUE.equals(interrogation.getIsPaused())
-                    && interrogation.getStatus() != CaseInterrogationStatusEnum.COMPLETED;
-
-            if (isRunning) {
-                throw new IllegalStateException("Таймер уже запущен");
-            }
-
             if (interrogation.getStartedAt() == null) {
                 interrogation.setStartedAt(now);
             }
@@ -826,7 +818,8 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
     @Transactional
     public List<CaseInterrogationApplicationFileResponse> uploadApplicationFiles(
-            Long caseId, Long interrogationId, List<MultipartFile> files, String email) {
+            Long caseId, Long interrogationId, List<MultipartFile> files,
+            Map<String, String> displayNames, String email) {
 
         if (files == null || files.isEmpty()) {
             return Collections.emptyList();
@@ -839,7 +832,6 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
         Case caseEntity = interrogation.getCaseEntity();
-
         validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
@@ -867,17 +859,17 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
             try {
                 CaseInterrogationApplicationFile appFile = minioService.uploadApplicationFile(
-                        file,
-                        caseEntity.getNumber(),
-                        interrogation.getFio()
+                        file, caseEntity.getNumber(), interrogation.getFio()
                 );
+
+                String displayName = displayNames.getOrDefault(originalName, originalName);
+                appFile.setDisplayName(displayName);
+
                 try {
                     Integer pages = pageCounter.countPagesByUrl(appFile.getFileUrl(), appFile.getContentType());
-                    if (pages != null) {
-                        appFile.setPages(pages);
-                    }
+                    if (pages != null) appFile.setPages(pages);
                 } catch (Exception e) {
-                    log.warn("Could not count pages for application file {}: {}", appFile.getOriginalFileName(), e.getMessage());
+                    log.warn("Could not count pages for {}: {}", appFile.getOriginalFileName(), e.getMessage());
                 }
 
                 appFile.addInterrogation(interrogation);
@@ -901,36 +893,27 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 }
 
             } catch (Exception e) {
-                log.error("Failed to upload application file: {} for interrogation: {}",
-                        originalName, interrogationId, e);
+                log.error("Failed to upload application file: {} for interrogation: {}", originalName, interrogationId, e);
             }
         }
         uploadedCaseFiles.forEach(caseFile -> {
             try {
                 Integer pages = pageCounter.countPagesByUrl(caseFile.getFileUrl(), caseFile.getContentType());
-                if (pages != null) {
-                    caseFile.setPages(pages);
-                }
+                if (pages != null) caseFile.setPages(pages);
             } catch (Exception e) {
                 log.warn("Could not count pages for file {}: {}", caseFile.getOriginalFileName(), e.getMessage());
             }
         });
+
         caseInterrogationRepository.saveAndFlush(interrogation);
+        uploadedFiles = new ArrayList<>(interrogation.getApplicationFiles());
 
         for (CaseFile caseFile : uploadedCaseFiles) {
             taskQueueService.addTaskToQueue(
-                    email,
-                    caseEntity.getId(),
-                    caseEntity.getNumber(),
-                    caseFile.getOriginalFileName(),
-                    caseFile.getFileUrl(),
-                    caseFile.getId()
+                    email, caseEntity.getId(), caseEntity.getNumber(),
+                    caseFile.getOriginalFileName(), caseFile.getFileUrl(), caseFile.getId()
             );
         }
-
-        log.info("Uploaded {}/{} application files for interrogation: {}",
-                uploadedFiles.size(), files.size(), interrogationId);
-
 
         String fileNames = uploadedFiles.stream()
                 .map(CaseInterrogationApplicationFile::getOriginalFileName)
@@ -939,11 +922,9 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         logService.log(
                 String.format("Uploading application files [%s] to interrogation №%d (FIO: %s) by user %s in case №%s",
                         fileNames, interrogationId, interrogation.getFio(), email, caseNumber),
-                LogLevel.INFO,
-                LogAction.FILE_UPLOAD,
-                caseNumber,
-                email
+                LogLevel.INFO, LogAction.FILE_UPLOAD, caseNumber, email
         );
+
         return uploadedFiles.stream()
                 .map(mapper::mapToApplicationFileResponse)
                 .toList();

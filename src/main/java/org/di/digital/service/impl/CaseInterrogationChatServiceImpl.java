@@ -10,6 +10,7 @@ import org.di.digital.dto.response.CaseChatMessageDto;
 import org.di.digital.model.*;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
+import org.di.digital.model.enums.MessageRole;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationChat;
 import org.di.digital.model.interrogation.CaseInterrogationQA;
@@ -235,13 +236,13 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     @Transactional
     public void toggleMessageSelected(Long caseId, Long interrogationId, Long messageId, boolean selected, String userEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         CaseChatMessage message = chatMessageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found: " + messageId));
+                .orElseThrow(() -> new RuntimeException("Сообщение не найдено: " + messageId));
 
         message.setIsSelected(selected);
         logService.log(

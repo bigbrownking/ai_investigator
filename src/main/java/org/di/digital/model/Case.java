@@ -48,6 +48,7 @@ public class Case {
     @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CaseFigurant> figurants = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CaseChat> chats = new ArrayList<>();
 
@@ -58,6 +59,7 @@ public class Case {
     private String indictment;
 
     private Boolean isFinalIndictmentDone;
+
     @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
     @JoinTable(

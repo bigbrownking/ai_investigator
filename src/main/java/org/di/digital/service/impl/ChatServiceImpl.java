@@ -2,14 +2,11 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.enums.MessageConstant;
+import org.di.digital.model.enums.*;
 import org.di.digital.dto.request.ChatRequest;
 import org.di.digital.dto.response.CaseChatHistoryResponse;
 import org.di.digital.dto.response.CaseChatMessageDto;
 import org.di.digital.model.*;
-import org.di.digital.model.enums.CaseActivityType;
-import org.di.digital.model.enums.LogAction;
-import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.CaseChatMessageRepository;
 import org.di.digital.repository.CaseChatRepository;
 import org.di.digital.repository.CaseRepository;

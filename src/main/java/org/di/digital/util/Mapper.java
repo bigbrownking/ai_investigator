@@ -8,6 +8,8 @@ import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationApplicationFile;
 import org.di.digital.model.interrogation.CaseInterrogationProtocol;
 import org.di.digital.model.interrogation.CaseInterrogationQA;
+import org.di.digital.model.support.Review;
+import org.di.digital.model.support.SupportTicket;
 import org.di.digital.service.MinioService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -402,6 +404,7 @@ public class Mapper {
     public CaseInterrogationApplicationFileResponse mapToApplicationFileResponse(CaseInterrogationApplicationFile file) {
         return CaseInterrogationApplicationFileResponse.builder()
                 .id(file.getId())
+                .displayName(file.getDisplayName())
                 .originalFileName(file.getOriginalFileName())
                 .storedFileName(file.getStoredFileName())
                 .previewUrl(minioService.generatePresignedUrlForPreview(file.getFileUrl()))
@@ -496,6 +499,46 @@ public class Mapper {
                 .lastActivityDate(c.getLastActivityDate())
                 .lastActivityType(c.getLastActivityType())
                 .ownerEmail(c.getOwner() != null ? c.getOwner().getEmail() : null)
+                .build();
+    }
+
+    public SupportTicketDto mapToSupportTicketDto(SupportTicket ticket) {
+        List<SupportTicketPhotoDto> photos = ticket.getPhotos().stream()
+                .map(p -> SupportTicketPhotoDto.builder()
+                        .id(p.getId())
+                        .originalFileName(p.getOriginalFileName())
+                        .contentType(p.getContentType())
+                        .previewUrl(minioService.generatePresignedUrlForPreview(p.getFileUrl()))
+                        .downloadUrl(minioService.generatePresignedUrlForDownload(p.getFileUrl(), p.getOriginalFileName()))
+                        .build())
+                .toList();
+
+        return SupportTicketDto.builder()
+                .id(ticket.getId())
+                .message(ticket.getMessage())
+                .phoneNumber(ticket.getPhoneNumber())
+                .createdAt(ticket.getCreatedAt())
+                .photos(photos)
+                .build();
+    }
+
+    public ReviewDto mapToReviewDto(Review review) {
+        String previewUrl = review.getFileUrl() != null
+                ? minioService.generatePresignedUrlForPreview(review.getFileUrl())
+                : null;
+        String downloadUrl = review.getFileUrl() != null
+                ? minioService.generatePresignedUrlForDownload(review.getFileUrl(), review.getOriginalFileName())
+                : null;
+
+        return ReviewDto.builder()
+                .id(review.getId())
+                .subject(review.getSubject())
+                .message(review.getMessage())
+                .createdAt(review.getCreatedAt())
+                .originalFileName(review.getOriginalFileName())
+                .contentType(review.getContentType())
+                .previewUrl(previewUrl)
+                .downloadUrl(downloadUrl)
                 .build();
     }
 }

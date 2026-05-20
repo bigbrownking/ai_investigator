@@ -75,7 +75,7 @@ public class CaseIndictmentController {
 
         Resource resource = indictmentService.downloadIndictmentAsWord(caseNumber, authentication.getName());
 
-        String filename = String.format("Indictment_%s.docx", caseNumber.replace("/", "-"));
+        String filename = String.format("обвинительный акт_%s.docx", caseNumber.replace("/", "-"));
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")

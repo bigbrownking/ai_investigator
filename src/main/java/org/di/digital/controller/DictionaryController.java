@@ -39,7 +39,7 @@ public class DictionaryController {
     public ResponseEntity<List<String>> getLanguages() {
         return ResponseEntity.ok(
                 Arrays.stream(
-                        UserSettingsLanguage.values())
+                                UserSettingsLanguage.values())
                         .map(UserSettingsLanguage::getLanguage)
                         .collect(Collectors.toList()));
     }
@@ -48,7 +48,7 @@ public class DictionaryController {
     public ResponseEntity<List<String>> getLevels() {
         return ResponseEntity.ok(
                 Arrays.stream(
-                        UserSettingsDetalizationLevel.values())
+                                UserSettingsDetalizationLevel.values())
                         .map(UserSettingsDetalizationLevel::getLevel)
                         .collect(Collectors.toList()));
     }
@@ -57,7 +57,7 @@ public class DictionaryController {
     public ResponseEntity<List<String>> getTheme() {
         return ResponseEntity.ok(
                 Arrays.stream(
-                        UserSettingsTheme.values())
+                                UserSettingsTheme.values())
                         .map(UserSettingsTheme::getTheme)
                         .collect(Collectors.toList()));
     }
@@ -69,7 +69,7 @@ public class DictionaryController {
     }
 
     @GetMapping("interrogationDocumentType")
-    public ResponseEntity<List<String>> getInterrogationDocumentTypes(){
+    public ResponseEntity<List<String>> getInterrogationDocumentTypes() {
         return ResponseEntity.ok(
                 List.of("ИИН", "Паспорт"));
     }

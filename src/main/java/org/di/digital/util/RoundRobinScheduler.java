@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.DocumentProcessingMessage;
 import org.di.digital.model.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
-import org.di.digital.model.TaskQueue;
+import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.service.impl.queue.DocumentQueueService;
 import org.di.digital.service.impl.NotificationService;
@@ -13,9 +13,6 @@ import org.di.digital.service.impl.queue.TaskQueueService;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
-
-import java.time.Duration;
-import java.time.temporal.ChronoUnit;
 
 @Slf4j
 @Component

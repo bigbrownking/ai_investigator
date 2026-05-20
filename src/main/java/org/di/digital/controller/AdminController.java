@@ -10,11 +10,16 @@ import org.di.digital.dto.response.*;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.AdminService;
 import org.di.digital.service.AuthService;
+import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+import static java.net.URLEncoder.encode;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Slf4j
@@ -25,6 +30,7 @@ public class AdminController {
 
     private final AdminService adminService;
     private final AuthService authService;
+    private final InterrogationExportService interrogationExportService;
 
     @PostMapping("/reg_admin")
     public ResponseEntity<String> regAdmin(@RequestBody SignUpRequest signUpRequest) {
@@ -58,6 +64,25 @@ public class AdminController {
     @GetMapping("/cases/{caseId}")
     public ResponseEntity<CaseResponse> getCaseDetail(@PathVariable Long caseId) {
         return ResponseEntity.ok(adminService.getCaseDetail(caseId));
+    }
+    @GetMapping("/interrogations/{id}")
+    public ResponseEntity<CaseInterrogationFullResponse> getInterrogationDetail(@PathVariable Long id) {
+        return ResponseEntity.ok(adminService.getInterrogationDetail(id));
+    }
+
+    @GetMapping("/interrogations/{id}/download")
+    public ResponseEntity<byte[]> downloadInterrogation(@PathVariable Long id) {
+        CaseInterrogationFullResponse data = adminService.getInterrogationDetail(id);
+        byte[] docx = interrogationExportService.exportToDocx(data);
+
+        String filename = "допрос_" + id + "_" + data.getFio().replace(" ", "_") + ".docx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + encode(filename, StandardCharsets.UTF_8))
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .body(docx);
     }
 
     @GetMapping("/cases/{caseId}/indictment")
@@ -125,5 +150,28 @@ public class AdminController {
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size) {
         return ResponseEntity.ok(adminService.getUserLogs(email, page, size));
+    }
+
+    @GetMapping("/support")
+    public ResponseEntity<Page<SupportTicketDto>> getAllSupportTickets(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(adminService.getAllSupportTickets(page, size));
+    }
+    @GetMapping("/support/{id}")
+    public ResponseEntity<SupportTicketDto> getSupportTicketDetail(@PathVariable Long id) {
+        return ResponseEntity.ok(adminService.getSupportTicketDetail(id));
+    }
+
+    @GetMapping("/reviews")
+    public ResponseEntity<Page<ReviewDto>> getAllReviews(
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "20") int size) {
+        return ResponseEntity.ok(adminService.getAllReviews(page, size));
+    }
+
+    @GetMapping("/reviews/{id}")
+    public ResponseEntity<ReviewDto> getReviewDetail(@PathVariable Long id) {
+        return ResponseEntity.ok(adminService.getReviewDetail(id));
     }
 }

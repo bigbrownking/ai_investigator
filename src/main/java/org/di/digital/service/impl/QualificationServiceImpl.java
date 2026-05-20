@@ -106,26 +106,25 @@ public class QualificationServiceImpl implements QualificationService {
                     RequestContextHolder.setRequestAttributes(requestAttributes);
                     try {
                         log.error("Qualification streaming error for case {}", caseNumber, error);
-                        if (error instanceof WebClientResponseException.BadRequest) {
-                            logService.log(
-                                    String.format("No required files found in case %s", caseNumber),
-                                    LogLevel.ERROR,
-                                    LogAction.NO_SUCH_FILE,
-                                    caseNumber,
-                                    userEmail
-                            );
-                            emitter.completeWithError(new IllegalStateException(
-                                    "Квалификация деяния не может быть сгенерирована, поскольку в материалах дела " +
-                                            "отсутствуют необходимые документы: ПОСТАНОВЛЕНИЕ о признании лица в качестве " +
-                                            "подозреваемого либо ПРОТОКОЛ задержания лица, подозреваемого в совершении " +
-                                            "уголовного правонарушения."));
-                        } else {
-                            emitter.completeWithError(error);
-                        }
+//                if (error instanceof WebClientResponseException.BadRequest) {
+//                    logService.log(
+//                            String.format("No required files found in case %s", caseNumber),
+//                            LogLevel.ERROR,
+//                            LogAction.NO_SUCH_FILE,
+//                            caseNumber,
+//                            userEmail
+//                    );
+//                    emitter.completeWithError(new IllegalStateException(
+//                            "Квалификация деяния не может быть сгенерирована, поскольку в материалах дела " +
+//                                    "отсутствуют необходимые документы: ПОСТАНОВЛЕНИЕ о признании лица в качестве " +
+//                                    "подозреваемого либо ПРОТОКОЛ задержания лица, подозреваемого в совершении " +
+//                                    "уголовного правонарушения."));
+//                } else {
+                        emitter.completeWithError(error);
+//                }
+                    } finally {
+                        RequestContextHolder.resetRequestAttributes();
                     }
-                    finally {
-                            RequestContextHolder.resetRequestAttributes();
-                        }
                 }
         );
     }

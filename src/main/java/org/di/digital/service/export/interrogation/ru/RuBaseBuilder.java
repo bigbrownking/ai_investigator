@@ -281,7 +281,7 @@ public abstract class RuBaseBuilder extends BaseInterrogationDocBuilder {
                 setLineSpacing(filePara);
                 XWPFRun fileRun = filePara.createRun();
                 String pages = file.getPages() != null ? ", " + file.getPages() + " л." : "";
-                fileRun.setText("- " + file.getOriginalFileName() + pages);
+                fileRun.setText("- " + file.getDisplayName() + pages);
                 fileRun.setFontFamily(FONT);
                 fileRun.setFontSize(FONT_SIZE);
             }

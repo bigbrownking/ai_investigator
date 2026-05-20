@@ -11,6 +11,7 @@ public class CaseInterrogationApplicationFileResponse {
     private Long id;
     private String originalFileName;
     private String storedFileName;
+    private String displayName;
     private String previewUrl;
     private String downloadUrl;
     private String contentType;

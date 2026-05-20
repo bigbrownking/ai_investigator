@@ -2,14 +2,12 @@ package org.di.digital.consumer;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.config.RabbitMQConfig;
 import org.di.digital.dto.message.ProcessingResultMessage;
 import org.di.digital.model.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.repository.CaseFileRepository;
 import org.di.digital.service.CaseFileService;
 import org.di.digital.service.impl.NotificationService;
-import org.di.digital.service.impl.queue.TaskQueueService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 

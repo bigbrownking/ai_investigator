@@ -1,12 +1,14 @@
 package org.di.digital.service.export.interrogation.kz;
 
 import org.apache.poi.xwpf.usermodel.*;
+import org.di.digital.dto.response.CaseInterrogationApplicationFileResponse;
 import org.di.digital.dto.response.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.CaseInterrogationProtocolResponse;
 import org.di.digital.dto.response.InvolvedPersonsResponse;
 import org.di.digital.model.User;
 import org.di.digital.service.export.interrogation.BaseInterrogationDocBuilder;
 import org.di.digital.util.LocalizationHelper;
+import org.springframework.util.StringUtils;
 
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
@@ -260,7 +262,6 @@ public abstract class KazBaseBuilder extends BaseInterrogationDocBuilder {
         famValue.setUnderline(UnderlinePatterns.SINGLE);
         famValue.setText(safe(data.getFamiliarization()).equals("—") ? "жария ету жолымен" : data.getFamiliarization());
         famValue.setFontFamily(FONT); famValue.setFontSize(FONT_SIZE);
-        famValue.setText(" танысты.");
         addEmptyLine(doc);
 
         addJustifiedParagraph(doc,
@@ -268,19 +269,49 @@ public abstract class KazBaseBuilder extends BaseInterrogationDocBuilder {
                         + "жауап алу барысында берілген айғақтарды толық қамтиды.");
         addEmptyLine(doc);
 
+        XWPFParagraph zaPara = doc.createParagraph();
+        zaPara.setAlignment(ParagraphAlignment.BOTH);
+        zaPara.setIndentationFirstLine(720);
+        XWPFRun zaLabel = zaPara.createRun();
+        zaLabel.setText("Хаттамаға енгізуге жататын өтініштер, ескертулер, толықтырулар, нақтылаулар мен түзетулер ");
+        zaLabel.setFontFamily(FONT); zaLabel.setFontSize(FONT_SIZE);
+        XWPFRun zaValue = zaPara.createRun();
+        zaValue.setUnderline(UnderlinePatterns.SINGLE);
+        zaValue.setText(safe(data.getAdditionalInfo()).equals("—") ? "жоқ" : data.getAdditionalInfo());
+        zaValue.setFontFamily(FONT); zaValue.setFontSize(FONT_SIZE);
+        addEmptyLine(doc);
+
+        if (StringUtils.hasText(data.getAdditionalInfo())) {
+            addJustifiedParagraph(doc, data.getAdditionalText());
+            addEmptyLine(doc);
+        }
+
         XWPFParagraph appPara = doc.createParagraph();
         appPara.setAlignment(ParagraphAlignment.BOTH);
         appPara.setIndentationFirstLine(720);
         XWPFRun appLabel = appPara.createRun();
-        appLabel.setText("Хаттамаға енгізуге жататын өтініштер, ескертулер, толықтырулар, нақтылаулар мен түзетулер   ");
+        appLabel.setText("Хаттамаға ");
         appLabel.setFontFamily(FONT); appLabel.setFontSize(FONT_SIZE);
         XWPFRun appValue = appPara.createRun();
         appValue.setUnderline(UnderlinePatterns.SINGLE);
-        appValue.setText(safe(data.getApplication()).equals("—") ? "жоқ" : data.getApplication());
+        appValue.setText(safe(data.getApplication()).equals("—") ? "қоса берілмейді" : data.getApplication());
         appValue.setFontFamily(FONT); appValue.setFontSize(FONT_SIZE);
         addEmptyLine(doc);
 
-        addInlineSignatureLine(doc, roleLabel, fio);
+        if (data.getApplications() != null && !data.getApplications().isEmpty()) {
+            for (CaseInterrogationApplicationFileResponse file : data.getApplications()) {
+                XWPFParagraph filePara = doc.createParagraph();
+                filePara.setAlignment(ParagraphAlignment.BOTH);
+                filePara.setIndentationFirstLine(720);
+                setLineSpacing(filePara);
+                XWPFRun fileRun = filePara.createRun();
+                String pages = file.getPages() != null ? ", " + file.getPages() + " п." : "";
+                fileRun.setText("- " + file.getDisplayName() + pages);
+                fileRun.setFontFamily(FONT); fileRun.setFontSize(FONT_SIZE);
+            }
+            addEmptyLine(doc);
+        }
+
         addEmptyLine(doc);
 
         addInvolvedPersonsSignaturesKaz(doc, data);

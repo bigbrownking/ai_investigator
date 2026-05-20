@@ -3,6 +3,7 @@ package org.di.digital.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.AddInterrogationRequest;
+import org.di.digital.dto.request.ApplicationFileUploadRequest;
 import org.di.digital.dto.request.EditAudioTranscribedTextRequest;
 import org.di.digital.dto.request.UpdateProtocolFieldRequest;
 import org.di.digital.dto.response.*;
@@ -18,6 +19,7 @@ import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
 import java.util.List;
+import java.util.Map;
 
 import static java.net.URLEncoder.encode;
 
@@ -213,12 +215,15 @@ public class CaseInterrogationController {
             @PathVariable Long caseId,
             @PathVariable Long interrogationId,
             @RequestParam("files") List<MultipartFile> files,
+            @RequestPart(value = "meta", required = false) ApplicationFileUploadRequest meta,
             Authentication authentication
     ) {
-        log.info("Uploading application files for interrogation: {}, case: {}", interrogationId, caseId);
-        List<CaseInterrogationApplicationFileResponse> response = caseInterrogationService
-                .uploadApplicationFiles(caseId, interrogationId, files, authentication.getName());
-        return ResponseEntity.ok(response);
+        Map<String, String> displayNames = (meta != null && meta.getDisplayNames() != null)
+                ? meta.getDisplayNames()
+                : Map.of();
+
+        return ResponseEntity.ok(caseInterrogationService
+                .uploadApplicationFiles(caseId, interrogationId, files, displayNames, authentication.getName()));
     }
 
     @DeleteMapping("/{caseId}/interrogations/{interrogationId}/application-files/{fileId}")

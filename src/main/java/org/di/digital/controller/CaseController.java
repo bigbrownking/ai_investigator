@@ -9,6 +9,7 @@ import org.di.digital.dto.response.CaseResponse;
 import org.di.digital.dto.response.CaseUserResponse;
 import org.di.digital.dto.response.FigurantResponse;
 import org.di.digital.model.CaseFile;
+import org.di.digital.service.CaseFileService;
 import org.di.digital.service.CaseService;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
@@ -26,6 +27,7 @@ import java.util.List;
 @RequiredArgsConstructor
 public class CaseController {
     private final CaseService caseService;
+    private final CaseFileService caseFileService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CaseResponse> createCase(
@@ -294,5 +296,16 @@ public class CaseController {
         return caseService.findFigurantByNumber(caseId, documentType, number, authentication.getName())
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
+    }
+
+    @PostMapping("/{caseId}/files/{fileId}/retry")
+    public ResponseEntity<Void> retryFileProcessing(
+            @PathVariable Long caseId,
+            @PathVariable Long fileId,
+            Authentication authentication
+    ) {
+        log.info("Retrying file: {} in case: {} by user: {}", fileId, caseId, authentication.getName());
+        caseFileService.retryFile(caseId, fileId, authentication.getName());
+        return ResponseEntity.ok().build();
     }
 }

@@ -19,4 +19,7 @@ public interface RegAdminService {
     String getMyRegionCaseIndictment(Long adminId, Long caseId);
     String getMyRegionCaseQualification(Long adminId, Long caseId);
     Page<LogDto> getMyRegionUserLogs(Long adminId, String email, int page, int size);
+    CaseInterrogationFullResponse getMyRegionInterrogationDetail(Long adminId, Long interrogationId);
+    byte[] downloadMyRegionInterrogation(Long adminId, Long interrogationId);
+    RegionStatsDto getMyRegionStats(Long adminId);
 }

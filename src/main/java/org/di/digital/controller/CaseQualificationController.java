@@ -78,7 +78,7 @@ public class CaseQualificationController {
 
         Resource resource = qualificationService.downloadQualificationAsWord(caseNumber, authentication.getName());
 
-        String filename = String.format("Qualification_%s.docx", caseNumber.replace("/", "-"));
+        String filename = String.format("квалификация_%s.docx", caseNumber.replace("/", "-"));
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")

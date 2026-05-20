@@ -145,4 +145,8 @@ public class UserServiceImpl implements UserService {
 
         return mapper.mapToUserProfileResponse(user);
     }
+    @Override
+    public User getMyBoss(String email) {
+        return null;
+    }
 }

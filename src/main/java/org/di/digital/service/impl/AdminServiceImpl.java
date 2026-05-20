@@ -8,12 +8,18 @@ import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.model.*;
 import org.di.digital.model.enums.AppealStatus;
+import org.di.digital.model.interrogation.CaseInterrogation;
+import org.di.digital.model.support.Review;
+import org.di.digital.model.support.SupportTicket;
 import org.di.digital.repository.*;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
+import org.di.digital.repository.support.ReviewRepository;
+import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.service.AdminService;
+import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.LocalizationHelper;
 import org.di.digital.util.Mapper;
 import org.springframework.data.domain.Page;
@@ -44,6 +50,9 @@ public class AdminServiceImpl implements AdminService {
     private final CaseFileRepository caseFileRepository;
     private final Mapper mapper;
     private final LocalizationHelper localizationHelper;
+    private final SupportTicketRepository supportTicketRepository;
+    private final ReviewRepository reviewRepository;
+    private final InterrogationExportService interrogationExportService;
 
     @Override
     public Page<UserProfile> getAllUsers(int page, int size, UserSearchRequest req) {
@@ -113,6 +122,12 @@ public class AdminServiceImpl implements AdminService {
                 .mapToLong(c -> c.getInterrogations().size())
                 .sum();
 
+        long totalPages = allFiltered.stream()
+                .mapToLong(c -> c.getFiles().stream()
+                        .mapToLong(f -> f.getPages() != null ? f.getPages() : 0)
+                        .sum())
+                .sum();
+
         long audioInterrogations = allFiltered.stream()
                 .mapToLong(Case::audioUsedCount)
                 .sum();
@@ -120,9 +135,29 @@ public class AdminServiceImpl implements AdminService {
         return CasePageResponse.builder()
                 .cases(casePage)
                 .totalDocuments(totalDocuments)
+                .totalPages(totalPages)
                 .totalInterrogations(totalInterrogations)
                 .audioInterrogations(audioInterrogations)
                 .build();
+    }
+
+    @Override
+    public CaseInterrogationFullResponse getInterrogationDetail(Long interrogationId) {
+        CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
+
+        User user = interrogation.getCaseEntity().getOwner();
+
+        return mapper.mapToInterrogationFullResponse(interrogation, user);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public byte[] downloadInterrogation(Long interrogationId) {
+        CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
+                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
+        CaseInterrogationFullResponse data = mapper.mapToInterrogationFullResponse(interrogation, interrogation.getCaseEntity().getOwner());
+        return interrogationExportService.exportToDocx(data);
     }
 
     @Override
@@ -294,6 +329,38 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
         return logRepository.findByEmail(email, PageRequest.of(page, size))
                 .map(mapper::toLogDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<SupportTicketDto> getAllSupportTickets(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return supportTicketRepository.findAll(pageable)
+                .map(mapper::mapToSupportTicketDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public SupportTicketDto getSupportTicketDetail(Long id) {
+        SupportTicket ticket = supportTicketRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Тикет не найден: " + id));
+        return mapper.mapToSupportTicketDto(ticket);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public Page<ReviewDto> getAllReviews(int page, int size) {
+        Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
+        return reviewRepository.findAll(pageable)
+                .map(mapper::mapToReviewDto);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public ReviewDto getReviewDetail(Long id) {
+        Review review = reviewRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Рецензия не найдена: " + id));
+        return mapper.mapToReviewDto(review);
     }
 }
 

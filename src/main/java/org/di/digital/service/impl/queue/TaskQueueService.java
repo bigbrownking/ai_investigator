@@ -4,11 +4,11 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
-import org.di.digital.model.QueueState;
-import org.di.digital.model.TaskQueue;
+import org.di.digital.model.queue.QueueState;
+import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.TaskStatus;
-import org.di.digital.repository.QueueStateRepository;
-import org.di.digital.repository.TaskQueueRepository;
+import org.di.digital.repository.queue.QueueStateRepository;
+import org.di.digital.repository.queue.TaskQueueRepository;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.Sort;
@@ -21,7 +21,6 @@ import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Set;
 
 @Slf4j
 @Service
@@ -56,7 +55,24 @@ public class TaskQueueService {
         rabbitAdmin.purgeQueue(DOCUMENT_QUEUE, false);
         log.info("Purged RabbitMQ queue on startup");
     }
+    public void retryTask(Long caseFileId, String userEmail, Long caseId,
+                          String caseNumber, String fileName, String fileUrl) {
+        List<TaskQueue> failedTasks = taskQueueRepository
+                .findByCaseFileIdAndStatus(caseFileId, TaskStatus.FAILED);
 
+        if (!failedTasks.isEmpty()) {
+            TaskQueue task = failedTasks.get(0);
+            task.setStatus(TaskStatus.PENDING);
+            task.setErrorMessage(null);
+            task.setCompletedAt(null);
+            task.setSentToQueueAt(null);
+            taskQueueRepository.save(task);
+            log.info("Task {} re-queued for caseFile {}", task.getId(), caseFileId);
+        } else {
+            log.warn("No FAILED task found for caseFileId {}, creating new task", caseFileId);
+            addTaskToQueue(userEmail, caseId, caseNumber, fileName, fileUrl, caseFileId);
+        }
+    }
     public void addTaskToQueue(String userEmail, Long caseId, String caseNumber,
                                String fileName, String fileUrl, Long caseFileId) {
 
