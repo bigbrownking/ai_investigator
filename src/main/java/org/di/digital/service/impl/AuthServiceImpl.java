@@ -2,28 +2,34 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.LoginRequest;
-import org.di.digital.dto.request.RefreshTokenRequest;
-import org.di.digital.dto.request.SignUpRequest;
+import org.di.digital.dto.request.auth.*;
 import org.di.digital.dto.response.JwtResponse;
-import org.di.digital.model.*;
 import org.di.digital.model.enums.*;
-import org.di.digital.repository.*;
+import org.di.digital.model.user.*;
+import org.di.digital.repository.user.*;
 import org.di.digital.security.crypto.RsaDecryptor;
 import org.di.digital.security.jwt.JwtTokenUtil;
 import org.di.digital.service.AuthService;
 import org.di.digital.service.LogService;
+import org.di.digital.service.impl.core.EmailService;
+import org.di.digital.service.impl.core.NotificationService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.UUID;
 import java.util.regex.Pattern;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AuthServiceImpl implements AuthService {
+
+    @Value("${app.frontend.url}")
+    private String frontendUrl;
 
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(
             "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]).{8,}$"
@@ -41,6 +47,8 @@ public class AuthServiceImpl implements AuthService {
     private final PasswordEncoder passwordEncoder;
     private final RsaDecryptor rsaDecryptor;
     private final NotificationService notificationService;
+    private final EmailService emailService;
+    private final UserFaceTemplateRepository faceTemplateRepository;
 
     private String decryptAndValidatePassword(String encryptedPassword) {
         String raw = rsaDecryptor.decrypt(encryptedPassword);
@@ -65,7 +73,7 @@ public class AuthServiceImpl implements AuthService {
         String rawPassword = request.getPassword();
 
         Role userRole = roleRepository.findByName("ADMIN")
-                .orElseThrow(() -> new RuntimeException("Роль не найдена"));
+                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
 
         User user = User.builder()
                 .email(request.getEmail())
@@ -108,30 +116,30 @@ public class AuthServiceImpl implements AuthService {
         String rawPassword = decryptAndValidatePassword(request.getPassword());
 
         Role userRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new RuntimeException("Роль не найдена"));
+                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
 
         Region region = null;
         if (request.getRegionId() != null) {
             region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new RuntimeException("Регион не найден"));
+                    .orElseThrow(() -> new IllegalStateException("Регион не найден"));
         }
 
         Profession profession = null;
         if (request.getProfessionId() != null) {
             profession = professionRepository.findById(request.getProfessionId())
-                    .orElseThrow(() -> new RuntimeException("Профессия не найдена"));
+                    .orElseThrow(() -> new IllegalStateException("Профессия не найдена"));
         }
 
         Rank rank = null;
         if (request.getRankId() != null) {
             rank = rankRepository.findById(request.getRankId())
-                    .orElseThrow(() -> new RuntimeException("Звание не найдено"));
+                    .orElseThrow(() -> new IllegalStateException("Звание не найдено"));
         }
 
         Administration administration = null;
         if (request.getAdministrationId() != null) {
             administration = administrationRepository.findById(request.getAdministrationId())
-                    .orElseThrow(() -> new RuntimeException("Управление не найдено"));
+                    .orElseThrow(() -> new IllegalStateException("Управление не найдено"));
         }
 
         User user = User.builder()
@@ -171,11 +179,13 @@ public class AuthServiceImpl implements AuthService {
 
         appealRepository.save(appeal);
 
-        if (region != null && region.getAdmin() != null) {
-            notificationService.sendNotificationToUser(
-                    region.getAdmin().getEmail(),
-                    "Новый пользователь хочет зарегистрироваться в вашем регионе: "
-                            + request.getName() + " " + request.getSurname()
+        if (region != null && !region.getAdmins().isEmpty()) {
+            region.getAdmins().forEach(admin ->
+                    notificationService.sendNotificationToUser(
+                            admin.getEmail(),
+                            "Новый пользователь хочет зарегистрироваться в вашем регионе: "
+                                    + request.getName() + " " + request.getSurname()
+                    )
             );
         }
         logService.log(
@@ -199,7 +209,7 @@ public class AuthServiceImpl implements AuthService {
         String rawPassword = decryptAndValidatePassword(request.getPassword());
 
         Role userRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new RuntimeException("Роль не найдена"));
+                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
 
         Region region = null;
         if (request.getRegionId() != null) {
@@ -236,7 +246,8 @@ public class AuthServiceImpl implements AuthService {
                 .build();
 
         if (region != null) {
-            region.setAdmin(user);
+            region.getAdmins().add(user);
+            regionRepository.save(region);
         }
 
         UserSettings userSettings = UserSettings.builder()
@@ -255,16 +266,18 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public JwtResponse login(LoginRequest request) {
         User user = userRepository.findByIin(request.getIin())
-                .orElseThrow(() -> new RuntimeException("Пользователь с таким ИИН не найден: " + request.getIin()));
+                .orElseThrow(() -> new IllegalStateException("Пользователь с таким ИИН не найден: " + request.getIin()));
 
-        if(!user.isActive()){
+        if (!user.isActive()) {
             throw new IllegalStateException("Пользователь еще не был подтвержден админом");
         }
         String rawPassword = rsaDecryptor.decrypt(request.getPassword());
 
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
-            throw new RuntimeException("Вы ввели неправильный пароль");
+            throw new IllegalStateException("Вы ввели неправильный пароль");
         }
+
+        boolean faceEnabled = !faceTemplateRepository.findByUserAndRevokedAtIsNull(user).isEmpty();
 
         String token = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
         String refreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());
@@ -282,6 +295,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken)
                 .type("Bearer")
                 .username(user.getEmail())
+                .faceEnabled(faceEnabled)
                 .build();
     }
 
@@ -300,6 +314,8 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + username));
 
+        boolean faceEnabled = !faceTemplateRepository.findByUserAndRevokedAtIsNull(user).isEmpty();
+
         String newAccessToken = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
         String newRefreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());
 
@@ -309,7 +325,48 @@ public class AuthServiceImpl implements AuthService {
                 .token(newAccessToken)
                 .refreshToken(newRefreshToken)
                 .type("Bearer")
+                .faceEnabled(faceEnabled)
                 .username(user.getEmail())
                 .build();
+    }
+
+    @Override
+    @Transactional
+    public String forgotPassword(ForgotPasswordRequest request) {
+        User user = userRepository.findByEmail(request.getEmail())
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+
+        String token = UUID.randomUUID().toString();
+        user.setResetToken(token);
+        user.setResetTokenExpiry(LocalDateTime.now().plusHours(1));
+        userRepository.save(user);
+
+        String origin = request.getOrigin() != null ? request.getOrigin() : frontendUrl;
+        String resetLink = origin + "/reset-password?token=" + token;
+        emailService.sendResetPasswordEmail(request.getEmail(), resetLink);
+
+        return "Письмо отправлено на " + request.getEmail();
+    }
+
+    @Override
+    @Transactional
+    public String resetPassword(ResetPasswordRequest request) {
+        User user = userRepository.findByResetToken(request.getToken())
+                .orElseThrow(() -> new RuntimeException("Неверный токен"));
+
+        if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+            throw new IllegalStateException("Срок действия ссылки истёк");
+        }
+
+        String rawPassword = decryptAndValidatePassword(request.getNewPassword());
+
+        log.info("Saving new password for user: {}", user.getEmail());
+        user.setPassword(passwordEncoder.encode(rawPassword));
+        user.setResetToken(null);
+        user.setResetTokenExpiry(null);
+        userRepository.save(user);
+        log.info("Password saved successfully for user: {}", user.getEmail());
+
+        return "Пароль успешно изменён";
     }
 }

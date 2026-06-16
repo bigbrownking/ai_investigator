@@ -1,8 +1,6 @@
 package org.di.digital.service;
 
-import org.di.digital.dto.request.LoginRequest;
-import org.di.digital.dto.request.RefreshTokenRequest;
-import org.di.digital.dto.request.SignUpRequest;
+import org.di.digital.dto.request.auth.*;
 import org.di.digital.dto.response.JwtResponse;
 
 public interface AuthService {
@@ -10,5 +8,7 @@ public interface AuthService {
     String signupRegAdmin(SignUpRequest request);
     String signup(SignUpRequest request);
     JwtResponse login(LoginRequest request);
+    String forgotPassword(ForgotPasswordRequest request);
+    String resetPassword(ResetPasswordRequest request);
     JwtResponse refreshToken(RefreshTokenRequest request);
 }

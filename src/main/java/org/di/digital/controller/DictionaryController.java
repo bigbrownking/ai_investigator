@@ -2,17 +2,17 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.response.AdministrationDto;
-import org.di.digital.dto.response.ProfessionDto;
-import org.di.digital.dto.response.RankDto;
-import org.di.digital.dto.response.RegionDto;
+import org.di.digital.dto.response.user.AdministrationDto;
+import org.di.digital.dto.response.user.ProfessionDto;
+import org.di.digital.dto.response.user.RankDto;
+import org.di.digital.dto.response.user.RegionDto;
 import org.di.digital.model.enums.UserSettingsDetalizationLevel;
 import org.di.digital.model.enums.UserSettingsLanguage;
 import org.di.digital.model.enums.UserSettingsTheme;
-import org.di.digital.repository.AdministrationRepository;
-import org.di.digital.repository.ProfessionRepository;
-import org.di.digital.repository.RankRepository;
-import org.di.digital.repository.RegionRepository;
+import org.di.digital.repository.user.AdministrationRepository;
+import org.di.digital.repository.user.ProfessionRepository;
+import org.di.digital.repository.user.RankRepository;
+import org.di.digital.repository.user.RegionRepository;
 import org.di.digital.util.Mapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -21,7 +21,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 import java.util.Arrays;
 import java.util.List;
-import java.util.Map;
 import java.util.stream.Collectors;
 
 @RestController
@@ -86,7 +85,7 @@ public class DictionaryController {
 
     @GetMapping("/professions")
     public ResponseEntity<List<ProfessionDto>> getProfessions() {
-        return ResponseEntity.ok(professionRepository.findAll().stream().map(mapper::toProfessionDto).collect(Collectors.toList()));
+        return ResponseEntity.ok(professionRepository.findAllOrdered().stream().map(mapper::toProfessionDto).collect(Collectors.toList()));
     }
 
     @GetMapping("/ranks")

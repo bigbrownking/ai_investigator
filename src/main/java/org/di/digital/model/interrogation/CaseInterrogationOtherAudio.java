@@ -32,6 +32,9 @@ public class CaseInterrogationOtherAudio {
     private Integer orderIndex;
     private LocalDateTime createdAt;
 
+    @Builder.Default
+    private Boolean manuallyEdited = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interrogation_id")
     private CaseInterrogation interrogation;

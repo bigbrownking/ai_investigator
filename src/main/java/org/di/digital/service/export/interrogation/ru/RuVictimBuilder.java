@@ -1,13 +1,11 @@
 package org.di.digital.service.export.interrogation.ru;
 
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.di.digital.dto.response.CaseInterrogationFullResponse;
-import org.di.digital.model.User;
+import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.model.user.User;
 import org.di.digital.service.export.interrogation.InterrogationProtocolBuilder;
 import org.di.digital.util.LocalizationHelper;
 import org.springframework.stereotype.Component;
-
-import static org.di.digital.util.UserUtil.getCurrentUser;
 
 /**
  * Протокол допроса потерпевшего (обычный и дополнительный).
@@ -21,16 +19,16 @@ public class RuVictimBuilder extends RuBaseBuilder implements InterrogationProto
     }
 
     @Override
-    public void build(XWPFDocument doc, CaseInterrogationFullResponse data) {
+    public void build(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
         if (Boolean.TRUE.equals(data.getIsDop())) {
-            buildDop(doc, data);
+            buildDop(doc, data, user);
         } else {
-            buildRegular(doc, data);
+            buildRegular(doc, data, user);
         }
     }
 
-    private void buildRegular(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        User user = getCurrentUser();
+    private void buildRegular(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
+       // User user = getCurrentUser();
         String fio = formatFio(data.getFio());
 
         addCenteredBoldParagraph(doc, "ПРОТОКОЛ", 14);
@@ -83,8 +81,8 @@ public class RuVictimBuilder extends RuBaseBuilder implements InterrogationProto
         addClosingSection(doc, data, "потерпевшего", "Потерпевший(ая)", fio);
     }
 
-    private void buildDop(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        User user = getCurrentUser();
+    private void buildDop(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
+       // User user = getCurrentUser();
         String fio = formatFio(data.getFio());
 
         addCenteredBoldParagraph(doc, "ПРОТОКОЛ", 14);

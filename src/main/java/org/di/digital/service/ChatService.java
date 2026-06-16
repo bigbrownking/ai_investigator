@@ -1,7 +1,7 @@
 package org.di.digital.service;
 
-import org.di.digital.dto.request.ChatRequest;
-import org.di.digital.dto.response.CaseChatHistoryResponse;
+import org.di.digital.dto.request.cases.ChatRequest;
+import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 public interface ChatService {

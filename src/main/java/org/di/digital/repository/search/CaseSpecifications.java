@@ -3,7 +3,7 @@ package org.di.digital.repository.search;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.di.digital.dto.request.search.CaseSearchRequest;
-import org.di.digital.model.Case;
+import org.di.digital.model.cases.Case;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 

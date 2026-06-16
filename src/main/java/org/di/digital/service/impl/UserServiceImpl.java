@@ -4,15 +4,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.UpdateProfileRequest;
 import org.di.digital.dto.request.UserSettingsRequest;
-import org.di.digital.dto.response.UserProfile;
-import org.di.digital.model.*;
+import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.model.enums.*;
-import org.di.digital.repository.*;
+import org.di.digital.model.user.*;
+import org.di.digital.repository.user.*;
 import org.di.digital.service.LogService;
 import org.di.digital.service.UserService;
 import org.di.digital.util.Mapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -146,7 +148,14 @@ public class UserServiceImpl implements UserService {
         return mapper.mapToUserProfileResponse(user);
     }
     @Override
-    public User getMyBoss(String email) {
-        return null;
+    public List<User> getMyBoss(String email) {
+        User user = userRepository.findByEmailWithSettings(email)
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+
+        if (user.getRegion() == null) {
+            throw new IllegalStateException("Пользователь не привязан к региону, невозможно определить начальство");
+        }
+
+        return user.getRegion().getAdmins();
     }
 }

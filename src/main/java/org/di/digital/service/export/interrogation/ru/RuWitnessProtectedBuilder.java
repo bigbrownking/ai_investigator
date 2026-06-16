@@ -1,13 +1,11 @@
 package org.di.digital.service.export.interrogation.ru;
 
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.di.digital.dto.response.CaseInterrogationFullResponse;
-import org.di.digital.model.User;
+import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.model.user.User;
 import org.di.digital.service.export.interrogation.InterrogationProtocolBuilder;
 import org.di.digital.util.LocalizationHelper;
 import org.springframework.stereotype.Component;
-
-import static org.di.digital.util.UserUtil.getCurrentUser;
 
 /**
  * Протокол допроса свидетеля, имеющего право на защиту (обычный и дополнительный).
@@ -17,22 +15,21 @@ import static org.di.digital.util.UserUtil.getCurrentUser;
 public class RuWitnessProtectedBuilder extends RuBaseBuilder implements InterrogationProtocolBuilder {
 
     private static final String ROLE_LABEL = "Свидетель, имеющий право на защиту";
-
     public RuWitnessProtectedBuilder(LocalizationHelper localizationHelper) {
         super(localizationHelper);
     }
 
     @Override
-    public void build(XWPFDocument doc, CaseInterrogationFullResponse data) {
+    public void build(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
         if (Boolean.TRUE.equals(data.getIsDop())) {
-            buildDop(doc, data);
+            buildDop(doc, data, user);
         } else {
-            buildRegular(doc, data);
+            buildRegular(doc, data, user);
         }
     }
 
-    private void buildRegular(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        User user = getCurrentUser();
+    private void buildRegular(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
+//        User user = getCurrentUser();
         String fio = formatFio(data.getFio());
 
         addCenteredBoldParagraph(doc, "ПРОТОКОЛ", 14);
@@ -99,8 +96,8 @@ public class RuWitnessProtectedBuilder extends RuBaseBuilder implements Interrog
                 data.getInvestigatorProfession(), formatFio(data.getInvestigator()));
     }
 
-    private void buildDop(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        User user = getCurrentUser();
+    private void buildDop(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
+        //User user = getCurrentUser();
         String fio = formatFio(data.getFio());
 
         addCenteredBoldParagraph(doc, "ПРОТОКОЛ", 14);

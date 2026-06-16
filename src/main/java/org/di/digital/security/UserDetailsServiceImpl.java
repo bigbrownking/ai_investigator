@@ -1,8 +1,8 @@
 package org.di.digital.security;
 
 import lombok.RequiredArgsConstructor;
-import org.di.digital.model.User;
-import org.di.digital.repository.UserRepository;
+import org.di.digital.model.user.User;
+import org.di.digital.repository.user.UserRepository;
 import org.springframework.security.core.userdetails.UserDetails;
 import org.springframework.security.core.userdetails.UserDetailsService;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;

@@ -8,7 +8,7 @@ import org.springframework.stereotype.Service;
 @Service
 @RequiredArgsConstructor
 public class TreeServiceImpl implements TreeService {
-    @Value("${qualification.model.host}")
+    @Value("${model.host}")
     private String pythonHost;
 
     @Value("${tree.port}")

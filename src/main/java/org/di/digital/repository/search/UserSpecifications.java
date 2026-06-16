@@ -3,7 +3,7 @@ package org.di.digital.repository.search;
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.di.digital.dto.request.search.UserSearchRequest;
-import org.di.digital.model.User;
+import org.di.digital.model.user.User;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 

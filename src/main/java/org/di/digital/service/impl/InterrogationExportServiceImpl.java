@@ -2,8 +2,8 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.di.digital.dto.response.CaseInterrogationFullResponse;
-import org.di.digital.model.User;
+import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.model.user.User;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
@@ -15,7 +15,7 @@ import org.springframework.stereotype.Service;
 import java.io.ByteArrayOutputStream;
 import java.util.Map;
 
-import static org.di.digital.util.UserUtil.getCurrentUser;
+import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 /**
  * Оркестратор экспорта протоколов допросов.
@@ -88,7 +88,7 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
     // ─── Entry point ─────────────────────────────────────────────────────────
 
     @Override
-    public byte[] exportToDocx(CaseInterrogationFullResponse data) {
+    public byte[] exportToDocx(CaseInterrogationFullResponse data, User user) {
         User currentUser = getCurrentUser();
         String role     = data.getRole() != null ? data.getRole().trim().toLowerCase() : "witness";
         String language = data.getLanguage() != null ? data.getLanguage().trim() : "русском";
@@ -99,7 +99,7 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
              ByteArrayOutputStream out = new ByteArrayOutputStream()) {
 
             BaseInterrogationDocBuilder.setPageMargins(doc);
-            builder.build(doc, data);
+            builder.build(doc, data, user);
             doc.write(out);
 
             logService.log(

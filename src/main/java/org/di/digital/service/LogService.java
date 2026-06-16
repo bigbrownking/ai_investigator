@@ -1,6 +1,5 @@
 package org.di.digital.service;
 
-import org.di.digital.model.Case;
 import org.di.digital.model.Log;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;

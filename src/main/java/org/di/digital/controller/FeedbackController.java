@@ -2,10 +2,10 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.ReviewRequest;
-import org.di.digital.dto.request.SupportTicketRequest;
-import org.di.digital.dto.response.ReviewDto;
-import org.di.digital.dto.response.SupportTicketDto;
+import org.di.digital.dto.request.support.ReviewRequest;
+import org.di.digital.dto.request.support.SupportTicketRequest;
+import org.di.digital.dto.response.support.ReviewDto;
+import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.service.FeedbackService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

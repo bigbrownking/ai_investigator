@@ -1,0 +1,32 @@
+package org.di.digital.dto.response.interrogation;
+
+import lombok.*;
+
+import java.util.List;
+
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
+public class CaseInterrogationProtocolResponse {
+    private Long interrogationId;
+    private String fio;
+    private String dateOfBirth;
+    private String birthPlace;
+    private String citizenship;
+    private String nationality;
+    private List<EducationResponse> educations;
+    private String martialStatus;
+    private String workOrStudyPlace;
+    private String position;
+    private String address;
+    private String contactPhone;
+    private String contactEmail;
+    private String other;
+    private List<RelationResponse> relation;
+    private String technical;
+    private List<MilitaryResponse> military;
+    private List<CriminalResponse> criminalRecord;
+    private String iinOrPassport;
+}

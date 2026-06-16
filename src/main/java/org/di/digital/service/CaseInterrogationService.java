@@ -1,9 +1,9 @@
 package org.di.digital.service;
 
-import org.di.digital.dto.request.AddInterrogationRequest;
-import org.di.digital.dto.request.EditAudioTranscribedTextRequest;
-import org.di.digital.dto.request.UpdateProtocolFieldRequest;
-import org.di.digital.dto.response.*;
+import org.di.digital.dto.request.interrogation.AddInterrogationRequest;
+import org.di.digital.dto.request.interrogation.EditAudioTranscribedTextRequest;
+import org.di.digital.dto.request.interrogation.UpdateProtocolFieldRequest;
+import org.di.digital.dto.response.interrogation.*;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.time.LocalDate;
@@ -22,6 +22,7 @@ public interface CaseInterrogationService {
     QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, Long qaId, String question, MultipartFile file, String email);
     OtherAudioResponse uploadOtherAudioAndEnqueue(Long caseId, Long interrogationId, Long qaId, String fieldName, MultipartFile file, String language, String email);
     QAResponse editTranscribedText(Long caseId, Long interrogationId, EditAudioTranscribedTextRequest request, String email);
+    OtherAudioResponse editOtherAudioText(Long caseId, Long interrogationId, Long otherAudioId, String text, String email);
     List<QAResponse> getQAList(Long caseId, Long interrogationId, String email);
 
     CaseInterrogationFullResponse getDetailed(long caseId, long interrogationId, String email);

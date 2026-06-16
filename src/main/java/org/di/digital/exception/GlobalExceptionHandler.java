@@ -26,13 +26,21 @@ public class GlobalExceptionHandler {
         problem.setTitle("Forbidden");
         return problem;
     }
-
-    @ExceptionHandler(RuntimeException.class)
-    public ProblemDetail handleRuntimeException(RuntimeException ex) {
+    @ExceptionHandler(NotFoundException.class)
+    public ProblemDetail handleNotFound(NotFoundException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
-                HttpStatus.BAD_REQUEST, ex.getMessage()
+                HttpStatus.NOT_FOUND, ex.getMessage()
         );
-        problem.setTitle("Bad Request");
+        problem.setTitle("Not Found");
         return problem;
     }
+
+//    @ExceptionHandler(RuntimeException.class)
+//    public ProblemDetail handleRuntimeException(RuntimeException ex) {
+//        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+//                HttpStatus.BAD_REQUEST, ex.getMessage()
+//        );
+//        problem.setTitle("Bad Request");
+//        return problem;
+//    }
 }

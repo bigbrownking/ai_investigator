@@ -2,10 +2,11 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.CaseFile;
+import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
-import org.di.digital.repository.CaseFileRepository;
+import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.service.CaseFileService;
+import org.di.digital.service.impl.core.NotificationService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -23,7 +24,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     @Override
     public CaseFile markAsCompleted(Long caseFileId, String result, Long processingDurationSeconds) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
-                .orElseThrow(() -> new RuntimeException("Файл не найден: " + caseFileId));
+                .orElseThrow(() -> new IllegalStateException("Файл не найден: " + caseFileId));
 
         caseFile.setStatus(CaseFileStatusEnum.COMPLETED);
         caseFile.setCompletedAt(LocalDateTime.now());
@@ -39,7 +40,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     @Override
     public CaseFile markAsFailed(Long caseFileId, String errorMessage) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
-                .orElseThrow(() -> new RuntimeException("Файл не найден: " + caseFileId));
+                .orElseThrow(() -> new IllegalStateException("Файл не найден: " + caseFileId));
 
         caseFile.setStatus(CaseFileStatusEnum.FAILED);
         caseFile.setCompletedAt(LocalDateTime.now());
@@ -55,7 +56,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     @Override
     public void markAsProcessing(Long caseFileId) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
-                .orElseThrow(() -> new RuntimeException("Файл не найден: " + caseFileId));
+                .orElseThrow(() -> new IllegalStateException("Файл не найден: " + caseFileId));
 
         caseFile.setStatus(CaseFileStatusEnum.PROCESSING);
         caseFile.setCompletedAt(LocalDateTime.now());
@@ -68,7 +69,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     @Transactional
     public void retryFile(Long caseId, Long caseFileId, String email) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
-                .orElseThrow(() -> new RuntimeException("Файл не найден: " + caseFileId));
+                .orElseThrow(() -> new IllegalStateException("Файл не найден: " + caseFileId));
 
         if (!CaseFileStatusEnum.FAILED.equals(caseFile.getStatus())) {
             throw new IllegalStateException("Повторная обработка доступна только для файлов со статусом ОШИБКА");

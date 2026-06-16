@@ -4,9 +4,13 @@ import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
+import org.di.digital.dto.response.admin.AppealDto;
+import org.di.digital.dto.response.admin.RegionStatsDto;
+import org.di.digital.dto.response.cases.CasePageResponse;
+import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.dto.response.user.UserProfile;
 import org.springframework.data.domain.Page;
-
-import java.util.List;
 
 public interface RegAdminService {
     Page<AppealDto> getMyRegionAppeals(Long adminId, int page, int size, AppealSearchRequest appealSearchRequest);
@@ -22,4 +26,5 @@ public interface RegAdminService {
     CaseInterrogationFullResponse getMyRegionInterrogationDetail(Long adminId, Long interrogationId);
     byte[] downloadMyRegionInterrogation(Long adminId, Long interrogationId);
     RegionStatsDto getMyRegionStats(Long adminId);
+    void changeOwner(Long adminId, Long caseId, String newOwnerEmail);
 }

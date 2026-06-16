@@ -2,7 +2,7 @@ package org.di.digital.model.support;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.di.digital.model.User;
+import org.di.digital.model.user.User;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 

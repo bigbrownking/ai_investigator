@@ -2,15 +2,24 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.SignUpRequest;
+import org.di.digital.dto.request.auth.SignUpRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
+import org.di.digital.dto.response.admin.AdminStatsDto;
+import org.di.digital.dto.response.admin.AppealDto;
+import org.di.digital.dto.response.admin.RegionStatsDto;
+import org.di.digital.dto.response.admin.RegionSummaryDto;
+import org.di.digital.dto.response.cases.CasePageResponse;
+import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.dto.response.support.ReviewDto;
+import org.di.digital.dto.response.support.SupportTicketDto;
+import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.AdminService;
 import org.di.digital.service.AuthService;
-import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -30,8 +39,6 @@ public class AdminController {
 
     private final AdminService adminService;
     private final AuthService authService;
-    private final InterrogationExportService interrogationExportService;
-
     @PostMapping("/reg_admin")
     public ResponseEntity<String> regAdmin(@RequestBody SignUpRequest signUpRequest) {
         return ResponseEntity.ok(authService.signupRegAdmin(signUpRequest));
@@ -73,7 +80,7 @@ public class AdminController {
     @GetMapping("/interrogations/{id}/download")
     public ResponseEntity<byte[]> downloadInterrogation(@PathVariable Long id) {
         CaseInterrogationFullResponse data = adminService.getInterrogationDetail(id);
-        byte[] docx = interrogationExportService.exportToDocx(data);
+        byte[] docx = adminService.downloadInterrogation(id);
 
         String filename = "допрос_" + id + "_" + data.getFio().replace(" ", "_") + ".docx";
 
@@ -173,5 +180,17 @@ public class AdminController {
     @GetMapping("/reviews/{id}")
     public ResponseEntity<ReviewDto> getReviewDetail(@PathVariable Long id) {
         return ResponseEntity.ok(adminService.getReviewDetail(id));
+    }
+
+    @PutMapping("/users/{id}/assign-advanced")
+    public ResponseEntity<Void> assignAdvanced(@PathVariable Long id) {
+        adminService.assignAdvancedUserRole(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/users/{id}/assign-reg-admin")
+    public ResponseEntity<Void> assignRegAdmin(@PathVariable Long id) {
+        adminService.assignRegAdminRole(id);
+        return ResponseEntity.ok().build();
     }
 }

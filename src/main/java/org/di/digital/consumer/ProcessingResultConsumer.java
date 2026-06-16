@@ -3,11 +3,11 @@ package org.di.digital.consumer;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.ProcessingResultMessage;
-import org.di.digital.model.CaseFile;
+import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
-import org.di.digital.repository.CaseFileRepository;
+import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.service.CaseFileService;
-import org.di.digital.service.impl.NotificationService;
+import org.di.digital.service.impl.core.NotificationService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +19,8 @@ public class ProcessingResultConsumer {
     private final CaseFileService caseFileService;
     private final NotificationService notificationService;
     private final CaseFileRepository caseFileRepository;
+    private final FigurantSyncService figurantSyncService;
+    private final PlanSyncService planSyncService;
 
     @RabbitListener(queues = "${spring.rabbitmq.mediator.result.queue}")
     public void handleProcessingResult(ProcessingResultMessage message) {
@@ -69,6 +71,9 @@ public class ProcessingResultConsumer {
                 caseFile,
                 message.getResult()
         );
+        figurantSyncService.sync(message.getCaseNumber());
+        planSyncService.sync(message.getCaseNumber());
+
 
         log.info("File {} marked as COMPLETED in case {} ({}s)",
                 message.getCaseFileId(), message.getCaseNumber(), message.getProcessingDurationSeconds());

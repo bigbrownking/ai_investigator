@@ -3,14 +3,22 @@ package org.di.digital.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.*;
-import org.di.digital.dto.response.CaseFileResponse;
-import org.di.digital.dto.response.CaseResponse;
-import org.di.digital.dto.response.CaseUserResponse;
-import org.di.digital.dto.response.FigurantResponse;
-import org.di.digital.model.CaseFile;
+import org.di.digital.consumer.FigurantSyncService;
+import org.di.digital.dto.request.cases.AddUserToCaseRequest;
+import org.di.digital.dto.request.cases.CreateCaseRequest;
+import org.di.digital.dto.request.cases.EditCaseRequest;
+import org.di.digital.dto.request.cases.ReorderCaseFilesRequest;
+import org.di.digital.dto.request.interrogation.AddFigurantToCaseRequest;
+import org.di.digital.dto.response.cases.CaseFileResponse;
+import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.CaseUserResponse;
+import org.di.digital.dto.response.cases.GroupedCaseFileResponse;
+import org.di.digital.dto.response.interrogation.FigurantResponse;
+import org.di.digital.model.cases.Case;
+import org.di.digital.model.enums.FileType;
 import org.di.digital.service.CaseFileService;
 import org.di.digital.service.CaseService;
+import org.di.digital.service.PlanApprovalService;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.http.*;
@@ -28,13 +36,13 @@ import java.util.List;
 public class CaseController {
     private final CaseService caseService;
     private final CaseFileService caseFileService;
+    private final FigurantSyncService figurantSyncService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CaseResponse> createCase(
             @RequestParam("title") String title,
             @RequestParam("number") String number,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
-            @RequestParam("tom") int tom,
             Authentication authentication
     ) {
         log.info("Creating case with title: {} and number: {} for user: {}",
@@ -44,7 +52,6 @@ public class CaseController {
                 .title(title)
                 .number(number)
                 .files(files)
-                .tom(tom)
                 .build();
 
         CaseResponse response = caseService.createCase(request, authentication.getName());
@@ -73,6 +80,37 @@ public class CaseController {
         return ResponseEntity.ok(response);
     }
 
+    @GetMapping("/{id}/files")
+    public ResponseEntity<GroupedCaseFileResponse> getGroupedCaseFilesById(
+            @PathVariable Long id,
+            Authentication authentication
+    ) {
+        log.info("Getting case with id: {} for user: {}", id, authentication.getName());
+        GroupedCaseFileResponse response = caseService.getGroupedCaseFilesById(id, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
+    @PutMapping("/{caseId}/files/reorder")
+    public ResponseEntity<GroupedCaseFileResponse> reorderCaseFiles(
+            @PathVariable Long caseId,
+            @RequestBody ReorderCaseFilesRequest request,
+            Authentication authentication
+    ) {
+        log.info("Reordering files in case: {} for user: {}", caseId, authentication.getName());
+        GroupedCaseFileResponse response = caseService.reorderCaseFiles(
+                caseId, request, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+    @PostMapping("/{caseId}/files/recalculate-toms")
+    public ResponseEntity<GroupedCaseFileResponse> recalculateToms(
+            @PathVariable Long caseId,
+            Authentication authentication
+    ) {
+        log.info("Recalculating toms for case: {} by user: {}", caseId, authentication.getName());
+        GroupedCaseFileResponse response = caseService.recalculateToms(caseId, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
     @GetMapping
     public ResponseEntity<List<CaseResponse>> getUserCases(
             @RequestParam(required = false, defaultValue = "desc") String sort,
@@ -88,7 +126,6 @@ public class CaseController {
             @PathVariable Long caseId,
             @RequestParam("files") List<MultipartFile> files,
             @RequestParam("type") String type,
-            @RequestParam("tom") int tom,
             Authentication authentication
     ) {
         FileType fileType;
@@ -107,7 +144,7 @@ public class CaseController {
         }
 
         List<CaseFileResponse> response = caseService.addFilesToCase(caseId, files,
-                fileType, tom, authentication.getName());
+                fileType, authentication.getName());
         return ResponseEntity.ok(response);
     }
 
@@ -199,6 +236,19 @@ public class CaseController {
 
         FigurantResponse response = caseService.addFigurantToCase(caseId, request, authentication.getName());
         return ResponseEntity.ok(response);
+    }
+
+    @PostMapping("/{caseId}/figurants/sync")
+    public ResponseEntity<Void> syncFigurants(
+            @PathVariable Long caseId,
+            Authentication authentication
+    ) {
+        log.info("Syncing figurants for case: {} by user: {}", caseId, authentication.getName());
+
+        Case caseEntity = caseService.getCaseEntityById(caseId, authentication.getName());
+        figurantSyncService.sync(caseEntity.getNumber());
+
+        return ResponseEntity.ok().build();
     }
 
     @DeleteMapping("/{caseId}/users/{userId}")

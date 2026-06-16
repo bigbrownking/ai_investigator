@@ -2,11 +2,9 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.Case;
 import org.di.digital.model.Log;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
-import org.di.digital.repository.CaseRepository;
 import org.di.digital.repository.LogRepository;
 import org.di.digital.service.LogService;
 import org.springframework.data.domain.Page;
@@ -18,7 +16,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
-import static org.di.digital.util.UserUtil.*;
+import static org.di.digital.util.requests.UserUtil.*;
 
 @Slf4j
 @Service
@@ -71,7 +69,7 @@ public class LogServiceImpl implements LogService {
             return null;
         } catch (Exception e) {
             log.error("Failed to search logs: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to search logs", e);
+            throw new IllegalStateException("Failed to search logs", e);
         }
     }
 
@@ -83,7 +81,7 @@ public class LogServiceImpl implements LogService {
             log.info("Deleted logs older than {}", beforeDate);
         } catch (Exception e) {
             log.error("Failed to delete old logs: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to delete old logs", e);
+            throw new IllegalStateException("Failed to delete old logs", e);
         }
     }
 

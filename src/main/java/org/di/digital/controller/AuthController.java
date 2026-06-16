@@ -2,20 +2,16 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.LoginRequest;
-import org.di.digital.dto.request.RefreshTokenRequest;
-import org.di.digital.dto.request.SignUpRequest;
+import org.di.digital.dto.request.auth.*;
 import org.di.digital.dto.response.JwtResponse;
-import org.di.digital.service.AdminService;
 import org.di.digital.service.AuthService;
-import org.di.digital.service.FLService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
 @RestController
 @Slf4j
 @RequiredArgsConstructor
-@RequestMapping("/auth/")
+@RequestMapping("/auth")
 public class AuthController {
     private final AuthService authService;
 
@@ -32,6 +28,16 @@ public class AuthController {
     @PostMapping("/login")
     public ResponseEntity<JwtResponse> login(@RequestBody LoginRequest loginRequest) {
         return ResponseEntity.ok(authService.login(loginRequest));
+    }
+
+    @PostMapping("/forgot-password")
+    public ResponseEntity<String> forgotPassword(@RequestBody ForgotPasswordRequest request) {
+        return ResponseEntity.ok(authService.forgotPassword(request));
+    }
+
+    @PatchMapping("/reset-password")
+    public ResponseEntity<String> resetPassword(@RequestBody ResetPasswordRequest request) {
+        return ResponseEntity.ok(authService.resetPassword(request));
     }
 
     @PostMapping("/refresh")

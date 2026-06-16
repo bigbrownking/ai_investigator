@@ -2,8 +2,8 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.ChatRequest;
-import org.di.digital.dto.response.CaseChatHistoryResponse;
+import org.di.digital.dto.request.cases.ChatRequest;
+import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.service.CaseInterrogationChatService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -67,6 +67,44 @@ public class CaseInterrogationChatController {
             Authentication authentication
     ) {
         interrogationChatService.toggleMessageSelected(caseId, interrogationId, messageId, selected, authentication.getName());
+        return ResponseEntity.noContent().build();
+    }
+
+
+
+
+    @PostMapping(value = "/{caseId}/interrogations/{interrogationId}/case-chat",
+            produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamCaseChat(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            @RequestBody ChatRequest request,
+            Authentication authentication) {
+        SseEmitter emitter = new SseEmitter(0L);
+        interrogationChatService.streamCaseInterrogationChatResponse(
+                caseId, interrogationId, request, authentication.getName(), emitter);
+        return emitter;
+    }
+
+    @GetMapping("/{caseId}/interrogations/{interrogationId}/case-chat/history")
+    public ResponseEntity<CaseChatHistoryResponse> getCaseChatHistory(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                interrogationChatService.getCaseInterrogationChatHistory(
+                        caseId, interrogationId, authentication.getName(), page, size));
+    }
+
+    @DeleteMapping("/{caseId}/interrogations/{interrogationId}/case-chat/history")
+    public ResponseEntity<Void> clearCaseChatHistory(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            Authentication authentication) {
+        interrogationChatService.clearCaseInterrogationChatHistory(
+                caseId, interrogationId, authentication.getName());
         return ResponseEntity.noContent().build();
     }
 }

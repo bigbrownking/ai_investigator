@@ -35,7 +35,6 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
         String email = extractAndValidateEmail(token, servletRequest);
 
         if (email == null) {
-            log.warn("WS handshake rejected: no valid authentication");
             return false;
         }
 
@@ -61,13 +60,11 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
     }
 
     private String extractToken(ServletServerHttpRequest servletRequest) {
-        // Try Authorization header first
         String authHeader = servletRequest.getServletRequest().getHeader("Authorization");
         if (authHeader != null && authHeader.startsWith("Bearer ")) {
             return authHeader.substring(7);
         }
 
-        // Fallback to query parameter
         String query = servletRequest.getServletRequest().getQueryString();
         if (query != null) {
             return extractQueryParam(query, "token");
@@ -85,11 +82,8 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
                         log.info("WS email extracted from JWT: {}", email);
                         return email;
                     }
-                } else {
-                    log.warn("WS invalid JWT token");
                 }
             } catch (Exception e) {
-                log.error("WS JWT validation error: {}", e.getMessage());
             }
         }
 

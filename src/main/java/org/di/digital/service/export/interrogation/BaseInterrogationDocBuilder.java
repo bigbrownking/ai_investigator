@@ -1,9 +1,9 @@
 package org.di.digital.service.export.interrogation;
 
 import org.apache.poi.xwpf.usermodel.*;
-import org.di.digital.dto.response.CaseInterrogationProtocolResponse;
-import org.di.digital.dto.response.CaseInterrogationQAResponse;
-import org.di.digital.dto.response.InterrogationTimerSessionResponse;
+import org.di.digital.dto.response.interrogation.CaseInterrogationProtocolResponse;
+import org.di.digital.dto.response.interrogation.CaseInterrogationQAResponse;
+import org.di.digital.dto.response.interrogation.InterrogationTimerSessionResponse;
 import org.openxmlformats.schemas.wordprocessingml.x2006.main.*;
 
 import java.math.BigInteger;

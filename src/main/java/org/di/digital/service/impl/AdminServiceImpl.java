@@ -6,18 +6,39 @@ import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
-import org.di.digital.model.*;
+import org.di.digital.dto.response.admin.AdminStatsDto;
+import org.di.digital.dto.response.admin.AppealDto;
+import org.di.digital.dto.response.admin.RegionStatsDto;
+import org.di.digital.dto.response.admin.RegionSummaryDto;
+import org.di.digital.dto.response.cases.CaseListResponse;
+import org.di.digital.dto.response.cases.CasePageResponse;
+import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.dto.response.support.ReviewDto;
+import org.di.digital.dto.response.support.SupportTicketDto;
+import org.di.digital.dto.response.user.UserProfile;
+import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.AppealStatus;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.support.Review;
 import org.di.digital.model.support.SupportTicket;
+import org.di.digital.model.user.Appeal;
+import org.di.digital.model.user.Region;
+import org.di.digital.model.user.Role;
+import org.di.digital.model.user.User;
 import org.di.digital.repository.*;
+import org.di.digital.repository.cases.CaseFileRepository;
+import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
 import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
+import org.di.digital.repository.user.AppealRepository;
+import org.di.digital.repository.user.RegionRepository;
+import org.di.digital.repository.user.RoleRepository;
+import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.AdminService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.LocalizationHelper;
@@ -34,7 +55,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 import static org.di.digital.repository.search.CaseSpecifications.hasOwner;
-import static org.di.digital.util.UserUtil.getCurrentUser;
+import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 @Slf4j
 @Service
@@ -43,6 +64,7 @@ public class AdminServiceImpl implements AdminService {
 
     private final UserRepository userRepository;
     private final CaseRepository caseRepository;
+    private final RoleRepository roleRepository;
     private final AppealRepository appealRepository;
     private final RegionRepository regionRepository;
     private final LogRepository logRepository;
@@ -66,7 +88,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public CasePageResponse getUserCases(Long userId, int page, int size, CaseSearchRequest req) {
         userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userId));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userId));
 
         Specification<Case> spec = CaseSpecifications.build(req)
                 .and(hasOwner(userId));
@@ -144,7 +166,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public CaseInterrogationFullResponse getInterrogationDetail(Long interrogationId) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
 
         User user = interrogation.getCaseEntity().getOwner();
 
@@ -155,9 +177,9 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public byte[] downloadInterrogation(Long interrogationId) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
         CaseInterrogationFullResponse data = mapper.mapToInterrogationFullResponse(interrogation, interrogation.getCaseEntity().getOwner());
-        return interrogationExportService.exportToDocx(data);
+        return interrogationExportService.exportToDocx(data, interrogation.getCaseEntity().getOwner());
     }
 
     @Override
@@ -201,7 +223,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public void activateUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userId));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userId));
         user.setActive(true);
         userRepository.save(user);
         log.info("User {} activated by admin", userId);
@@ -210,7 +232,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public void deactivateUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userId));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userId));
         user.setActive(false);
         userRepository.save(user);
         log.info("User {} deactivated by admin", userId);
@@ -234,7 +256,7 @@ public class AdminServiceImpl implements AdminService {
         Pageable pageable = PageRequest.of(page, size);
 
         Region region = regionRepository.findById(regionId)
-                .orElseThrow(() -> new RuntimeException("Регион не найден: " + regionId));
+                .orElseThrow(() -> new IllegalStateException("Регион не найден: " + regionId));
 
         RegionStatsDto stats = RegionStatsDto.builder()
                 .regionId(region.getId())
@@ -267,28 +289,28 @@ public class AdminServiceImpl implements AdminService {
     public CaseResponse getCaseDetail(Long caseId) {
         return caseRepository.findById(caseId)
                 .map(mapper::mapToCaseResponse)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
     }
 
     @Override
     public String getCaseQualification(Long caseId) {
         return caseRepository.findById(caseId)
                 .map(Case::getQualification)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
     }
 
     @Override
     public String getCaseIndictment(Long caseId) {
         return caseRepository.findById(caseId)
                 .map(Case::getIndictment)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
     }
 
     @Override
     @Transactional
     public void approveAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Админ не найден"));
+                .orElseThrow(() -> new IllegalStateException("Админ не найден"));
 
         Appeal appeal = appealRepository.findById(appealId)
                 .orElseThrow(() -> new RuntimeException("Обращение не найдено"));
@@ -361,6 +383,54 @@ public class AdminServiceImpl implements AdminService {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("Рецензия не найдена: " + id));
         return mapper.mapToReviewDto(review);
+    }
+
+    @Override
+    @Transactional
+    public void assignAdvancedUserRole(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userId));
+
+        Role role = roleRepository.findByName("ADVANCED_USER")
+                .orElseThrow(() -> new RuntimeException("Роль не найдена"));
+
+        if (user.hasRole("ADVANCED_USER")) {
+            throw new IllegalStateException("Пользователь уже имеет роль ADVANCED_USER");
+        }
+
+        user.getRoles().add(role);
+
+        if (user.getRegion() != null && !user.getRegion().getAdmins().contains(user)) {
+            user.getRegion().getAdmins().add(user);
+            regionRepository.save(user.getRegion());
+        }
+
+        userRepository.save(user);
+        log.info("User {} assigned ADVANCED_USER role", userId);
+    }
+
+    @Override
+    @Transactional
+    public void assignRegAdminRole(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userId));
+
+        Role regAdminRole = roleRepository.findByName("REG_ADMIN")
+                .orElseThrow(() -> new RuntimeException("Роль не найдена"));
+
+        if (user.hasRole("REG_ADMIN")) {
+            throw new IllegalStateException("Пользователь уже имеет роль REG_ADMIN");
+        }
+
+        user.getRoles().add(regAdminRole);
+
+        if (user.getRegion() != null && !user.getRegion().getAdmins().contains(user)) {
+            user.getRegion().getAdmins().add(user);
+            regionRepository.save(user.getRegion());
+        }
+
+        userRepository.save(user);
+        log.info("User {} assigned REG_ADMIN role", userId);
     }
 }
 

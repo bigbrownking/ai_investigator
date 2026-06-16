@@ -2,16 +2,16 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.ReviewRequest;
-import org.di.digital.dto.request.SupportTicketRequest;
-import org.di.digital.dto.response.ReviewDto;
-import org.di.digital.dto.response.SupportTicketDto;
-import org.di.digital.dto.response.SupportTicketPhotoDto;
-import org.di.digital.model.*;
+import org.di.digital.dto.request.support.ReviewRequest;
+import org.di.digital.dto.request.support.SupportTicketRequest;
+import org.di.digital.dto.response.support.ReviewDto;
+import org.di.digital.dto.response.support.SupportTicketDto;
+import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.support.Review;
 import org.di.digital.model.support.SupportTicket;
 import org.di.digital.model.support.SupportTicketPhoto;
-import org.di.digital.repository.UserRepository;
+import org.di.digital.model.user.User;
+import org.di.digital.repository.user.UserRepository;
 import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.service.FeedbackService;
@@ -39,7 +39,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Transactional
     public SupportTicketDto createSupportTicket(SupportTicketRequest request, List<MultipartFile> photos, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
         SupportTicket ticket = SupportTicket.builder()
                 .user(user)
@@ -75,7 +75,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Transactional
     public ReviewDto createReview(ReviewRequest request, MultipartFile file, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
         String fileUrl = null;
         String originalFileName = null;

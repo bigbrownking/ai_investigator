@@ -1,6 +1,6 @@
 package org.di.digital.service;
 
-import org.di.digital.model.CaseFile;
+import org.di.digital.model.cases.CaseFile;
 
 public interface CaseFileService {
     CaseFile markAsCompleted(Long caseFileId, String result, Long processingDurationSeconds);

@@ -3,7 +3,7 @@ package org.di.digital.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.ChatRequest;
+import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.service.ChatService;
 import org.springframework.http.MediaType;
 import org.springframework.web.bind.annotation.PostMapping;

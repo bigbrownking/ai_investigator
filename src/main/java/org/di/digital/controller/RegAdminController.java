@@ -2,10 +2,17 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.cases.ChangeOwnerRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
+import org.di.digital.dto.response.admin.AppealDto;
+import org.di.digital.dto.response.admin.RegionStatsDto;
+import org.di.digital.dto.response.cases.CasePageResponse;
+import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.RegAdminService;
 import org.springframework.data.domain.Page;
@@ -18,7 +25,7 @@ import org.springframework.web.bind.annotation.*;
 import java.nio.charset.StandardCharsets;
 
 import static java.net.URLEncoder.encode;
-import static org.di.digital.util.UserUtil.getCurrentUser;
+import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 @RestController
 @Slf4j
@@ -138,5 +145,15 @@ public class RegAdminController {
     public ResponseEntity<RegionStatsDto> getStats(Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return ResponseEntity.ok(regAdminService.getMyRegionStats(userDetails.getId()));
+    }
+
+    @PatchMapping("/cases/{caseId}/owner")
+    public ResponseEntity<Void> changeOwner(
+            @PathVariable Long caseId,
+            @RequestBody ChangeOwnerRequest request,
+            Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        regAdminService.changeOwner(userDetails.getId(), caseId, request.getNewOwnerEmail());
+        return ResponseEntity.ok().build();
     }
 }

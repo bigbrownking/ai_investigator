@@ -23,4 +23,7 @@ public interface TaskQueueRepository extends MongoRepository<TaskQueue, String> 
     List<TaskQueue> findByUserEmailAndStatusOrderByPriorityDescCreatedAtAsc(
             String userEmail, TaskStatus status
     );
+
+    List<TaskQueue> findByUserEmailAndStatusAndPriorityOrderByCreatedAtAsc(
+            String userEmail, TaskStatus status, int priority);
 }

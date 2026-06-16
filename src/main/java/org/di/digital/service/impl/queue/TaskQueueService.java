@@ -52,8 +52,12 @@ public class TaskQueueService {
             log.info("Reset {} stuck PROCESSING tasks to PENDING", stuckTasks.size());
         }
 
-        rabbitAdmin.purgeQueue(DOCUMENT_QUEUE, false);
-        log.info("Purged RabbitMQ queue on startup");
+        try {
+            rabbitAdmin.purgeQueue(DOCUMENT_QUEUE, false);
+            log.info("Purged RabbitMQ queue on startup");
+        } catch (Exception e) {
+            log.error("Failed to purge queue", e);
+        }
     }
     public void retryTask(Long caseFileId, String userEmail, Long caseId,
                           String caseNumber, String fileName, String fileUrl) {
@@ -104,12 +108,12 @@ public class TaskQueueService {
     }
 
     public TaskQueue getNextTaskByRoundRobin() {
-        List<String> users = getOrderedUsersWithPendingTasks();
-        log.info("DEBUG: Found {} users with pending tasks: {}", users.size(), users);
+        int maxPriority = getMaxPendingPriority();
 
-        if (users.isEmpty()) {
-            return null;
-        }
+        List<String> users = getOrderedUsersWithPendingTasksByPriority(maxPriority);
+        log.info("DEBUG: Max priority={}, users with this priority: {}", maxPriority, users);
+
+        if (users.isEmpty()) return null;
 
         QueueState state = queueStateRepository.findById(ROUND_ROBIN_STATE_ID)
                 .orElse(QueueState.builder()
@@ -117,11 +121,8 @@ public class TaskQueueService {
                         .lastSelectedUser(null)
                         .build());
 
-        log.info("DEBUG: Last selected user: {}", state.getLastSelectedUser());
-
         String lastSelectedUser = state.getLastSelectedUser();
 
-        // Определяем стартовый индекс — следующий после последнего выбранного
         int startIndex = 0;
         if (lastSelectedUser != null) {
             int lastIndex = users.indexOf(lastSelectedUser);
@@ -130,30 +131,58 @@ public class TaskQueueService {
             }
         }
 
-        // Перебираем пользователей начиная со startIndex
         for (int i = 0; i < users.size(); i++) {
             String candidate = users.get((startIndex + i) % users.size());
 
             List<TaskQueue> userTasks = taskQueueRepository
-                    .findByUserEmailAndStatusOrderByPriorityDescCreatedAtAsc(candidate, TaskStatus.PENDING);
-            log.info("DEBUG: User {} has {} pending tasks", candidate, userTasks.size());
+                    .findByUserEmailAndStatusAndPriorityOrderByCreatedAtAsc(
+                            candidate, TaskStatus.PENDING, maxPriority);
+
             if (!userTasks.isEmpty()) {
                 TaskQueue task = userTasks.get(0);
                 task.setStatus(TaskStatus.PROCESSING);
                 task.setSentToQueueAt(LocalDateTime.now());
                 taskQueueRepository.save(task);
 
-                // Сохраняем выбранного пользователя в БД
                 state.setLastSelectedUser(candidate);
                 queueStateRepository.save(state);
 
-                log.info("Selected task {} for user {} by Round-Robin",
-                        task.getFileName(), candidate);
+                log.info("Selected task {} for user {} (priority={})",
+                        task.getFileName(), candidate, maxPriority);
                 return task;
             }
         }
 
         return null;
+    }
+
+    private int getMaxPendingPriority() {
+        Query query = new Query();
+        query.addCriteria(Criteria.where("status").is(TaskStatus.PENDING));
+        query.with(Sort.by(Sort.Direction.DESC, "priority"));
+        query.limit(1);
+        TaskQueue top = mongoTemplate.findOne(query, TaskQueue.class);
+        return top != null ? top.getPriority() : 0;
+    }
+
+    private List<String> getOrderedUsersWithPendingTasksByPriority(int priority) {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(
+                        Criteria.where("status").is(TaskStatus.PENDING)
+                                .and("priority").is(priority)
+                ),
+                Aggregation.group("userEmail")
+                        .min("createdAt").as("firstTaskTime"),
+                Aggregation.sort(Sort.by(Sort.Direction.ASC, "firstTaskTime"))
+        );
+
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(aggregation, "task_queue", Document.class);
+
+        return results.getMappedResults()
+                .stream()
+                .map(doc -> doc.getString("_id"))
+                .toList();
     }
 
     public void completeTask(Long caseFileId, Long processingDurationSeconds) {
@@ -170,29 +199,6 @@ public class TaskQueueService {
         } else {
             log.warn("No PROCESSING task found for caseFileId {}", caseFileId);
         }
-    }
-
-    private List<String> getOrderedUsersWithPendingTasks() {
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(
-                        Criteria.where("status").is(TaskStatus.PENDING)
-                ),
-                Aggregation.group("userEmail")
-                        .min("createdAt").as("firstTaskTime")
-                        .max("priority").as("maxPriority"),
-                Aggregation.sort(
-                        Sort.by(Sort.Direction.DESC, "maxPriority")
-                                .and(Sort.by(Sort.Direction.ASC, "firstTaskTime"))
-                )
-        );
-
-        AggregationResults<Document> results =
-                mongoTemplate.aggregate(aggregation, "task_queue", Document.class);
-
-        return results.getMappedResults()
-                .stream()
-                .map(doc -> doc.getString("_id"))
-                .toList();
     }
     public void failTask(Long caseFileId, String errorMessage) {
         List<TaskQueue> tasks = taskQueueRepository
@@ -215,13 +221,6 @@ public class TaskQueueService {
     }
 
     public void deleteTasksByCaseId(Long caseId){ taskQueueRepository.deleteByCaseId(caseId);}
-    public List<TaskQueue> getUserTasks(String userEmail) {
-        return taskQueueRepository.findByUserEmailAndStatus(userEmail, TaskStatus.PENDING);
-    }
-
-    public Long getPendingTasksCount() {
-        return taskQueueRepository.countByStatus(TaskStatus.PENDING);
-    }
     public Long getProcessingTasksCount() {
         return taskQueueRepository.countByStatus(TaskStatus.PROCESSING);
     }

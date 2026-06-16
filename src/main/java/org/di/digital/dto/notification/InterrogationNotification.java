@@ -17,8 +17,8 @@ public class InterrogationNotification {
     private String role;
     private InterrogationNotificationStatus status;
     private String activity;
-    private String transcribedText;  // заполняется только при COMPLETED
-    private String errorMessage;     // заполняется только при FAILED
+    private String transcribedText;
+    private String errorMessage;
     private LocalDateTime timestamp;
-    private String fieldName; // для уведомлений, связанных с обновлением конкретного поля
+    private String fieldName;
 }
