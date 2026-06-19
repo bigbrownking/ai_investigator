@@ -3,8 +3,8 @@ package org.di.digital.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.ChatRequest;
-import org.di.digital.dto.response.CaseChatHistoryResponse;
+import org.di.digital.dto.request.cases.ChatRequest;
+import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.service.ChatService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,15 +17,15 @@ import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RestController
-@RequestMapping("/cases")
+@RequestMapping("/cases/chat")
 @RequiredArgsConstructor
 public class CaseChatController {
 
     private final ChatService chatService;
 
-    @PostMapping(value = "/{caseNumber}/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(
-            @PathVariable String caseNumber,
+            @RequestParam String caseNumber,
             @Valid @RequestBody ChatRequest request,
             Authentication authentication
     ) {
@@ -52,9 +52,9 @@ public class CaseChatController {
         return emitter;
     }
 
-    @GetMapping("/{caseNumber}/chat/history")
+    @GetMapping("/history")
     public ResponseEntity<CaseChatHistoryResponse> getChatHistory(
-            @PathVariable String caseNumber,
+            @RequestParam String caseNumber,
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "50") int size,
             Authentication authentication
@@ -71,9 +71,9 @@ public class CaseChatController {
         return ResponseEntity.ok(response);
     }
 
-    @DeleteMapping("/{caseNumber}/chat/history")
+    @DeleteMapping("/history")
     public ResponseEntity<Void> clearChatHistory(
-            @PathVariable String caseNumber,
+            @RequestParam String caseNumber,
             Authentication authentication
     ) {
         log.info("Clearing chat history for case: {} by user: {}", caseNumber, authentication.getName());

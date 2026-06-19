@@ -2,12 +2,39 @@ package org.di.digital.util;
 
 import lombok.RequiredArgsConstructor;
 import org.di.digital.dto.response.*;
-import org.di.digital.model.*;
+import org.di.digital.dto.response.admin.AppealDto;
+import org.di.digital.dto.response.cases.CaseFileResponse;
+import org.di.digital.dto.response.cases.CaseListResponse;
+import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.CaseUserResponse;
+import org.di.digital.dto.response.interrogation.*;
+import org.di.digital.dto.response.plan.ManagementPendingPlanDto;
+import org.di.digital.dto.response.plan.PlanApprovalHistoryDto;
+import org.di.digital.dto.response.plan.PlanEditHistoryDto;
+import org.di.digital.dto.response.support.ReviewDto;
+import org.di.digital.dto.response.support.SupportTicketDto;
+import org.di.digital.dto.response.support.SupportTicketPhotoDto;
+import org.di.digital.dto.response.user.*;
+import org.di.digital.model.plan.PlanApprovalHistory;
+import org.di.digital.model.plan.PlanEditHistory;
+import org.di.digital.model.user.Administration;
+import org.di.digital.model.user.Appeal;
+import org.di.digital.model.cases.Case;
+import org.di.digital.model.cases.CaseFile;
+import org.di.digital.model.interrogation.CaseFigurant;
+import org.di.digital.model.Log;
+import org.di.digital.model.user.Profession;
+import org.di.digital.model.user.Rank;
+import org.di.digital.model.user.Region;
+import org.di.digital.model.user.Role;
+import org.di.digital.model.user.User;
 import org.di.digital.model.enums.UserSettingsLanguage;
-import org.di.digital.model.interrogation.CaseInterrogation;
-import org.di.digital.model.interrogation.CaseInterrogationApplicationFile;
-import org.di.digital.model.interrogation.CaseInterrogationProtocol;
-import org.di.digital.model.interrogation.CaseInterrogationQA;
+import org.di.digital.model.interrogation.*;
+import org.di.digital.model.support.Review;
+import org.di.digital.model.support.SupportTicket;
+import org.di.digital.model.user.*;
+import org.di.digital.repository.user.RegionRepository;
+import org.di.digital.repository.user.UserFaceTemplateRepository;
 import org.di.digital.service.MinioService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -16,15 +43,19 @@ import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 import java.util.stream.Collectors;
 
-import static org.di.digital.util.UserUtil.getCurrentUser;
+import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 @Component
 @RequiredArgsConstructor
 public class Mapper {
     private final MinioService minioService;
     private final LocalizationHelper localizationHelper;
+    private final UserFaceTemplateRepository faceTemplateRepository;
+    private final RegionRepository regionRepository;
 
     @Value("${last.seen.ttl}")
     private int ttl;
@@ -42,7 +73,12 @@ public class Mapper {
                 .audioUsed(interrogation.isAudioUsed())
                 .build();
     }
-    public CaseInterrogationQAResponse mapToInterrogationQAResponse(CaseInterrogationQA caseInterrogationQA){
+
+    public CaseInterrogationQAResponse mapToInterrogationQAResponse(CaseInterrogationQA caseInterrogationQA) {
+        List<AudioRecordResponse> audioRecords = caseInterrogationQA.getAudioRecords().stream()
+                .map(this::mapToAudioRecordResponse)
+                .toList();
+
         return CaseInterrogationQAResponse.builder()
                 .id(caseInterrogationQA.getId())
                 .interrogationId(caseInterrogationQA.getInterrogation().getId())
@@ -50,6 +86,19 @@ public class Mapper {
                 .answer(caseInterrogationQA.getAnswer())
                 .status(caseInterrogationQA.getStatus().name())
                 .createAt(caseInterrogationQA.getCreatedAt())
+                .audioRecords(audioRecords)
+                .build();
+    }
+
+    public AudioRecordResponse mapToAudioRecordResponse(CaseInterrogationAudioRecord record) {
+        return AudioRecordResponse.builder()
+                .id(record.getId())
+                .audioUrl(record.getAudioFileUrl() != null
+                        ? minioService.generatePresignedUrlForPreview(record.getAudioFileUrl())
+                        : null)
+                .transcribedText(record.getTranscribedText())
+                .status(record.getStatus() != null ? record.getStatus().name() : null)
+                .createdAt(record.getCreatedAt())
                 .build();
     }
 
@@ -100,7 +149,7 @@ public class Mapper {
                 .fio(localizationHelper.toTitleCase(protocol.getFio()))
                 .dateOfBirth(localizationHelper.formatToRussianDate(protocol.getDateOfBirth()))
                 .birthPlace(localizationHelper.toTitleCase(protocol.getBirthPlace()))
-                .citizenship(citizenShip != null ? "гражданин Республики "+ citizenShip : null)
+                .citizenship(citizenShip != null ? "гражданин Республики " + citizenShip : null)
                 .nationality(localizationHelper.toTitleCase(protocol.getNationality()))
                 .educations(educations)
                 .martialStatus(genderCorrectedStatus)
@@ -118,6 +167,7 @@ public class Mapper {
                 .interrogationId(protocol.getInterrogation() != null ? protocol.getInterrogation().getId() : null)
                 .build();
     }
+
     private String formatMartialStatus(CaseInterrogationProtocol protocol) {
         String status = protocol.getMartialStatus();
         String sexId = protocol.getSexId();
@@ -143,6 +193,12 @@ public class Mapper {
     }
 
     public CaseResponse mapToCaseResponse(Case caseEntity) {
+        User approvedBy = caseEntity.getPlanApprovedBy();
+        User reviewedBy = caseEntity.getPlanReviewedBy();
+
+        String approvedByName =  approvedBy == null ? null : approvedBy.getSurname() + " " + approvedBy.getName().charAt(0) + ". " + approvedBy.getFathername().charAt(0) + ".";
+        String reviewedByName = reviewedBy == null ? null : reviewedBy.getSurname() + " " + reviewedBy.getName().charAt(0) + ". " + reviewedBy.getFathername().charAt(0) + ".";
+
         return CaseResponse.builder()
                 .id(caseEntity.getId())
                 .title(caseEntity.getTitle())
@@ -150,6 +206,9 @@ public class Mapper {
                 .status(caseEntity.isStatus())
                 .totalDocuments(caseEntity.getFiles().size())
                 .audioUsed(caseEntity.audioUsedCount())
+                .hasPlan(caseEntity.hasPlan())
+                .hasIndictment(caseEntity.hasIndictment())
+                .hasQualification(caseEntity.hasQualification())
                 .totalPages(caseEntity.getFiles().stream()
                         .filter(f -> f.getPages() != null)
                         .mapToInt(CaseFile::getPages)
@@ -157,7 +216,7 @@ public class Mapper {
                 .files(caseEntity.getFiles().stream()
                         .sorted(Comparator
                                 .comparing(CaseFile::getTom, Comparator.nullsLast(Comparator.naturalOrder()))
-                                .thenComparing(f -> extractLeadingNumber(f.getOriginalFileName()), Comparator.nullsLast(Comparator.naturalOrder()))                                .thenComparing(CaseFile::getOriginalFileName, Comparator.nullsLast(Comparator.naturalOrder())))
+                                .thenComparing(f -> extractLeadingNumber(f.getOriginalFileName()), Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(CaseFile::getOriginalFileName, Comparator.nullsLast(Comparator.naturalOrder())))
                         .map(this::mapToCaseFileResponse)
                         .collect(Collectors.toList()))
                 .interrogations(caseEntity.getInterrogations().stream()
@@ -181,6 +240,7 @@ public class Mapper {
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(\\d+)").matcher(fileName);
         return m.find() ? Long.parseLong(m.group(1)) : null;
     }
+
     public CaseUserResponse mapToCaseUserResponse(User user, Case caseEntity) {
         return CaseUserResponse.builder()
                 .id(user.getId())
@@ -193,11 +253,7 @@ public class Mapper {
     }
 
     public UserProfile mapToUserProfileResponse(User user) {
-        String roles = user.getRoles().stream()
-                .map(Role::getName)
-                .sorted()
-                .reduce((r1, r2) -> r1 + ", " + r2)
-                .orElse("");
+        Set<String> roles = user.getRoles().stream().map(Role::getName).collect(Collectors.toSet());
 
         UserSettingsLanguage language = user.getSettings().getLanguage();
         UserSettingsDto settingsDto = null;
@@ -209,9 +265,13 @@ public class Mapper {
                     .build();
         }
         Address sterr = null;
-        if(user.getRegion() != null && !user.getRegion().getAddresses().isEmpty()){
+        if (user.getRegion() != null && !user.getRegion().getAddresses().isEmpty()) {
             sterr = user.getRegion().getAddresses().get(0);
         }
+        List<String> responsibleRegions = regionRepository.findByAdminsContaining(user)
+                .stream()
+                .map(region -> localizationHelper.getLocalizedName(region, language))
+                .toList();
         return UserProfile.builder()
                 .id(user.getId())
                 .iin(user.getIin())
@@ -223,15 +283,18 @@ public class Mapper {
                 .profession(localizationHelper.getLocalizedName(user.getProfession(), language))
                 .rank(user.getRank() != null ? user.getRank().getName() : null)
                 .region(localizationHelper.getLocalizedName(user.getRegion(), language))
+                .responsibleRegions(responsibleRegions)
                 .email(user.getEmail())
+                .faceEnabled(!faceTemplateRepository.findByUserAndRevokedAtIsNull(user).isEmpty())
                 .active(user.isActive())
                 .online(user.isOnline(ttl))
                 .settings(settingsDto)
                 .street(localizationHelper.getLocalizedName(sterr, language))
-                .createdCaseCount(user.getCases() != null ? user.getCases().size() : 0)
+                .createdCaseCount(user.getOwnedCases() != null ? user.getOwnedCases().size() : 0)
                 .lastSeenAt(formatLastSeen(user.getLastSeenAt()))
                 .build();
     }
+
     public static String formatLastSeen(LocalDateTime lastSeenAt) {
         if (lastSeenAt == null) return null;
 
@@ -252,10 +315,20 @@ public class Mapper {
     public FigurantResponse mapToFigurantResponse(CaseFigurant figurant) {
         return FigurantResponse.builder()
                 .id(figurant.getId())
+                .externalId(figurant.getExternalId())
                 .documentType(figurant.getDocumentType())
                 .number(figurant.getNumber())
                 .fio(figurant.getFio())
                 .role(figurant.getRole())
+                .details(figurant.getDetails())
+                .references(figurant.getReferences() == null ? List.of() :
+                        figurant.getReferences().stream()
+                                .map(r -> FigurantReferenceResponse.builder()
+                                        .id(r.getId())
+                                        .referenceId(r.getReferenceId())
+                                        .filePath(r.getFilePath())
+                                        .build())
+                                .toList())
                 .build();
     }
 
@@ -266,17 +339,20 @@ public class Mapper {
                 ? interrogation.getInvestigatorProfession()
                 : userProf;
 
-        String region = localizationHelper.getGenitive(
-                interrogation.getInvestigatorRegion() != null
-                        ? interrogation.getInvestigatorRegion()
-                        : user.getRegion().getRuName()
-        );
 
-        String administration = localizationHelper.getGenitive(
-                interrogation.getInvestigatorAdministration() != null
-                        ? interrogation.getInvestigatorAdministration()
-                        : user.getAdministration().getRuName()
-        );
+        String regionSource = interrogation.getInvestigatorRegion() != null
+                ? interrogation.getInvestigatorRegion()
+                : localizationHelper.getLocalizedName(
+                        user.getRegion(), user.getSettings().getLanguage());
+        String region = localizationHelper.getGenitive(regionSource);
+
+
+        String administrationSource = interrogation.getInvestigatorAdministration() != null
+                ? interrogation.getInvestigatorAdministration()
+                : localizationHelper.getLocalizedName(
+                        user.getAdministration(), user.getSettings().getLanguage());
+        String administration = localizationHelper.getGenitive(administrationSource);
+
 
         String userAdr = localizationHelper.getLocalizedName(
                 user.getRegion().getAddresses().get(0), user.getSettings().getLanguage());
@@ -286,7 +362,7 @@ public class Mapper {
 
         String city = interrogation.getCity() != null
                 ? interrogation.getCity()
-                : "г. Астана";
+                : localizationHelper.extractRegionShortName(user.getRegion().getKzName(), user.getSettings().getLanguage());
 
         CaseInterrogationProtocolResponse protocolResponse = null;
         String fio = interrogation.getFio();
@@ -392,16 +468,17 @@ public class Mapper {
                 .uploadedAt(String.valueOf(f.getUploadedAt()))
                 .completedAt(String.valueOf(f.getCompletedAt()))
                 .isQualification(f.isQualification())
-                .isPlan(f.isPlan())
-                .isPlanComponent(f.isPlanComponent())
                 .tom(f.getTom())
                 .pages(f.getPages() != null ? f.getPages() : 0)
+                .startPage(f.getStartPage())
+                .endPage(f.getEndPage())
                 .build();
     }
 
     public CaseInterrogationApplicationFileResponse mapToApplicationFileResponse(CaseInterrogationApplicationFile file) {
         return CaseInterrogationApplicationFileResponse.builder()
                 .id(file.getId())
+                .displayName(file.getDisplayName())
                 .originalFileName(file.getOriginalFileName())
                 .storedFileName(file.getStoredFileName())
                 .previewUrl(minioService.generatePresignedUrlForPreview(file.getFileUrl()))
@@ -413,7 +490,11 @@ public class Mapper {
                 .build();
     }
 
-    public QAResponse mapToQAResponse(CaseInterrogationQA caseInterrogationQA){
+    public QAResponse mapToQAResponse(CaseInterrogationQA caseInterrogationQA) {
+        List<AudioRecordResponse> audioRecords = caseInterrogationQA.getAudioRecords().stream()
+                .map(this::mapToAudioRecordResponse)
+                .toList();
+
         return QAResponse.builder()
                 .id(caseInterrogationQA.getId())
                 .question(caseInterrogationQA.getQuestion())
@@ -421,8 +502,24 @@ public class Mapper {
                 .orderIndex(caseInterrogationQA.getOrderIndex())
                 .edited(caseInterrogationQA.getIsEdited())
                 .status(caseInterrogationQA.getStatus())
+                .audioRecords(audioRecords)
                 .build();
     }
+
+    public OtherAudioResponse mapToOtherAudioResponse(CaseInterrogationOtherAudio otherAudio) {
+        List<AudioRecordResponse> audioRecords = otherAudio.getAudioRecords().stream()
+                .map(this::mapToAudioRecordResponse)
+                .toList();
+
+        return OtherAudioResponse.builder()
+                .id(otherAudio.getId())
+                .fieldName(otherAudio.getFieldName())
+                .text(otherAudio.getText())
+                .status(otherAudio.getStatus())
+                .audioRecords(audioRecords)
+                .build();
+    }
+
     public AppealDto toAppealDto(Appeal appeal) {
         return AppealDto.builder()
                 .id(appeal.getId())
@@ -441,32 +538,35 @@ public class Mapper {
                 .reviewedAt(appeal.getReviewedAt())
                 .build();
     }
-    public ProfessionDto toProfessionDto(Profession profession){
+
+    public ProfessionDto toProfessionDto(Profession profession) {
         return ProfessionDto.builder()
                 .id(profession.getId())
                 .name(profession.getRuName())
                 .build();
     }
-    public RankDto toRankDto(Rank rank){
+
+    public RankDto toRankDto(Rank rank) {
         return RankDto.builder()
                 .id(rank.getId())
                 .name(rank.getName())
                 .build();
     }
 
-    public RegionDto toRegionDto(Region region){
+    public RegionDto toRegionDto(Region region) {
         return RegionDto.builder()
                 .id(region.getId())
                 .name(region.getRuName())
                 .build();
     }
 
-    public AdministrationDto toAdministrationDto(Administration administration){
+    public AdministrationDto toAdministrationDto(Administration administration) {
         return AdministrationDto.builder()
                 .id(administration.getId())
                 .name(administration.getRuName())
                 .build();
     }
+
     public LogDto toLogDto(Log log) {
         return LogDto.builder()
                 .id(log.getId())
@@ -479,12 +579,16 @@ public class Mapper {
                 .ipAddress(log.getIpAddress())
                 .build();
     }
+
     public CaseListResponse mapToCaseListResponse(Case c) {
         return CaseListResponse.builder()
                 .id(c.getId())
                 .title(c.getTitle())
                 .number(c.getNumber())
                 .status(c.isStatus())
+                .hasPlan(c.hasPlan())
+                .hasIndictment(c.hasIndictment())
+                .hasQualification(c.hasQualification())
                 .totalDocuments(c.getFiles().size())
                 .totalPages(c.getFiles().stream()
                         .filter(f -> f.getPages() != null)
@@ -496,6 +600,97 @@ public class Mapper {
                 .lastActivityDate(c.getLastActivityDate())
                 .lastActivityType(c.getLastActivityType())
                 .ownerEmail(c.getOwner() != null ? c.getOwner().getEmail() : null)
+                .build();
+    }
+
+    public SupportTicketDto mapToSupportTicketDto(SupportTicket ticket) {
+        List<SupportTicketPhotoDto> photos = ticket.getPhotos().stream()
+                .map(p -> SupportTicketPhotoDto.builder()
+                        .id(p.getId())
+                        .originalFileName(p.getOriginalFileName())
+                        .contentType(p.getContentType())
+                        .previewUrl(minioService.generatePresignedUrlForPreview(p.getFileUrl()))
+                        .downloadUrl(minioService.generatePresignedUrlForDownload(p.getFileUrl(), p.getOriginalFileName()))
+                        .build())
+                .toList();
+
+        User user = ticket.getUser();
+        return SupportTicketDto.builder()
+                .id(ticket.getId())
+                .fio(user.getSurname() + " " + user.getName() + " " + user.getFathername())
+                .region(user.getRegion().getRuName())
+                .profession(user.getProfession().getRuName())
+                .message(ticket.getMessage())
+                .phoneNumber(ticket.getPhoneNumber())
+                .createdAt(ticket.getCreatedAt())
+                .photos(photos)
+                .build();
+    }
+
+    public ReviewDto mapToReviewDto(Review review) {
+        String previewUrl = review.getFileUrl() != null
+                ? minioService.generatePresignedUrlForPreview(review.getFileUrl())
+                : null;
+        String downloadUrl = review.getFileUrl() != null
+                ? minioService.generatePresignedUrlForDownload(review.getFileUrl(), review.getOriginalFileName())
+                : null;
+
+        User user = review.getUser();
+        return ReviewDto.builder()
+                .id(review.getId())
+                .fio(user.getSurname() + " " + user.getName() + " " + user.getFathername())
+                .region(user.getRegion().getRuName())
+                .profession(user.getProfession().getRuName())
+                .subject(review.getSubject())
+                .message(review.getMessage())
+                .createdAt(review.getCreatedAt())
+                .originalFileName(review.getOriginalFileName())
+                .contentType(review.getContentType())
+                .previewUrl(previewUrl)
+                .downloadUrl(downloadUrl)
+                .build();
+    }
+
+    public PlanApprovalHistoryDto toPlanApprovalHistoryDto(PlanApprovalHistory h) {
+        User reviewer = h.getReviewer();
+        return PlanApprovalHistoryDto.builder()
+                .id(h.getId())
+                .approvalLevel(h.getApprovalLevel())
+                .fromStatus(h.getFromStatus())
+                .toStatus(h.getToStatus())
+                .reviewerName(reviewer != null
+                        ? reviewer.getSurname() + " " + reviewer.getName().charAt(0) + "."
+                        : null)
+                .reviewerProfession(reviewer != null && reviewer.getProfession() != null
+                        ? reviewer.getProfession().getRuName()
+                        : null)
+                .comment(h.getComment())
+                .reviewedAt(h.getReviewedAt())
+                .build();
+    }
+
+    public ManagementPendingPlanDto toManagementPendingPlanDto(Case c, Map<String, Object> enrichedPlan) {
+        User author = c.getOwner();
+        return ManagementPendingPlanDto.builder()
+                .author(author.getSurname() + " " + author.getName().charAt(0))
+                .caseNumber(c.getNumber())
+                .caseTitle(c.getTitle())
+                .planStatus(c.getPlanStatus())
+                .planSubmittedAt(c.getPlanSubmittedAt())
+                .plan(enrichedPlan)
+                .build();
+    }
+
+    public PlanEditHistoryDto toPlanEditHistoryDto(PlanEditHistory h) {
+        User editor = h.getEditor();
+        return PlanEditHistoryDto.builder()
+                .id(h.getId())
+                .editorName(editor.getSurname() + " " + editor.getName().charAt(0) + ".")
+                .actionNumber(h.getActionNumber())
+                .fieldKey(h.getFieldKey())
+                .oldValue(h.getOldValue())
+                .newValue(h.getNewValue())
+                .editedAt(h.getEditedAt())
                 .build();
     }
 }

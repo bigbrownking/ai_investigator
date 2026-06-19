@@ -2,29 +2,31 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.cases.ReorderCaseFilesRequest;
+import org.di.digital.dto.response.cases.*;
+import org.di.digital.dto.response.interrogation.FigurantResponse;
+import org.di.digital.model.cases.Case;
+import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.MessageConstant;
-import org.di.digital.dto.request.AddFigurantToCaseRequest;
-import org.di.digital.dto.request.CreateCaseRequest;
-import org.di.digital.dto.request.EditCaseRequest;
-import org.di.digital.dto.request.FileType;
-import org.di.digital.dto.response.CaseFileResponse;
-import org.di.digital.dto.response.CaseResponse;
-import org.di.digital.dto.response.CaseUserResponse;
-import org.di.digital.dto.response.FigurantResponse;
-import org.di.digital.model.*;
+import org.di.digital.dto.request.interrogation.AddFigurantToCaseRequest;
+import org.di.digital.dto.request.cases.CreateCaseRequest;
+import org.di.digital.dto.request.cases.EditCaseRequest;
+import org.di.digital.model.enums.FileType;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
-import org.di.digital.repository.CaseFileRepository;
-import org.di.digital.repository.CaseRepository;
-import org.di.digital.repository.UserRepository;
+import org.di.digital.model.interrogation.CaseFigurant;
+import org.di.digital.model.user.User;
+import org.di.digital.repository.cases.CaseFileRepository;
+import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.CaseService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.MinioService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
 import org.di.digital.util.PageCounter;
-import org.di.digital.util.UrlBuilder;
+import org.di.digital.util.requests.RequestUrlBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
@@ -41,8 +43,7 @@ import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
-import static org.di.digital.util.UrlBuilder.renameWorkspaceUrl;
-import static org.di.digital.util.UserUtil.validateUserAccess;
+import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -59,17 +60,56 @@ public class CaseServiceImpl implements CaseService {
     private final PageCounter pageCounter;
     private final CaseFileRepository caseFileRepository;
 
-    @Value("${qualification.model.host}")
+    private static final int MAX_PAGES_PER_TOM = 180;
+
+
+    @Value("${model.host}")
     private String pythonHost;
 
-    @Value("${index.control.port}")
+    @Value("${index.port}")
     private String pythonPort;
 
+    @Override
+    @Transactional(readOnly = true)
+    public Case getCaseEntityById(Long caseId, String email) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
 
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+
+        validateUserAccess(caseEntity, user);
+
+        return caseEntity;
+    }
+    private void assignToms(List<CaseFile> newFiles, List<CaseFile> existingFiles) {
+        Map<Integer, Integer> tomPageCounts = new HashMap<>();
+        for (CaseFile f : existingFiles) {
+            int t = f.getTom() == null ? 1 : f.getTom();
+            int pages = f.getPages() == null ? 0 : f.getPages();
+            tomPageCounts.merge(t, pages, Integer::sum);
+        }
+
+        int currentTom = tomPageCounts.isEmpty() ? 1
+                : Collections.max(tomPageCounts.keySet());
+        int currentPages = tomPageCounts.getOrDefault(currentTom, 0);
+
+        for (CaseFile file : newFiles) {
+            int filePages = file.getPages() == null ? 0 : file.getPages();
+
+            if (currentPages > 0 && currentPages + filePages > MAX_PAGES_PER_TOM) {
+                currentTom++;
+                currentPages = 0;
+            }
+
+            file.setTom(currentTom);
+            currentPages += filePages;
+        }
+    }
     @Transactional
     public CaseResponse createCase(CreateCaseRequest request, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
         if (caseRepository.existsByNumber(request.getNumber())) {
             logService.log(
@@ -82,7 +122,6 @@ public class CaseServiceImpl implements CaseService {
             throw new IllegalStateException("Дело уже создано, пожалуйста проинформируйте создателя дела.");
         }
 
-        int tom = request.getTom();
         String caseNumber = request.getNumber();
         Case newCase = Case.builder()
                 .title(request.getTitle())
@@ -95,17 +134,20 @@ public class CaseServiceImpl implements CaseService {
         newCase.addUser(user);
         Case savedCase = caseRepository.save(newCase);
 
+        List<CaseFile> uploadedFiles = new ArrayList<>();
+
         if (request.getFiles() != null && !request.getFiles().isEmpty()) {
             for (MultipartFile file : request.getFiles()) {
                 if (!file.isEmpty()) {
                     CaseFile caseFile = minioService.uploadFile(file, request.getNumber());
                     caseFile.addCaseEntity(savedCase);
-                    caseFile.setTom(tom);
+                    caseFile.setStatus(CaseFileStatusEnum.QUEUED);
+                    uploadedFiles.add(caseFile);
                 }
             }
         }
 
-        savedCase.getFiles().forEach(caseFile -> {
+        uploadedFiles.forEach(caseFile -> {
             try {
                 Integer pages = pageCounter.countPagesByUrl(caseFile.getFileUrl(), caseFile.getContentType());
                 if (pages != null) {
@@ -115,6 +157,7 @@ public class CaseServiceImpl implements CaseService {
                 log.warn("Could not count pages for file {}: {}", caseFile.getOriginalFileName(), e.getMessage());
             }
         });
+        assignToms(uploadedFiles, Collections.emptyList());
 
         caseRepository.flush();
 
@@ -127,7 +170,6 @@ public class CaseServiceImpl implements CaseService {
                     caseFile.getFileUrl(),
                     caseFile.getId()
             );
-            caseFile.setStatus(CaseFileStatusEnum.QUEUED);
         }
 
         log.info("Case created with id: {} for user: {}", savedCase.getId(), email);
@@ -147,10 +189,10 @@ public class CaseServiceImpl implements CaseService {
     @Transactional
     public CaseResponse editCase(Long caseId, EditCaseRequest request, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -195,7 +237,7 @@ public class CaseServiceImpl implements CaseService {
         return mapper.mapToCaseResponse(savedCase);
     }
     private void renameWorkspace(String oldNumber, String newNumber) {
-        String url = UrlBuilder.renameWorkspaceUrl(pythonHost, pythonPort, oldNumber);
+        String url = RequestUrlBuilder.renameWorkspaceUrl(pythonHost, pythonPort, oldNumber);
         Map<String, String> body = Map.of("new_name", newNumber);
 
         log.info("Renaming workspace from {} to {}", oldNumber, newNumber);
@@ -227,20 +269,133 @@ public class CaseServiceImpl implements CaseService {
     @Transactional(readOnly = true)
     public CaseResponse getCaseById(Long id, String email) {
         Case caseEntity = caseRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Case not found with id: " + id));
+                .orElseThrow(() -> new IllegalStateException("Case not found with id: " + id));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
 
         validateUserAccess(caseEntity, user);
 
         return mapper.mapToCaseResponse(caseEntity);
     }
+    @Transactional
+    public GroupedCaseFileResponse recalculateToms(Long caseId, String email) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+
+        validateUserAccess(caseEntity, user);
+
+        List<CaseFile> orderedFiles = caseEntity.getFiles().stream()
+                .sorted(Comparator.comparing(CaseFile::getOrderIndex,
+                        Comparator.nullsLast(Integer::compareTo)))
+                .collect(Collectors.toList());
+
+        for (int i = 0; i < orderedFiles.size(); i++) {
+            if (orderedFiles.get(i).getOrderIndex() == null) {
+                orderedFiles.get(i).setOrderIndex(i);
+            }
+        }
+
+        assignToms(orderedFiles, Collections.emptyList());
+
+        caseFileRepository.saveAll(orderedFiles);
+
+        logService.log(
+                String.format("Toms recalculated in case %s by user %s", caseEntity.getNumber(), email),
+                LogLevel.INFO, LogAction.FILE_REORDER,
+                caseEntity.getNumber(), email
+        );
+
+        return getGroupedCaseFilesById(caseId, email);
+    }
+    @Override
+    @Transactional
+    public GroupedCaseFileResponse getGroupedCaseFilesById(Long id, String email) {
+
+        Case caseEntity = caseRepository.findById(id)
+                .orElseThrow(() -> new IllegalStateException("Case not found"));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found"));
+
+        validateUserAccess(caseEntity, user);
+
+        Map<Integer, List<CaseFile>> grouped =
+                caseEntity.getFiles().stream()
+                        .sorted(Comparator
+                                .comparing(CaseFile::getTom, Comparator.nullsLast(Integer::compareTo))
+                                .thenComparing(CaseFile::getOrderIndex,
+                                        Comparator.nullsLast(Integer::compareTo)))
+                        .collect(Collectors.groupingBy(
+                                file -> file.getTom() == null ? 0 : file.getTom(),
+                                LinkedHashMap::new,
+                                Collectors.toList()
+                        ));
+
+        List<TomGroupResponse> toms = grouped.entrySet().stream()
+                .map(entry -> {
+                    Integer tom = entry.getKey();
+                    List<CaseFile> tomFiles = entry.getValue();
+
+                    int[] pageCounter = {1};
+
+                    List<CaseFileResponse> files = tomFiles.stream()
+                            .map(f -> {
+                                CaseFileResponse dto = mapper.mapToCaseFileResponse(f);
+                                int pages = f.getPages() == null ? 0 : f.getPages();
+
+                                if (pages > 0) {
+                                    f.setStartPage(pageCounter[0]);
+                                    f.setEndPage(pageCounter[0] + pages - 1);
+                                    dto.setStartPage(pageCounter[0]);
+                                    dto.setEndPage(pageCounter[0] + pages - 1);
+                                    pageCounter[0] += pages;
+                                } else {
+                                    f.setStartPage(null);
+                                    f.setEndPage(null);
+                                    dto.setStartPage(null);
+                                    dto.setEndPage(null);
+                                }
+
+                                return dto;
+                            })
+                            .toList();
+
+                    caseFileRepository.saveAll(tomFiles);
+
+                    int totalPages = pageCounter[0] - 1;
+
+                    return TomGroupResponse.builder()
+                            .tom(tom)
+                            .files(files)
+                            .totalFiles(files.size())
+                            .totalPages(totalPages)
+                            .build();
+                })
+                .toList();
+
+        int totalPages = toms.stream()
+                .mapToInt(TomGroupResponse::getTotalPages)
+                .sum();
+
+        int totalFiles = toms.stream()
+                .mapToInt(TomGroupResponse::getTotalFiles)
+                .sum();
+
+        return GroupedCaseFileResponse.builder()
+                .toms(toms)
+                .totalPages(totalPages)
+                .totalFiles(totalFiles)
+                .build();
+    }
 
     @Transactional(readOnly = true)
     public List<CaseResponse> getUserCases(String email, String sort) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
 
         Comparator<Case> comparator = "asc".equalsIgnoreCase(sort)
                 ? Comparator.comparing(Case::getCreatedDate, Comparator.nullsLast(Comparator.naturalOrder()))
@@ -258,10 +413,10 @@ public class CaseServiceImpl implements CaseService {
         log.info("Updating status for case: {} to {} by user: {}", caseId, status, email);
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found"));
+                .orElseThrow(() -> new IllegalStateException("User not found"));
 
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found"));
+                .orElseThrow(() -> new IllegalStateException("Case not found"));
 
         String caseNumber = caseEntity.getNumber();
         validateUserAccess(caseEntity, user);
@@ -285,20 +440,20 @@ public class CaseServiceImpl implements CaseService {
 
     @Transactional
     public List<CaseFileResponse> addFilesToCase(Long caseId, List<MultipartFile> files,
-                                                 FileType type, int tom, String email) {
+                                                 FileType type, String email) {
         if (files == null || files.isEmpty()) {
             return Collections.emptyList();
         }
 
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("user not found: " + email));
+                .orElseThrow(() -> new IllegalStateException("user not found: " + email));
 
         validateUserAccess(caseEntity, user);
 
-        if (caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()) {
+        if (Boolean.TRUE.equals(caseEntity.getIsFinalIndictmentDone())) {
             logService.log(
                     String.format("Cannot upload files by %s user in case %s: [%s]", email, caseEntity.getNumber(),
                             files.stream().map(MultipartFile::getOriginalFilename).collect(Collectors.joining(", "))),
@@ -317,13 +472,13 @@ public class CaseServiceImpl implements CaseService {
                 .map(CaseFile::getOriginalFileName)
                 .collect(Collectors.toSet());
 
+        List<CaseFile> existingFiles = new ArrayList<>(caseEntity.getFiles());
         List<CaseFile> uploadedFiles = new ArrayList<>();
 
         for (MultipartFile file : files) {
             if (file.isEmpty()) continue;
 
             String originalName = file.getOriginalFilename();
-
             if (existingFileNames.contains(originalName)) {
                 log.warn("File already exists: {} in case: {}", originalName, caseId);
                 continue;
@@ -333,7 +488,6 @@ public class CaseServiceImpl implements CaseService {
                 CaseFile caseFile = minioService.uploadFile(file, caseEntity.getNumber());
                 caseFile.addCaseEntity(caseEntity);
                 caseFile.setQualification(isQualification);
-                caseFile.setTom(tom);
                 caseFile.setStatus(CaseFileStatusEnum.QUEUED);
                 uploadedFiles.add(caseFile);
             } catch (Exception e) {
@@ -351,6 +505,7 @@ public class CaseServiceImpl implements CaseService {
                 log.warn("Could not count pages for file {}: {}", caseFile.getOriginalFileName(), e.getMessage());
             }
         });
+        assignToms(uploadedFiles, existingFiles);
 
         List<CaseFile> savedFiles = caseFileRepository.saveAllAndFlush(uploadedFiles);
 
@@ -383,6 +538,50 @@ public class CaseServiceImpl implements CaseService {
                 .map(mapper::mapToCaseFileResponse)
                 .toList();
     }
+
+
+    @Transactional
+    public GroupedCaseFileResponse reorderCaseFiles(Long caseId, ReorderCaseFilesRequest request,
+                                                    String email) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+
+        validateUserAccess(caseEntity, user);
+
+        List<Long> fileIds = request.getFileIds();
+
+        Map<Long, CaseFile> fileMap = caseEntity.getFiles().stream()
+                .collect(Collectors.toMap(CaseFile::getId, f -> f));
+
+        if (fileIds.size() != fileMap.size() || !fileMap.keySet().containsAll(fileIds)) {
+            throw new IllegalArgumentException("File IDs do not match case files");
+        }
+
+        List<CaseFile> orderedFiles = fileIds.stream()
+                .map(fileMap::get)
+                .collect(Collectors.toList());
+
+        for (int i = 0; i < orderedFiles.size(); i++) {
+            orderedFiles.get(i).setOrderIndex(i);
+        }
+
+        assignToms(orderedFiles, Collections.emptyList());
+
+        caseFileRepository.saveAll(orderedFiles);
+
+        logService.log(
+                String.format("Files reordered in case %s by user %s", caseEntity.getNumber(), email),
+                LogLevel.INFO, LogAction.FILE_REORDER,
+                caseEntity.getNumber(), email
+        );
+
+        return getGroupedCaseFilesById(caseId, email);
+    }
+
+
     @Transactional
     public void deleteFileFromCase(Long caseId, String fileName, String email) {
         Case caseEntity = caseRepository.findById(caseId)
@@ -816,5 +1015,58 @@ public class CaseServiceImpl implements CaseService {
                 currentUserEmail
         );
         log.info("Case {} deleted", caseId);
+    }
+
+    @Transactional
+    public void migrateAllCaseToms() {
+        List<Case> allCases = caseRepository.findAll();
+
+        for (Case caseEntity : allCases) {
+            List<CaseFile> orderedFiles = caseEntity.getFiles().stream()
+                    .sorted(Comparator.comparing(CaseFile::getOrderIndex,
+                            Comparator.nullsLast(Integer::compareTo)))
+                    .collect(Collectors.toList());
+
+            for (int i = 0; i < orderedFiles.size(); i++) {
+                if (orderedFiles.get(i).getOrderIndex() == null) {
+                    orderedFiles.get(i).setOrderIndex(i);
+                }
+            }
+
+            assignToms(orderedFiles, Collections.emptyList());
+            caseFileRepository.saveAll(orderedFiles);
+
+            log.info("Migrated toms for case: {}", caseEntity.getNumber());
+        }
+    }
+
+    @Transactional
+    public void recalculateAllPages() {
+        List<CaseFile> files = caseFileRepository.findAll();
+        int updated = 0;
+        int failed = 0;
+
+        for (CaseFile file : files) {
+            try {
+                Integer pages = pageCounter.countPagesByUrl(
+                        file.getFileUrl(), file.getContentType());
+
+                if (pages != null) {
+                    file.setPages(pages);
+                    caseFileRepository.save(file);
+                    updated++;
+                    log.debug("File {} — pages: {}", file.getOriginalFileName(), pages);
+                } else {
+                    log.debug("File {} — pages: null, skipping", file.getOriginalFileName());
+                }
+            } catch (Exception e) {
+                failed++;
+                log.warn("Failed to count pages for file {}: {}",
+                        file.getOriginalFileName(), e.getMessage());
+            }
+        }
+
+        log.info("Page count migration done. Updated: {}, Failed: {}, Skipped: {}",
+                updated, failed, files.size() - updated - failed);
     }
 }

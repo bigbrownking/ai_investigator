@@ -1,11 +1,11 @@
 package org.di.digital.service.export.interrogation.ru;
 
 import org.apache.poi.xwpf.usermodel.*;
-import org.di.digital.dto.response.CaseInterrogationApplicationFileResponse;
-import org.di.digital.dto.response.CaseInterrogationFullResponse;
-import org.di.digital.dto.response.CaseInterrogationProtocolResponse;
-import org.di.digital.dto.response.InvolvedPersonsResponse;
-import org.di.digital.model.User;
+import org.di.digital.dto.response.interrogation.CaseInterrogationApplicationFileResponse;
+import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.dto.response.interrogation.CaseInterrogationProtocolResponse;
+import org.di.digital.dto.response.interrogation.InvolvedPersonsResponse;
+import org.di.digital.model.user.User;
 import org.di.digital.service.export.interrogation.BaseInterrogationDocBuilder;
 import org.di.digital.util.LocalizationHelper;
 import org.springframework.util.StringUtils;
@@ -281,7 +281,7 @@ public abstract class RuBaseBuilder extends BaseInterrogationDocBuilder {
                 setLineSpacing(filePara);
                 XWPFRun fileRun = filePara.createRun();
                 String pages = file.getPages() != null ? ", " + file.getPages() + " л." : "";
-                fileRun.setText("- " + file.getOriginalFileName() + pages);
+                fileRun.setText("- " + file.getDisplayName() + pages);
                 fileRun.setFontFamily(FONT);
                 fileRun.setFontSize(FONT_SIZE);
             }

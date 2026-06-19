@@ -45,13 +45,20 @@ public class TranscriptionUpdateService {
                             r.setStatus(status);
                         });
 
-                String concatenated = qa.getAudioRecords().stream()
-                        .filter(r -> r.getTranscribedText() != null)
-                        .sorted(Comparator.comparing(CaseInterrogationAudioRecord::getCreatedAt))
-                        .map(CaseInterrogationAudioRecord::getTranscribedText)
-                        .collect(Collectors.joining("\n\n"));
-
-                qa.setAnswer(concatenated);
+                if (Boolean.TRUE.equals(qa.getManuallyEdited())) {
+                    String existing = qa.getAnswer();
+                    qa.setAnswer((existing != null && !existing.isBlank())
+                            ? existing + "\n\n" + transcribedText
+                            : transcribedText);
+                }
+                else {
+                    String concatenated = qa.getAudioRecords().stream()
+                            .filter(r -> r.getTranscribedText() != null)
+                            .sorted(Comparator.comparing(CaseInterrogationAudioRecord::getCreatedAt))
+                            .map(CaseInterrogationAudioRecord::getTranscribedText)
+                            .collect(Collectors.joining("\n\n"));
+                    qa.setAnswer(concatenated);
+                }
             }
 
             qaRepository.save(qa);
@@ -72,13 +79,19 @@ public class TranscriptionUpdateService {
                         r.setStatus(status);
                     });
 
-            String concatenated = otherAudio.getAudioRecords().stream()
-                    .filter(r -> r.getTranscribedText() != null)
-                    .sorted(Comparator.comparing(CaseInterrogationAudioRecord::getCreatedAt))
-                    .map(CaseInterrogationAudioRecord::getTranscribedText)
-                    .collect(Collectors.joining("\n\n"));
-
-            otherAudio.setText(concatenated);
+            if (Boolean.TRUE.equals(otherAudio.getManuallyEdited())) {
+                String existing = otherAudio.getText();
+                otherAudio.setText((existing != null && !existing.isBlank())
+                        ? existing + "\n\n" + transcribedText
+                        : transcribedText);
+            } else {
+                String concatenated = otherAudio.getAudioRecords().stream()
+                        .filter(r -> r.getTranscribedText() != null)
+                        .sorted(Comparator.comparing(CaseInterrogationAudioRecord::getCreatedAt))
+                        .map(CaseInterrogationAudioRecord::getTranscribedText)
+                        .collect(Collectors.joining("\n\n"));
+                otherAudio.setText(concatenated);
+            }
         }
 
         otherAudioRepository.save(otherAudio);

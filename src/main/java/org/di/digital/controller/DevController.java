@@ -2,9 +2,9 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.TaskQueue;
+import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.TaskStatus;
-import org.di.digital.service.impl.DevService;
+import org.di.digital.service.impl.core.DevService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -97,5 +97,22 @@ public class DevController {
     public ResponseEntity<Void> cancelFile(@PathVariable Long caseFileId) {
         devService.cancelPendingTask(caseFileId);
         return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/recalculate-pages")
+    public ResponseEntity<String> recalculateAllPages() {
+        devService.recalculateAllStartEndPages();
+        return ResponseEntity.ok("Done");
+    }
+    @PostMapping("/recalculate-pages-null")
+    public ResponseEntity<String> recalculatePagesForNullFiles() {
+        devService.recalculatePagesForNullFiles();
+        return ResponseEntity.ok("Done");
+    }
+
+    @PostMapping("/sync-figurants")
+    public ResponseEntity<String> syncFigurants(){
+        devService.syncAllFigurants();
+        return ResponseEntity.ok("Done");
     }
 }

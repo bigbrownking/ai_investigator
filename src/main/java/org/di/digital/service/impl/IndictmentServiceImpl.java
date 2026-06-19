@@ -4,16 +4,16 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.enums.MessageConstant;
-import org.di.digital.model.Case;
-import org.di.digital.model.User;
+import org.di.digital.model.cases.Case;
+import org.di.digital.model.user.User;
 import org.di.digital.model.enums.CaseActivityType;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
-import org.di.digital.repository.CaseFileRepository;
+import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
-import org.di.digital.repository.CaseRepository;
-import org.di.digital.repository.UserRepository;
+import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.*;
 import org.di.digital.service.export.DocumentFormatterService;
 import org.springframework.beans.factory.annotation.Value;
@@ -30,8 +30,8 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static org.di.digital.util.RequestBodyBuilder.indictmentBody;
-import static org.di.digital.util.UrlBuilder.indictmentUrl;
+import static org.di.digital.util.requests.RequestBodyBuilder.indictmentBody;
+import static org.di.digital.util.requests.RequestUrlBuilder.indictmentUrl;
 
 @Slf4j
 @Service
@@ -50,10 +50,10 @@ public class IndictmentServiceImpl implements IndictmentService {
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    @Value("${indictment.model.host}")
+    @Value("${model.host}")
     private String pythonHost;
 
-    @Value("${indictment.model.port}")
+    @Value("${indictment.port}")
     private String pythonPort;
 
     @Override
@@ -93,7 +93,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
 
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(caseNumber);
@@ -156,7 +156,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
 
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(caseNumber);
@@ -262,7 +262,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                     documentFormatterService.generateIndictmentDocument(getIndictment(caseNumber))
             );
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IllegalStateException(e);
         }
     }
 

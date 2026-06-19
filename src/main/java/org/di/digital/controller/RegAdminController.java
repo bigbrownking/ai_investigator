@@ -2,18 +2,31 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.cases.ChangeOwnerRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
+import org.di.digital.dto.response.admin.AppealDto;
+import org.di.digital.dto.response.admin.RegionStatsDto;
+import org.di.digital.dto.response.cases.CasePageResponse;
+import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.RegAdminService;
 import org.springframework.data.domain.Page;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
-import static org.di.digital.util.UserUtil.getCurrentUser;
+import java.nio.charset.StandardCharsets;
+import java.util.Map;
+
+import static java.net.URLEncoder.encode;
+import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 @RestController
 @Slf4j
@@ -58,20 +71,6 @@ public class RegAdminController {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return ResponseEntity.ok(regAdminService.getMyRegionCaseDetail(userDetails.getId(), caseId));
     }
-    @GetMapping("/cases/{caseId}/indictment")
-    public ResponseEntity<String> getCaseIndictment(
-            @PathVariable Long caseId,
-            Authentication authentication) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        return ResponseEntity.ok(regAdminService.getMyRegionCaseIndictment(userDetails.getId(), caseId));
-    }
-    @GetMapping("/cases/{caseId}/qualification")
-    public ResponseEntity<String> getCaseQualification(
-            @PathVariable Long caseId,
-            Authentication authentication) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        return ResponseEntity.ok(regAdminService.getMyRegionCaseQualification(userDetails.getId(), caseId));
-    }
 
     @GetMapping("/users/{userId}/cases")
     public ResponseEntity<CasePageResponse> getUserCases(
@@ -103,5 +102,63 @@ public class RegAdminController {
             @RequestParam(defaultValue = "20") int size) {
         Long adminId = getCurrentUser().getId();
         return ResponseEntity.ok(regAdminService.getMyRegionUserLogs(adminId, email, page, size));
+    }
+
+    @GetMapping("/interrogations/{id}")
+    public ResponseEntity<CaseInterrogationFullResponse> getInterrogationDetail(
+            @PathVariable Long id, Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionInterrogationDetail(userDetails.getId(), id));
+    }
+
+    @GetMapping("/interrogations/{id}/download")
+    public ResponseEntity<byte[]> downloadInterrogation(
+            @PathVariable Long id, Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        CaseInterrogationFullResponse data = regAdminService.getMyRegionInterrogationDetail(userDetails.getId(), id);
+        byte[] docx = regAdminService.downloadMyRegionInterrogation(userDetails.getId(), id);
+
+        String filename = "допрос_" + id + "_" + data.getFio().replace(" ", "_") + ".docx";
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + encode(filename, StandardCharsets.UTF_8))
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .body(docx);
+    }
+
+    @GetMapping("/stats")
+    public ResponseEntity<RegionStatsDto> getStats(Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionStats(userDetails.getId()));
+    }
+
+    @PatchMapping("/cases/{caseId}/owner")
+    public ResponseEntity<Void> changeOwner(
+            @PathVariable Long caseId,
+            @RequestBody ChangeOwnerRequest request,
+            Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        regAdminService.changeOwner(userDetails.getId(), caseId, request.getNewOwnerEmail());
+        return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/cases/{caseId}/indictment")
+    public ResponseEntity<String> getIndictment(@PathVariable Long caseId,Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionIndictment(userDetails.getId(), caseId));
+    }
+
+    @GetMapping("/cases/{caseId}/qualification")
+    public ResponseEntity<String> getQualification(@PathVariable Long caseId,Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionQualification(userDetails.getId(), caseId));
+    }
+
+    @GetMapping("/cases/{caseId}/plan")
+    public ResponseEntity<Map<String, Object>> getPlan(@PathVariable Long caseId,Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionPlan(userDetails.getId(), caseId));
     }
 }

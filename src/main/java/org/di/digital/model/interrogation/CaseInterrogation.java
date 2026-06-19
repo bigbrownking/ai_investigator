@@ -2,7 +2,7 @@ package org.di.digital.model.interrogation;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.di.digital.model.Case;
+import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseInterrogationStatusEnum;
 
 import java.time.LocalDate;

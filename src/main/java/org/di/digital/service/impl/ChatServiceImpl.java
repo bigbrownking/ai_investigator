@@ -1,19 +1,20 @@
 package org.di.digital.service.impl;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.enums.MessageConstant;
-import org.di.digital.dto.request.ChatRequest;
-import org.di.digital.dto.response.CaseChatHistoryResponse;
-import org.di.digital.dto.response.CaseChatMessageDto;
-import org.di.digital.model.*;
-import org.di.digital.model.enums.CaseActivityType;
-import org.di.digital.model.enums.LogAction;
-import org.di.digital.model.enums.LogLevel;
-import org.di.digital.repository.CaseChatMessageRepository;
-import org.di.digital.repository.CaseChatRepository;
-import org.di.digital.repository.CaseRepository;
-import org.di.digital.repository.UserRepository;
+import org.di.digital.model.cases.Case;
+import org.di.digital.model.cases.CaseChat;
+import org.di.digital.model.cases.CaseChatMessage;
+import org.di.digital.model.enums.*;
+import org.di.digital.dto.request.cases.ChatRequest;
+import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
+import org.di.digital.dto.response.chat.CaseChatMessageDto;
+import org.di.digital.model.user.User;
+import org.di.digital.repository.cases.CaseChatMessageRepository;
+import org.di.digital.repository.cases.CaseChatRepository;
+import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.CaseService;
 import org.di.digital.service.ChatService;
 import org.di.digital.service.LogService;
@@ -28,10 +29,10 @@ import java.io.IOException;
 import java.util.Collections;
 import java.util.List;
 
-import static org.di.digital.util.RequestBodyBuilder.generalChatBody;
-import static org.di.digital.util.UrlBuilder.generalChatUrl;
-import static org.di.digital.util.UrlBuilder.qualificationChatUrl;
-import static org.di.digital.util.UserUtil.validateUserAccess;
+import static org.di.digital.util.requests.RequestBodyBuilder.generalChatBody;
+import static org.di.digital.util.requests.RequestUrlBuilder.generalChatUrl;
+import static org.di.digital.util.requests.RequestUrlBuilder.qualificationChatUrl;
+import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -46,13 +47,14 @@ public class ChatServiceImpl implements ChatService {
     private final StreamingService streamingService;
     private final LogService logService;
 
-    @Value("${qualification.model.host}")
+    private final ObjectMapper objectMapper;
+    @Value("${model.host}")
     private String pythonHost;
 
-    @Value("${qualification.model.port}")
+    @Value("${qualification.port}")
     private String qualificationPort;
 
-    @Value("${chat.model.port}")
+    @Value("${chat.port}")
     private String chatPort;
 
     @Value("${chat.context.max-messages:20}")
@@ -73,15 +75,17 @@ public class ChatServiceImpl implements ChatService {
         );
     }
 
-    private String extractOpenAIChunk(String sseChunk) {
-        if (sseChunk == null || sseChunk.isBlank() || sseChunk.contains("[DONE]")) return null;
+    private String extractOpenAIChunk(String chunk) {
+        if (chunk == null || chunk.isBlank()) return null;
         try {
-            String json = sseChunk.startsWith("data: ") ? sseChunk.substring(6) : sseChunk;
-            if (json.isBlank() || json.equals("[DONE]")) return null;
-            var node = new com.fasterxml.jackson.databind.ObjectMapper().readTree(json);
-            if (node.has("choices") && node.get("choices").isArray() && !node.get("choices").isEmpty()) {
-                var delta = node.get("choices").get(0).get("delta");
-                if (delta != null && delta.has("content")) return delta.get("content").asText();
+            var node = new ObjectMapper().readTree(chunk.trim());
+
+            if (node.has("response")) {
+                return node.get("response").asText();
+            }
+
+            if (node.has("references")) {
+                return "\n[REFS]" + node.get("references").toString();
             }
         } catch (Exception ignored) {}
         return null;
@@ -92,9 +96,9 @@ public class ChatServiceImpl implements ChatService {
     public void streamCaseChatResponseWithHistory(String caseNumber, ChatRequest request,
                                                   String userEmail, SseEmitter emitter) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
@@ -162,9 +166,9 @@ public class ChatServiceImpl implements ChatService {
     @Transactional(readOnly = true)
     public CaseChatHistoryResponse getChatHistoryByCaseNumber(String caseNumber, String userEmail, int page, int size) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
         return getChatHistory(caseEntity.getId(), user.getId(), page, size);
     }
@@ -187,7 +191,7 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public void clearChatHistoryByCaseNumber(String caseNumber, String userEmail) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);

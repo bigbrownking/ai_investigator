@@ -4,11 +4,11 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.enums.MessageConstant;
-import org.di.digital.model.Case;
+import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseActivityType;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
-import org.di.digital.repository.CaseRepository;
+import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.service.*;
 import org.di.digital.service.export.DocumentFormatterService;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,7 +17,6 @@ import org.springframework.core.io.Resource;
 import org.springframework.stereotype.Service;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
-import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
@@ -26,7 +25,7 @@ import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 
-import static org.di.digital.util.UrlBuilder.qualificationUrl;
+import static org.di.digital.util.requests.RequestUrlBuilder.qualificationUrl;
 
 @Slf4j
 @Service
@@ -42,10 +41,10 @@ public class QualificationServiceImpl implements QualificationService {
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
-    @Value("${qualification.model.host}")
+    @Value("${model.host}")
     private String pythonHost;
 
-    @Value("${qualification.model.port}")
+    @Value("${qualification.port}")
     private String pythonPort;
 
     @Override
@@ -106,26 +105,25 @@ public class QualificationServiceImpl implements QualificationService {
                     RequestContextHolder.setRequestAttributes(requestAttributes);
                     try {
                         log.error("Qualification streaming error for case {}", caseNumber, error);
-                        if (error instanceof WebClientResponseException.BadRequest) {
-                            logService.log(
-                                    String.format("No required files found in case %s", caseNumber),
-                                    LogLevel.ERROR,
-                                    LogAction.NO_SUCH_FILE,
-                                    caseNumber,
-                                    userEmail
-                            );
-                            emitter.completeWithError(new IllegalStateException(
-                                    "Квалификация деяния не может быть сгенерирована, поскольку в материалах дела " +
-                                            "отсутствуют необходимые документы: ПОСТАНОВЛЕНИЕ о признании лица в качестве " +
-                                            "подозреваемого либо ПРОТОКОЛ задержания лица, подозреваемого в совершении " +
-                                            "уголовного правонарушения."));
-                        } else {
-                            emitter.completeWithError(error);
-                        }
+//                if (error instanceof WebClientResponseException.BadRequest) {
+//                    logService.log(
+//                            String.format("No required files found in case %s", caseNumber),
+//                            LogLevel.ERROR,
+//                            LogAction.NO_SUCH_FILE,
+//                            caseNumber,
+//                            userEmail
+//                    );
+//                    emitter.completeWithError(new IllegalStateException(
+//                            "Квалификация деяния не может быть сгенерирована, поскольку в материалах дела " +
+//                                    "отсутствуют необходимые документы: ПОСТАНОВЛЕНИЕ о признании лица в качестве " +
+//                                    "подозреваемого либо ПРОТОКОЛ задержания лица, подозреваемого в совершении " +
+//                                    "уголовного правонарушения."));
+//                } else {
+                        emitter.completeWithError(error);
+//                }
+                    } finally {
+                        RequestContextHolder.resetRequestAttributes();
                     }
-                    finally {
-                            RequestContextHolder.resetRequestAttributes();
-                        }
                 }
         );
     }

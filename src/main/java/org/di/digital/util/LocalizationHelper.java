@@ -10,10 +10,71 @@ import java.time.format.DateTimeFormatter;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.stream.Collectors;
 
 @Component
 public class LocalizationHelper {
+    private static final Map<String, String> REGION_KZ_TO_RU = Map.ofEntries(
+            Map.entry("Ақмола", "Акмолинская область"),
+            Map.entry("Ақтөбе", "Актюбинская область"),
+            Map.entry("Алматы облысы", "Алматинская область"),
+            Map.entry("Алматы қаласы", "город Алматы"),
+            Map.entry("Астана қаласы", "город Астана"),
+            Map.entry("Атырау", "Атырауская область"),
+            Map.entry("Шығыс Қазақстан", "Восточно-Казахстанская область"),
+            Map.entry("Жамбыл", "Жамбылская область"),
+            Map.entry("Батыс Қазақстан", "Западно-Казахстанская область"),
+            Map.entry("Қарағанды", "Карагандинская область"),
+            Map.entry("Қостанай", "Костанайская область"),
+            Map.entry("Қызылорда", "Кызылординская область"),
+            Map.entry("Маңғыстау", "Мангистауская область"),
+            Map.entry("Павлодар", "Павлодарская область"),
+            Map.entry("Солтүстік Қазақстан", "Северо-Казахстанская область"),
+            Map.entry("Түркістан", "Туркестанская область"),
+            Map.entry("Шымкент", "город Шымкент"),
+            Map.entry("Абай", "Абайская область"),
+            Map.entry("Жетісу", "Жетысуская область"),
+            Map.entry("Ұлытау", "Улытауская область")
+    );
+
+    private static final Map<String, String> REGION_KZ_TO_KZ_SHORT = Map.ofEntries(
+            Map.entry("Ақмола", "Ақмола облысы"),
+            Map.entry("Ақтөбе", "Ақтөбе облысы"),
+            Map.entry("Алматы облысы", "Алматы облысы"),
+            Map.entry("Алматы қаласы", "Алматы қаласы"),
+            Map.entry("Астана қаласы", "Астана қаласы"),
+            Map.entry("Атырау", "Атырау облысы"),
+            Map.entry("Шығыс Қазақстан", "Шығыс Қазақстан облысы"),
+            Map.entry("Жамбыл", "Жамбыл облысы"),
+            Map.entry("Батыс Қазақстан", "Батыс Қазақстан облысы"),
+            Map.entry("Қарағанды", "Қарағанды облысы"),
+            Map.entry("Қостанай", "Қостанай облысы"),
+            Map.entry("Қызылорда", "Қызылорда облысы"),
+            Map.entry("Маңғыстау", "Маңғыстау облысы"),
+            Map.entry("Павлодар", "Павлодар облысы"),
+            Map.entry("Солтүстік Қазақстан", "Солтүстік Қазақстан облысы"),
+            Map.entry("Түркістан", "Түркістан облысы"),
+            Map.entry("Шымкент", "Шымкент қаласы"),
+            Map.entry("Абай", "Абай облысы"),
+            Map.entry("Жетісу", "Жетісу облысы"),
+            Map.entry("Ұлытау", "Ұлытау облысы")
+    );
+
+    public String extractRegionShortName(String fullDepartmentName, UserSettingsLanguage language) {
+        if (!StringUtils.hasText(fullDepartmentName)) return fullDepartmentName;
+
+        for (Map.Entry<String, String> entry : REGION_KZ_TO_RU.entrySet()) {
+            if (fullDepartmentName.contains(entry.getKey())) {
+                return switch (language) {
+                    case KZ -> REGION_KZ_TO_KZ_SHORT.getOrDefault(entry.getKey(), entry.getKey());
+                    case RU, EN -> entry.getValue();
+                };
+            }
+        }
+
+        return fullDepartmentName;
+    }
 
     public String getLocalizedName(Localizable entity, UserSettingsLanguage language) {
         if (entity == null) {
@@ -43,6 +104,24 @@ public class LocalizationHelper {
             int spaceIdx = rest.indexOf(' ');
             prefix = rest.substring(0, spaceIdx + 1);
             rest = rest.substring(spaceIdx + 1);
+        }
+
+
+        if (rest.contains("департаменті") || rest.contains("Департаменті")) {
+            return prefix + rest
+                    .replace("департаменті", "департаментінің")
+                    .replace("Департаменті", "Департаментінің");
+        }
+
+        if (rest.contains("мекемесі") || rest.contains("Мекемесі")) {
+            return prefix + rest
+                    .replace("мекемесі", "мекемесінің")
+                    .replace("Мекемесі", "Мекемесінің");
+        }
+
+        if (rest.endsWith("Тергеу бөлімі")) {
+            return prefix + rest
+                    .replace("Тергеу бөлімі", "Тергеу бөлімінің");
         }
 
         if (rest.equalsIgnoreCase("Следственное управление") ||

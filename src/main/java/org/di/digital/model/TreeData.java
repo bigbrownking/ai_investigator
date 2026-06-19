@@ -3,6 +3,7 @@ package org.di.digital.model;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.TreeModuleType;
 import org.hibernate.annotations.ColumnTransformer;
 import org.springframework.data.annotation.CreatedDate;

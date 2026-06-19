@@ -32,7 +32,7 @@ public class FLRecordRepository {
         String iin = flJdbcTemplate.queryForObject(docSql,
                 (rs, rowNum) -> rs.getString("iin"), documentNumber);
 
-        if (iin.isEmpty()) throw new RuntimeException("Человека с этим документов не найдено: " + documentNumber);
+        if (iin.isEmpty()) throw new IllegalStateException("Человека с этим документов не найдено: " + documentNumber);
 
         return findByIin(iin, language);
     }
@@ -43,24 +43,22 @@ public class FLRecordRepository {
         if(language.equals("русском")){
             personSql = """
             SELECT
-                p.IIN as iin, p.SEX_ID as sexId, p.SURNAME as surname, p.FIRSTNAME as firstname,
-                p.SECONDNAME as secondname, p.BIRTH_DATE as birthdate,
+                p.iin as iin, p.sex_id as sexId, p.surname as surname, p.first_name as firstname,
+                p.second_name as secondname, toDate(toDateTime(toInt64(p.birth_date) / 1000)) AS birthdate,
                 citizenship.RU_NAME AS citizenship,
                 birthCountry.RU_NAME AS birthCountry,
                 region.RU_NAME AS birthRegion,
                 district.RU_NAME AS birthDistricts,
-                CASE 
-                    WHEN p.SEX_ID = '1' THEN nat_m.RU_NAME
-                    WHEN p.SEX_ID = '2' THEN nat_f.RU_NAME
-                END AS nationality
-            FROM gbd_fl_30_09_25.person_info p
-            LEFT JOIN gbd_fl_30_09_25.DIC_COUNTRY citizenship ON citizenship.ID = p.CITIZENSHIP_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_COUNTRY birthCountry ON birthCountry.ID = p.BIRTH_COUNTRY_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_REGION region ON region.ID = p.BIRTH_REGION_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_DISTRICTS district ON district.ID = p.BIRTH_DISTRICTS_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_NATIONALITY_M nat_m ON nat_m.ID = p.NATIONALTY_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_NATIONALITY_F nat_f ON nat_f.ID = p.NATIONALTY_ID
-            WHERE p.IIN = ?
+                nat.RU_NAME AS nationality
+            FROM fldb.person_info_gbdfl p
+            LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY citizenship ON citizenship.CODE = p.citizenship_id
+            LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY birthCountry ON birthCountry.CODE = p.birth_country_id
+            LEFT JOIN db_fl_ul_dpar.DIC_REGION region ON region.CODE = p.birth_region_id
+            LEFT JOIN db_fl_ul_dpar.DIC_DISTRICTS district ON district.CODE = p.birth_districts_id
+            LEFT JOIN db_fl_ul_dpar.nationality nat
+                ON nat.CODE = p.nationality_id
+                AND nat.SEX = p.sex_id
+            WHERE p.iin = ?
             LIMIT 1
             """;
 
@@ -77,28 +75,30 @@ public class FLRecordRepository {
             LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_type ON doc_type.ID = pd.DOCUMENT_TYPE_ID
             LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_INVALIDITY doc_invalid ON doc_invalid.ID = pd.DOCUMENT_INVALIDITY_ID
             WHERE pd.IIN = ?
+            ORDER BY
+                CASE WHEN doc_invalid.RU_NAME = 'ДОКУМЕНТ ДЕЙСТВИТЕЛЕН' THEN 0 ELSE 1 END ASC, 
+                pd.DOCUMENT_END_DATE DESC
+            LIMIT 1
             """;
         }else if(language.equals("казахском")){
             personSql = """
             SELECT
-                p.IIN as iin, p.SURNAME as surname, p.FIRSTNAME as firstname,
-                p.SECONDNAME as secondname, p.BIRTH_DATE as birthdate,
+                p.iin as iin, p.sex_id as sexId, p.surname as surname, p.first_name as firstname,
+                p.second_name as secondname, toDate(toDateTime(toInt64(p.birth_date) / 1000)) AS birthdate,
                 citizenship.KZ_NAME AS citizenship,
                 birthCountry.KZ_NAME AS birthCountry,
                 region.KZ_NAME AS birthRegion,
                 district.KZ_NAME AS birthDistricts,
-                CASE 
-                    WHEN p.SEX_ID = '1' THEN nat_m.KZ_NAME
-                    WHEN p.SEX_ID = '2' THEN nat_f.KZ_NAME
-                END AS nationality
-            FROM gbd_fl_30_09_25.person_info p
-            LEFT JOIN gbd_fl_30_09_25.DIC_COUNTRY citizenship ON citizenship.ID = p.CITIZENSHIP_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_COUNTRY birthCountry ON birthCountry.ID = p.BIRTH_COUNTRY_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_REGION region ON region.ID = p.BIRTH_REGION_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_DISTRICTS district ON district.ID = p.BIRTH_DISTRICTS_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_NATIONALITY_M nat_m ON nat_m.ID = p.NATIONALTY_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_NATIONALITY_F nat_f ON nat_f.ID = p.NATIONALTY_ID
-            WHERE p.IIN = ?
+                nat.KZ_NAME AS nationality
+            FROM fldb.person_info_gbdfl p
+            LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY citizenship ON citizenship.CODE = p.citizenship_id
+            LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY birthCountry ON birthCountry.CODE = p.birth_country_id
+            LEFT JOIN db_fl_ul_dpar.DIC_REGION region ON region.CODE = p.birth_region_id
+            LEFT JOIN db_fl_ul_dpar.DIC_DISTRICTS district ON district.CODE = p.birth_districts_id
+            LEFT JOIN db_fl_ul_dpar.nationality nat
+                ON nat.CODE = p.nationality_id
+                AND nat.SEX = p.sex_id
+            WHERE p.iin = ?
             LIMIT 1
             """;
 
@@ -115,6 +115,10 @@ public class FLRecordRepository {
             LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_type ON doc_type.ID = pd.DOCUMENT_TYPE_ID
             LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_INVALIDITY doc_invalid ON doc_invalid.ID = pd.DOCUMENT_INVALIDITY_ID
             WHERE pd.IIN = ?
+            ORDER BY
+                CASE WHEN doc_invalid.KZ_NAME = 'ҚҰЖАТ ЖАРАМДЫ' THEN 0 ELSE 1 END ASC, 
+                pd.DOCUMENT_END_DATE DESC
+            LIMIT 1
             """;
         }
 
@@ -145,7 +149,6 @@ public class FLRecordRepository {
                 .invalidityReason(rs.getString("invalidityReason"))
                 .invalidityDate(parseDate(rs.getString("invalidityDate")))
                 .build(), iin);
-
         record.setDocuments(documents);
         return record;
     }

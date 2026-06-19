@@ -1,13 +1,11 @@
 package org.di.digital.service.export.interrogation.kz;
 
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.di.digital.dto.response.CaseInterrogationFullResponse;
-import org.di.digital.model.User;
+import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.model.user.User;
 import org.di.digital.service.export.interrogation.InterrogationProtocolBuilder;
 import org.di.digital.util.LocalizationHelper;
 import org.springframework.stereotype.Component;
-
-import static org.di.digital.util.UserUtil.getCurrentUser;
 
 /**
  * role="witness_protected" + isDop=false → Қорғалуға құқығы бар куәдан жауап алу хаттамасы
@@ -23,13 +21,13 @@ public class KazWitnessProtectedBuilder extends KazBaseBuilder implements Interr
     }
 
     @Override
-    public void build(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        if (Boolean.TRUE.equals(data.getIsDop())) buildDop(doc, data);
-        else buildRegular(doc, data);
+    public void build(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
+        if (Boolean.TRUE.equals(data.getIsDop())) buildDop(doc, data, user);
+        else buildRegular(doc, data, user);
     }
 
-    private void buildRegular(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        User user = getCurrentUser();
+    private void buildRegular(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
+     //   User user = getCurrentUser();
         String fio = formatFio(data.getFio());
 
         addCenteredBoldParagraph(doc, "ХАТТАМА", 14);
@@ -94,8 +92,8 @@ public class KazWitnessProtectedBuilder extends KazBaseBuilder implements Interr
                 data.getInvestigatorProfession(), formatFio(data.getInvestigator()));
     }
 
-    private void buildDop(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        User user = getCurrentUser();
+    private void buildDop(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
+     //   User user = getCurrentUser();
         String fio = formatFio(data.getFio());
 
         addCenteredBoldParagraph(doc, "ХАТТАМА", 14);

@@ -1,0 +1,19 @@
+package org.di.digital.dto.request.interrogation;
+
+import lombok.AllArgsConstructor;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+@Getter
+@Setter
+@NoArgsConstructor
+@AllArgsConstructor
+public class UpdateProtocolFieldRequest {
+    private String field;
+    private String value;
+
+    private Long id;
+    private String type;
+    private String about;
+}

@@ -21,6 +21,5 @@ public class ProcessingResultMessage {
     private String errorMessage;
     private LocalDateTime timestamp;
 
-    // Дополнительные поля для отладки
     private Long processingDurationSeconds;
 }

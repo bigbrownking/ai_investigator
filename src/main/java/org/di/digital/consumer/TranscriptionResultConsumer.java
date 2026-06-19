@@ -5,10 +5,13 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.TranscriptionResultMessage;
+import org.di.digital.dto.request.interrogation.CleanTranscriptRequest;
+import org.di.digital.dto.response.interrogation.CleanTranscriptResponse;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.enums.QAStatusEnum;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
-import org.di.digital.service.impl.NotificationService;
+import org.di.digital.service.interrogation.CaseInterrogationReformulateService;
+import org.di.digital.service.impl.core.NotificationService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
@@ -19,6 +22,7 @@ public class TranscriptionResultConsumer {
 
     private final CaseInterrogationRepository interrogationRepository;
     private final TranscriptionUpdateService transcriptionUpdateService;
+    private final CaseInterrogationReformulateService caseInterrogationReformulateService;
     private final NotificationService notificationService;
     private final ObjectMapper objectMapper;
 
@@ -48,6 +52,24 @@ public class TranscriptionResultConsumer {
                 }
                 case COMPLETED -> {
                     String transcribedText = extractText(message.getTranscribedText());
+
+                    if(transcribedText.startsWith("Продолжение следует.")){
+                        transcribedText = null;
+                    }
+                    try {
+                        CleanTranscriptRequest cleanRequest = CleanTranscriptRequest.builder()
+                                .text(transcribedText)
+                                .language(interrogation.getLanguage().equals("русском") ? "russian" : "kazakh")
+                                .build();
+                        CleanTranscriptResponse cleaned = caseInterrogationReformulateService.cleanTranscript(cleanRequest);
+                        if (cleaned != null && cleaned.getCorrectedText() != null) {
+                            transcribedText = cleaned.getCorrectedText();
+                        }
+
+                    } catch (Exception e) {
+                        log.warn("Failed to clean transcript, using original: {}", e.getMessage());
+                    }
+
                     transcriptionUpdateService.updateStatus(
                             message.getQaId(), message.getRecordId(), QAStatusEnum.TRANSCRIBED, transcribedText);
                     if (isOtherAudio) {
@@ -83,10 +105,73 @@ public class TranscriptionResultConsumer {
     private String extractText(String raw) {
         try {
             JsonNode node = objectMapper.readTree(raw);
-            if (node.has("data")) return node.get("data").asText();
+            if (node.has("data")) {
+                return deduplicateWords(node.get("data").asText());
+            }
         } catch (Exception e) {
             log.warn("Failed to parse transcription JSON, using raw text: {}", e.getMessage());
         }
         return raw;
+    }
+
+    private String deduplicateWords(String text) {
+        if (text == null || text.isBlank()) return text;
+
+        text = deduplicatePhrases(text);
+
+        String[] words = text.split("\\s+");
+        StringBuilder result = new StringBuilder();
+        String lastWord = null;
+
+        for (String word : words) {
+            String normalized = word.toLowerCase().replaceAll("[^\\p{L}]", "");
+            String lastNormalized = lastWord != null
+                    ? lastWord.toLowerCase().replaceAll("[^\\p{L}]", "")
+                    : null;
+
+            if (!normalized.equals(lastNormalized)) {
+                if (!result.isEmpty()) result.append(" ");
+                result.append(word);
+            }
+            lastWord = word;
+        }
+
+        return result.toString();
+    }
+    private String deduplicatePhrases(String text) {
+        String[] words = text.split("\\s+");
+
+        for (int phraseLen = 5; phraseLen >= 2; phraseLen--) {
+            words = removeDuplicatePhrases(words, phraseLen);
+        }
+
+        return String.join(" ", words);
+    }
+    private String[] removeDuplicatePhrases(String[] words, int phraseLen) {
+        if (words.length < phraseLen * 2) return words;
+
+        java.util.List<String> result = new java.util.ArrayList<>(java.util.Arrays.asList(words));
+        int i = 0;
+
+        while (i <= result.size() - phraseLen * 2) {
+            java.util.List<String> phrase = result.subList(i, i + phraseLen);
+            java.util.List<String> next = result.subList(i + phraseLen, i + phraseLen * 2);
+
+            String phraseNorm = phrase.stream()
+                    .map(w -> w.toLowerCase().replaceAll("[^\\p{L}]", ""))
+                    .collect(java.util.stream.Collectors.joining(" "));
+
+            String nextNorm = next.stream()
+                    .map(w -> w.toLowerCase().replaceAll("[^\\p{L}]", ""))
+                    .collect(java.util.stream.Collectors.joining(" "));
+
+            if (phraseNorm.equals(nextNorm)) {
+                result.subList(i + phraseLen, i + phraseLen * 2).clear();
+            } else {
+                i++;
+            }
+        }
+
+        return result.toArray(new String[0]);
     }
 }

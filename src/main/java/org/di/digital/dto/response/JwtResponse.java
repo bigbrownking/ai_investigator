@@ -10,4 +10,5 @@ public class JwtResponse {
     private String refreshToken;
     private String type;
     private String username;
+    private boolean faceEnabled;
 }

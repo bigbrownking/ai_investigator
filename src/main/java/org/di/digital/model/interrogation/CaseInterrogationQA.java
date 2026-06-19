@@ -37,11 +37,15 @@ public class CaseInterrogationQA {
     private Integer orderIndex;
     private LocalDateTime createdAt;
 
+    @Builder.Default
+    private Boolean manuallyEdited = false;
+
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "interrogation_id")
     private CaseInterrogation interrogation;
 
-    @OneToMany(mappedBy = "qa", cascade = CascadeType.ALL, fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "qa", cascade = CascadeType.ALL,
+            orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("createdAt ASC")
     private List<CaseInterrogationAudioRecord> audioRecords = new ArrayList<>();
 }

@@ -1,13 +1,11 @@
 package org.di.digital.service.export.interrogation.kz;
 
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
-import org.di.digital.dto.response.CaseInterrogationFullResponse;
-import org.di.digital.model.User;
+import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.model.user.User;
 import org.di.digital.service.export.interrogation.InterrogationProtocolBuilder;
 import org.di.digital.util.LocalizationHelper;
 import org.springframework.stereotype.Component;
-
-import static org.di.digital.util.UserUtil.getCurrentUser;
 
 /**
  * role="expert" + isDop=false → Сарапшыдан жауап алу хаттамасы
@@ -21,13 +19,13 @@ public class KazExpertBuilder extends KazBaseBuilder implements InterrogationPro
     }
 
     @Override
-    public void build(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        if (Boolean.TRUE.equals(data.getIsDop())) buildDop(doc, data);
-        else buildRegular(doc, data);
+    public void build(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
+        if (Boolean.TRUE.equals(data.getIsDop())) buildDop(doc, data, user);
+        else buildRegular(doc, data, user);
     }
 
-    private void buildRegular(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        User user = getCurrentUser();
+    private void buildRegular(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
+       // User user = getCurrentUser();
         String fio = formatFio(data.getFio());
 
         addCenteredBoldParagraph(doc, "ХАТТАМА", 14);
@@ -49,7 +47,7 @@ public class KazExpertBuilder extends KazBaseBuilder implements InterrogationPro
                         + "сондай-ақ жауап алу тәртібі туралы хабарланды.");
         addEmptyLine(doc);
 
-        addRightsSectionKaz(doc, "Сарапшыға", fio, "82", RIGHTS_ST82_EXPERT_KAZ);
+        addRightsSectionKaz(doc, "Сарапшыға", fio, "82", RIGHTS_ST79_EXPERT_KAZ);
 
         addJustifiedParagraph(doc,
                 "Сарапшы " + fio + " келесі сұрақтар бойынша айғақтар беруі ұсынылды "
@@ -62,8 +60,8 @@ public class KazExpertBuilder extends KazBaseBuilder implements InterrogationPro
         addClosingSpecialistKaz(doc, data, "Сарапшы", fio, false);
     }
 
-    private void buildDop(XWPFDocument doc, CaseInterrogationFullResponse data) {
-        User user = getCurrentUser();
+    private void buildDop(XWPFDocument doc, CaseInterrogationFullResponse data, User user) {
+      //  User user = getCurrentUser();
         String fio = formatFio(data.getFio());
 
         addCenteredBoldParagraph(doc, "ХАТТАМА", 14);
@@ -85,7 +83,7 @@ public class KazExpertBuilder extends KazBaseBuilder implements InterrogationPro
                         + "сондай-ақ жауап алу тәртібі туралы хабарланды.");
         addEmptyLine(doc);
 
-        addRightsSectionKaz(doc, "Сарапшыға", fio, "82", RIGHTS_ST82_EXPERT_KAZ);
+        addRightsSectionKaz(doc, "Сарапшыға", fio, "82", RIGHTS_ST79_EXPERT_KAZ);
 
         addJustifiedParagraph(doc,
                 "Сарапшы " + fio + " бұрын берген қорытындысын және айғақтарын толықтыру немесе нақтылау туралы айтып беруі ұсынылды, "

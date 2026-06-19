@@ -23,6 +23,9 @@ public class CaseInterrogationApplicationFile {
     private String contentType;
     private Long fileSize;
 
+    @Column(name = "display_name")
+    private String displayName;
+
     @Column(name = "pages")
     private Integer pages;
 

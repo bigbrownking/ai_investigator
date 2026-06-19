@@ -5,13 +5,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.TreeDataResponse;
 import org.di.digital.dto.response.TreeModuleResponse;
-import org.di.digital.model.Case;
 import org.di.digital.model.TreeData;
-import org.di.digital.model.User;
+import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.TreeModuleType;
-import org.di.digital.repository.CaseRepository;
+import org.di.digital.model.user.User;
 import org.di.digital.repository.TreeDataRepository;
-import org.di.digital.repository.UserRepository;
+import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.TreeService;
 import org.di.digital.util.TreeUrlBuilder;
 import org.springframework.beans.factory.annotation.Value;
@@ -40,12 +40,12 @@ public class TreeServiceImpl implements TreeService {
     private final WebClient.Builder webClientBuilder;
     private final ObjectMapper objectMapper;
 
-    @Value("${qualification.model.host}")
+    @Value("${model.host}")
     private String pythonHost;
+
 
     @Value("${tree.port}")
     private String treePort;
-
     @Override
     @Transactional
     public TreeDataResponse fetchAndSaveAllModules(String caseNumber, String userEmail) {
@@ -169,7 +169,6 @@ public class TreeServiceImpl implements TreeService {
                     .accept(MediaType.APPLICATION_JSON)
                     .retrieve()
                     .bodyToMono(String.class)
-                    .timeout(Duration.ofSeconds(30))
                     .onErrorResume(WebClientResponseException.class, e -> {
                         log.error("API error for {}: {} - {}", moduleType, e.getStatusCode(), e.getResponseBodyAsString());
                         return Mono.error(new RuntimeException(

@@ -2,8 +2,7 @@ package org.di.digital.security;
 
 import lombok.AllArgsConstructor;
 import lombok.Getter;
-import org.di.digital.model.Role;
-import org.di.digital.model.User;
+import org.di.digital.model.user.User;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.core.userdetails.UserDetails;

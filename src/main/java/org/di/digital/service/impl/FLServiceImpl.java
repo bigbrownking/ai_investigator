@@ -20,7 +20,7 @@ public class FLServiceImpl implements FLService {
         return switch (documentType.toUpperCase()) {
             case "ИИН" -> flRecordRepository.findByIin(number, language);
             case "ПАСПОРТ" -> flRecordRepository.findByDocumentNumber(number, language);
-            default -> throw new RuntimeException("Unsupported document type: " + documentType);
+            default -> throw new IllegalStateException("Unsupported document type: " + documentType);
         };
     }
     @Override

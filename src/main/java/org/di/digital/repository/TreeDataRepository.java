@@ -1,7 +1,7 @@
 package org.di.digital.repository;
 
-import org.di.digital.model.Case;
 import org.di.digital.model.TreeData;
+import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.TreeModuleType;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;

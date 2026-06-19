@@ -57,6 +57,9 @@ public class WebConfig {
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
+                        .requestMatchers("/auth/face/challenge", "/auth/face/login").permitAll()
+                        .requestMatchers("/auth/face/liveness/challenge", "/auth/face/liveness/verify").permitAll()
+                        .requestMatchers("/auth/face/enroll", "/auth/face/remove").authenticated()
                         .requestMatchers("/actuator/**").permitAll()
 
                         .requestMatchers("/ws/**").permitAll()
@@ -67,7 +70,7 @@ public class WebConfig {
                         .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/dict/**").permitAll()
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
-                        .requestMatchers("/reg-admin/**").hasAuthority("REG_ADMIN")
+                        .requestMatchers("/reg-admin/**").hasAnyAuthority("REG_ADMIN", "ADVANCED_USER")
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())
