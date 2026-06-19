@@ -18,7 +18,6 @@ import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.FileType;
 import org.di.digital.service.CaseFileService;
 import org.di.digital.service.CaseService;
-import org.di.digital.service.PlanApprovalService;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.http.*;

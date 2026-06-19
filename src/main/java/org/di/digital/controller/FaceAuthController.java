@@ -8,13 +8,10 @@ import org.di.digital.dto.response.auth.ChallengeResponse;
 import org.di.digital.dto.response.auth.FaceStatusResponse;
 import org.di.digital.dto.response.auth.LivenessChallengeResponse;
 import org.di.digital.dto.response.auth.LivenessVerifyResponse;
-import org.di.digital.service.FaceAuthService;
-import org.di.digital.service.impl.FaceAuthServiceImpl;
+import org.di.digital.service.auth.FaceAuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.Map;
 
 @Slf4j
 @RestController

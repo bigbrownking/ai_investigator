@@ -23,11 +23,9 @@ public class CaseResponse {
     private long totalDocuments;
     private long audioUsed;
 
-    private Map<String, Object> plan;
-    private PlanStatus planStatus;
-    private String planReviewComment;
-    private LocalDateTime planReviewedAt;
-    private String reviewedBy;
+    private boolean hasPlan;
+    private boolean hasQualification;
+    private boolean hasIndictment;
 
     private List<CaseUserResponse> users;
 

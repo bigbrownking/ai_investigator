@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
-import org.di.digital.service.CaseInterrogationChatService;
+import org.di.digital.service.interrogation.CaseInterrogationChatService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;

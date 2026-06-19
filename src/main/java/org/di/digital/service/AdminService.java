@@ -1,5 +1,6 @@
 package org.di.digital.service;
 
+import org.di.digital.dto.request.UpdateProfileRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
@@ -11,12 +12,14 @@ import org.di.digital.dto.response.admin.RegionSummaryDto;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
+import java.util.Map;
 
 public interface AdminService {
     Page<UserProfile> getAllUsers(int page, int size, UserSearchRequest userSearchRequest);
@@ -31,8 +34,6 @@ public interface AdminService {
     CaseResponse getCaseDetail(Long caseId);
     CaseInterrogationFullResponse getInterrogationDetail(Long interrogationId);
     byte[] downloadInterrogation(Long interrogationId);
-    String getCaseIndictment(Long caseId);
-    String getCaseQualification(Long caseId);
     void approveAppeal(Long appealId, Long adminId);
     void rejectAppeal(Long appealId, Long adminId);
     Page<LogDto> getUserLogs(String email, int page, int size);
@@ -40,6 +41,13 @@ public interface AdminService {
     SupportTicketDto getSupportTicketDetail(Long id);
     Page<ReviewDto> getAllReviews(int page, int size);
     ReviewDto getReviewDetail(Long id);
-    void assignAdvancedUserRole(Long userId);
-    void assignRegAdminRole(Long userId);
+    void assignAdvancedUserRole(String email);
+    void assignRegAdminRole(String email, List<String> regions);
+    void removeRegAdminRole(String email, List<String> regions);
+    UserProfile updateUserProfile(String email, UpdateProfileRequest request);
+    //жалал не админ
+    String getIndictment(Long caseId);
+    String getQualification(Long caseId);
+    CasePlanResponse getPlan(Long caseId);
+
 }

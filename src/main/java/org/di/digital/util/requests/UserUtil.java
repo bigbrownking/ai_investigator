@@ -76,6 +76,15 @@ public class UserUtil {
             throw new AccessDeniedException("Дело не принадлежит вашему региону");
         }
     }
+    public static void validateUserRegionAccess(User admin, User user) {
+        if (admin.getRegion() == null) {
+            throw new AccessDeniedException("У администратора нет региона");
+        }
+        if (user.getRegion() == null ||
+                !user.getRegion().getId().equals(admin.getRegion().getId())) {
+            throw new AccessDeniedException("Этот пользователь не принадлежит вашему региону");
+        }
+    }
     public static boolean isRegAdmin(User user) {
         return user.getRoles().stream()
                 .anyMatch(r -> r.getName().equals(ROLE_REG_ADMIN));

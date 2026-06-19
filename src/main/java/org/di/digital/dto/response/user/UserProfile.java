@@ -22,6 +22,7 @@ public class UserProfile {
     private String rank;
     private String administration;
     private String region;
+    private List<String> responsibleRegions;
     private String street;
     private UserSettingsDto settings;
     private int createdCaseCount;

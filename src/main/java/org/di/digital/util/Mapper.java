@@ -33,6 +33,7 @@ import org.di.digital.model.interrogation.*;
 import org.di.digital.model.support.Review;
 import org.di.digital.model.support.SupportTicket;
 import org.di.digital.model.user.*;
+import org.di.digital.repository.user.RegionRepository;
 import org.di.digital.repository.user.UserFaceTemplateRepository;
 import org.di.digital.service.MinioService;
 import org.springframework.beans.factory.annotation.Value;
@@ -54,6 +55,7 @@ public class Mapper {
     private final MinioService minioService;
     private final LocalizationHelper localizationHelper;
     private final UserFaceTemplateRepository faceTemplateRepository;
+    private final RegionRepository regionRepository;
 
     @Value("${last.seen.ttl}")
     private int ttl;
@@ -191,6 +193,12 @@ public class Mapper {
     }
 
     public CaseResponse mapToCaseResponse(Case caseEntity) {
+        User approvedBy = caseEntity.getPlanApprovedBy();
+        User reviewedBy = caseEntity.getPlanReviewedBy();
+
+        String approvedByName =  approvedBy == null ? null : approvedBy.getSurname() + " " + approvedBy.getName().charAt(0) + ". " + approvedBy.getFathername().charAt(0) + ".";
+        String reviewedByName = reviewedBy == null ? null : reviewedBy.getSurname() + " " + reviewedBy.getName().charAt(0) + ". " + reviewedBy.getFathername().charAt(0) + ".";
+
         return CaseResponse.builder()
                 .id(caseEntity.getId())
                 .title(caseEntity.getTitle())
@@ -198,6 +206,9 @@ public class Mapper {
                 .status(caseEntity.isStatus())
                 .totalDocuments(caseEntity.getFiles().size())
                 .audioUsed(caseEntity.audioUsedCount())
+                .hasPlan(caseEntity.hasPlan())
+                .hasIndictment(caseEntity.hasIndictment())
+                .hasQualification(caseEntity.hasQualification())
                 .totalPages(caseEntity.getFiles().stream()
                         .filter(f -> f.getPages() != null)
                         .mapToInt(CaseFile::getPages)
@@ -257,6 +268,10 @@ public class Mapper {
         if (user.getRegion() != null && !user.getRegion().getAddresses().isEmpty()) {
             sterr = user.getRegion().getAddresses().get(0);
         }
+        List<String> responsibleRegions = regionRepository.findByAdminsContaining(user)
+                .stream()
+                .map(region -> localizationHelper.getLocalizedName(region, language))
+                .toList();
         return UserProfile.builder()
                 .id(user.getId())
                 .iin(user.getIin())
@@ -268,13 +283,14 @@ public class Mapper {
                 .profession(localizationHelper.getLocalizedName(user.getProfession(), language))
                 .rank(user.getRank() != null ? user.getRank().getName() : null)
                 .region(localizationHelper.getLocalizedName(user.getRegion(), language))
+                .responsibleRegions(responsibleRegions)
                 .email(user.getEmail())
                 .faceEnabled(!faceTemplateRepository.findByUserAndRevokedAtIsNull(user).isEmpty())
                 .active(user.isActive())
                 .online(user.isOnline(ttl))
                 .settings(settingsDto)
                 .street(localizationHelper.getLocalizedName(sterr, language))
-                .createdCaseCount(user.getCases() != null ? user.getCases().size() : 0)
+                .createdCaseCount(user.getOwnedCases() != null ? user.getOwnedCases().size() : 0)
                 .lastSeenAt(formatLastSeen(user.getLastSeenAt()))
                 .build();
     }
@@ -570,6 +586,9 @@ public class Mapper {
                 .title(c.getTitle())
                 .number(c.getNumber())
                 .status(c.isStatus())
+                .hasPlan(c.hasPlan())
+                .hasIndictment(c.hasIndictment())
+                .hasQualification(c.hasQualification())
                 .totalDocuments(c.getFiles().size())
                 .totalPages(c.getFiles().stream()
                         .filter(f -> f.getPages() != null)

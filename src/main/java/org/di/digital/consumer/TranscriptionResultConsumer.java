@@ -10,7 +10,7 @@ import org.di.digital.dto.response.interrogation.CleanTranscriptResponse;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.enums.QAStatusEnum;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
-import org.di.digital.service.CaseInterrogationReformulateService;
+import org.di.digital.service.interrogation.CaseInterrogationReformulateService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;

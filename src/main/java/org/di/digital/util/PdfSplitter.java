@@ -34,10 +34,6 @@ public class PdfSplitter {
         }
     }
 
-    public byte[] readAllBytes(InputStream stream) throws IOException {
-        return stream.readAllBytes();
-    }
-
     public byte[] mergeSegments(List<byte[]> pdfBytesList) throws IOException {
         try (PDDocument merged = new PDDocument()) {
             for (byte[] pdfBytes : pdfBytesList) {

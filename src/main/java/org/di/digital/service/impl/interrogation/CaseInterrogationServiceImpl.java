@@ -20,7 +20,7 @@ import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.interrogation.*;
 import org.di.digital.repository.user.UserRepository;
-import org.di.digital.service.CaseInterrogationService;
+import org.di.digital.service.interrogation.CaseInterrogationService;
 import org.di.digital.service.FLService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.MinioService;
@@ -609,7 +609,6 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .filter(q -> q.getId().equals(request.getQaId()))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Вопрос/ответ не найден: " + request.getQaId()));
-        qa.getAudioRecords().forEach(r -> r.setTranscribedText(null));
 
         qa.setAnswer(request.getAnswer());
         qa.setManuallyEdited(true);
@@ -650,6 +649,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .edited(assistantReplied)
                 .build();
     }
+
     @Override
     @Transactional
     public OtherAudioResponse editOtherAudioText(Long caseId, Long interrogationId, Long otherAudioId, String text, String email) {
@@ -669,7 +669,6 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .filter(o -> o.getId().equals(otherAudioId))
                 .findFirst()
                 .orElseThrow(() -> new RuntimeException("Аудио не найдено: " + otherAudioId));
-        otherAudio.getAudioRecords().forEach(r -> r.setTranscribedText(null));
 
         otherAudio.setText(text);
         otherAudio.setManuallyEdited(true);

@@ -3,7 +3,7 @@ package org.di.digital.controller;
 import lombok.RequiredArgsConstructor;
 import org.di.digital.dto.request.interrogation.ReformulateQuestionRequest;
 import org.di.digital.dto.response.interrogation.ReformulateQuestionResponse;
-import org.di.digital.service.CaseInterrogationReformulateService;
+import org.di.digital.service.interrogation.CaseInterrogationReformulateService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;

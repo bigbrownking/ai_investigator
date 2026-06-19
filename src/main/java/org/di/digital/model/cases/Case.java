@@ -206,4 +206,13 @@ public class Case {
                 .filter(CaseInterrogation::isAudioUsed)
                 .count();
     }
+    public boolean hasQualification(){
+        return qualification != null;
+    }
+    public boolean hasIndictment(){
+        return indictment != null;
+    }
+    public boolean hasPlan(){
+        return plan != null;
+    }
 }

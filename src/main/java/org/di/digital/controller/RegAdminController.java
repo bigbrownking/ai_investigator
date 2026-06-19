@@ -23,6 +23,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
+import java.util.Map;
 
 import static java.net.URLEncoder.encode;
 import static org.di.digital.util.requests.UserUtil.getCurrentUser;
@@ -69,20 +70,6 @@ public class RegAdminController {
             Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return ResponseEntity.ok(regAdminService.getMyRegionCaseDetail(userDetails.getId(), caseId));
-    }
-    @GetMapping("/cases/{caseId}/indictment")
-    public ResponseEntity<String> getCaseIndictment(
-            @PathVariable Long caseId,
-            Authentication authentication) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        return ResponseEntity.ok(regAdminService.getMyRegionCaseIndictment(userDetails.getId(), caseId));
-    }
-    @GetMapping("/cases/{caseId}/qualification")
-    public ResponseEntity<String> getCaseQualification(
-            @PathVariable Long caseId,
-            Authentication authentication) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        return ResponseEntity.ok(regAdminService.getMyRegionCaseQualification(userDetails.getId(), caseId));
     }
 
     @GetMapping("/users/{userId}/cases")
@@ -155,5 +142,23 @@ public class RegAdminController {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         regAdminService.changeOwner(userDetails.getId(), caseId, request.getNewOwnerEmail());
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/cases/{caseId}/indictment")
+    public ResponseEntity<String> getIndictment(@PathVariable Long caseId,Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionIndictment(userDetails.getId(), caseId));
+    }
+
+    @GetMapping("/cases/{caseId}/qualification")
+    public ResponseEntity<String> getQualification(@PathVariable Long caseId,Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionQualification(userDetails.getId(), caseId));
+    }
+
+    @GetMapping("/cases/{caseId}/plan")
+    public ResponseEntity<Map<String, Object>> getPlan(@PathVariable Long caseId,Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.getMyRegionPlan(userDetails.getId(), caseId));
     }
 }

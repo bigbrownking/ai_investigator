@@ -2,6 +2,7 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.UpdateProfileRequest;
 import org.di.digital.dto.request.auth.SignUpRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
@@ -14,12 +15,13 @@ import org.di.digital.dto.response.admin.RegionSummaryDto;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.AdminService;
-import org.di.digital.service.AuthService;
+import org.di.digital.service.auth.AuthService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -90,16 +92,6 @@ public class AdminController {
                 .contentType(MediaType.parseMediaType(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
                 .body(docx);
-    }
-
-    @GetMapping("/cases/{caseId}/indictment")
-    public ResponseEntity<String> getCaseIndictment(@PathVariable Long caseId) {
-        return ResponseEntity.ok(adminService.getCaseIndictment(caseId));
-    }
-
-    @GetMapping("/cases/{caseId}/qualification")
-    public ResponseEntity<String> getCaseQualification(@PathVariable Long caseId) {
-        return ResponseEntity.ok(adminService.getCaseQualification(caseId));
     }
 
     @GetMapping("/appeals")
@@ -182,15 +174,48 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getReviewDetail(id));
     }
 
-    @PutMapping("/users/{id}/assign-advanced")
-    public ResponseEntity<Void> assignAdvanced(@PathVariable Long id) {
-        adminService.assignAdvancedUserRole(id);
+    @PutMapping("/users/assign-advanced")
+    public ResponseEntity<Void> assignAdvanced(@RequestParam String email) {
+        adminService.assignAdvancedUserRole(email);
         return ResponseEntity.ok().build();
     }
 
-    @PutMapping("/users/{id}/assign-reg-admin")
-    public ResponseEntity<Void> assignRegAdmin(@PathVariable Long id) {
-        adminService.assignRegAdminRole(id);
+    @PutMapping("/users/assign-reg-admin")
+    public ResponseEntity<Void> assignRegAdmin(
+            @RequestParam String email,
+            @RequestParam List<String> regions) {
+        adminService.assignRegAdminRole(email, regions);
         return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/users/remove-reg-admin")
+    public ResponseEntity<Void> removeRegAdmin(
+            @RequestParam String email,
+            @RequestParam List<String> regions) {
+        adminService.removeRegAdminRole(email, regions);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/users/profile")
+    public ResponseEntity<UserProfile> updateUserProfile(
+            @RequestBody UpdateProfileRequest request,
+            Authentication authentication){
+        return ResponseEntity.ok(adminService.updateUserProfile(authentication.getName(), request));
+    }
+
+
+    @GetMapping("/cases/{caseId}/indictment")
+    public ResponseEntity<String> getIndictment(@PathVariable Long caseId) {
+        return ResponseEntity.ok(adminService.getIndictment(caseId));
+    }
+
+    @GetMapping("/cases/{caseId}/qualification")
+    public ResponseEntity<String> getQualification(@PathVariable Long caseId) {
+        return ResponseEntity.ok(adminService.getQualification(caseId));
+    }
+
+    @GetMapping("/cases/{caseId}/plan")
+    public ResponseEntity<CasePlanResponse> getPlan(@PathVariable Long caseId) {
+        return ResponseEntity.ok(adminService.getPlan(caseId));
     }
 }

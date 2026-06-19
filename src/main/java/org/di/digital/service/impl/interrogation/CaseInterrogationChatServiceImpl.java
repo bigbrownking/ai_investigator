@@ -22,7 +22,7 @@ import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationCaseChatRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationChatRepository;
 import org.di.digital.repository.user.UserRepository;
-import org.di.digital.service.CaseInterrogationChatService;
+import org.di.digital.service.interrogation.CaseInterrogationChatService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.StreamingService;
 import org.springframework.beans.factory.annotation.Value;

@@ -16,7 +16,7 @@ import org.di.digital.repository.plan.PlanEditHistoryRepository;
 import org.di.digital.repository.plan.PlanNotificationRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
-import org.di.digital.service.PlanService;
+import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.DocumentFormatterService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.di.digital.util.Mapper;
@@ -45,10 +45,9 @@ import java.util.Map;
 import static org.di.digital.util.requests.RequestBodyBuilder.planBody;
 import static org.di.digital.util.requests.RequestUrlBuilder.planGeneratorUrl;
 import static org.di.digital.util.requests.RequestUrlBuilder.planUpdateUrl;
-import static org.di.digital.util.requests.UserUtil.isRegAdmin;
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 import static org.di.digital.util.requests.RequestBodyBuilder.manualStatusBody;
 import static org.di.digital.util.requests.RequestUrlBuilder.manualStatusUrl;
+import static org.di.digital.util.requests.UserUtil.*;
 
 @Slf4j
 @Service
@@ -186,7 +185,7 @@ public class PlanServiceImpl implements PlanService {
         return owner.getSurname() + " " + owner.getName().charAt(0) + "." + owner.getFathername().charAt(0);
     }
 
-    private Map<String, Object> enrichPlanWithStatus(Map<String, Object> plan) {
+    public Map<String, Object> enrichPlanWithStatus(Map<String, Object> plan) {
         if (plan == null) return null;
 
         Map<String, Object> result = new java.util.LinkedHashMap<>(plan);
@@ -688,7 +687,7 @@ public class PlanServiceImpl implements PlanService {
                 .map(mapper::toPlanEditHistoryDto)
                 .toList();
     }
-    public static boolean canWithdraw(PlanStatus status) {
+    public boolean canWithdraw(PlanStatus status) {
         return status == PlanStatus.PENDING
                 || status == PlanStatus.APPROVED_L1
                 || status == PlanStatus.APPROVED_L2;
@@ -755,13 +754,14 @@ public class PlanServiceImpl implements PlanService {
             log.warn("Failed to sync plan to AI for case {}: {}", caseNumber, e.getMessage());
         }
     }
-    private String getReviewerName(Case caseEntity) {
+
+    public String getReviewerName(Case caseEntity) {
         User reviewer = caseEntity.getPlanReviewedBy();
         if (reviewer == null) return null;
         return reviewer.getSurname() + " " + reviewer.getName().charAt(0) + ".";
     }
 
-    private String getApproverName(Case caseEntity) {
+    public String getApproverName(Case caseEntity) {
         User approver = caseEntity.getPlanApprovedBy();
         if (approver == null) return null;
         return approver.getSurname() + " " + approver.getName().charAt(0) + ".";

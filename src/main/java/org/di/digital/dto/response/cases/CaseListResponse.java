@@ -14,6 +14,9 @@ public class CaseListResponse {
     private String title;
     private String number;
     private boolean status;
+    private boolean hasQualification;
+    private boolean hasIndictment;
+    private boolean hasPlan;
     private int totalDocuments;
     private int totalPages;
     private int totalInterrogations;

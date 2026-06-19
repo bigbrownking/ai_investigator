@@ -333,11 +333,11 @@ public class MinioServiceImpl implements MinioService {
     }
     private void validateFileType(String fileName) {
         if (fileName == null || !fileName.contains(".")) {
-            throw new IllegalArgumentException("Файл должен иметь расширение: " + fileName);
+            throw new IllegalStateException("Файл должен иметь расширение: " + fileName);
         }
         String extension = fileName.substring(fileName.lastIndexOf(".") + 1).toLowerCase();
         if (!ALLOWED_EXTENSIONS.contains(extension)) {
-            throw new IllegalArgumentException(
+            throw new IllegalStateException(
                     "Недопустимый тип файла: " + fileName +
                             ". Разрешены: pdf, doc, docx, xls, xlsx");
         }
@@ -345,7 +345,7 @@ public class MinioServiceImpl implements MinioService {
 
     private void validatePdfOnly(String fileName) {
         if (fileName == null || !fileName.toLowerCase().endsWith(".pdf")) {
-            throw new IllegalArgumentException("Осмотр поддерживает только PDF файлы: " + fileName);
+            throw new IllegalStateException("Осмотр поддерживает только PDF файлы: " + fileName);
         }
     }
 }

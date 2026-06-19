@@ -14,7 +14,7 @@ import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.plan.PlanApprovalHistoryRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
-import org.di.digital.service.PlanApprovalService;
+import org.di.digital.service.plan.PlanApprovalService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.di.digital.util.Mapper;
 import org.springframework.security.access.AccessDeniedException;

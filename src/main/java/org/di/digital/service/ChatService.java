@@ -9,7 +9,6 @@ public interface ChatService {
     void streamCaseChatResponseWithHistory(String caseNumber, ChatRequest request, String userEmail, SseEmitter emitter);
 
     void streamChatResponse(ChatRequest request, SseEmitter emitter);
-
     CaseChatHistoryResponse getChatHistoryByCaseNumber(String caseNumber, String userEmail, int page, int size);
 
     CaseChatHistoryResponse getChatHistory(Long caseId, Long userId, int page, int size);

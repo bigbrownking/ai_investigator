@@ -6,7 +6,7 @@ import org.di.digital.dto.request.interrogation.CleanTranscriptRequest;
 import org.di.digital.dto.request.interrogation.ReformulateQuestionRequest;
 import org.di.digital.dto.response.interrogation.CleanTranscriptResponse;
 import org.di.digital.dto.response.interrogation.ReformulateQuestionResponse;
-import org.di.digital.service.CaseInterrogationReformulateService;
+import org.di.digital.service.interrogation.CaseInterrogationReformulateService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;

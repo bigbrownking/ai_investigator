@@ -31,6 +31,11 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
             return false;
         }
 
+        String path = request.getURI().getPath();
+        if (path.endsWith("/info")) {
+            return true;
+        }
+
         String token = extractToken(servletRequest);
         String email = extractAndValidateEmail(token, servletRequest);
 
