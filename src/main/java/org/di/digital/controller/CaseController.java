@@ -89,6 +89,19 @@ public class CaseController {
         return ResponseEntity.ok(response);
     }
 
+    @PatchMapping("/{caseId}/files/{fileId}/qualification")
+    public ResponseEntity<Void> toggleQualification(
+            @PathVariable Long caseId,
+            @PathVariable Long fileId,
+            @RequestParam boolean isQualification,
+            Authentication authentication
+    ) {
+        log.info("Setting qualification={} for file {} in case {} by user {}",
+                isQualification, fileId, caseId, authentication.getName());
+        caseFileService.setQualification(caseId, fileId, isQualification, authentication.getName());
+        return ResponseEntity.ok().build();
+    }
+
     @PutMapping("/{caseId}/files/reorder")
     public ResponseEntity<GroupedCaseFileResponse> reorderCaseFiles(
             @PathVariable Long caseId,

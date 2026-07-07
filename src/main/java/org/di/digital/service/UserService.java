@@ -1,7 +1,7 @@
 package org.di.digital.service;
 
-import org.di.digital.dto.request.UpdateProfileRequest;
-import org.di.digital.dto.request.UserSettingsRequest;
+import org.di.digital.dto.request.user.UpdateProfileRequest;
+import org.di.digital.dto.request.user.UserSettingsRequest;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.model.user.User;
 

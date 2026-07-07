@@ -11,4 +11,6 @@ import java.util.Optional;
 public interface CaseInterrogationQARepository extends JpaRepository<CaseInterrogationQA, Long> {
     List<CaseInterrogationQA> findByInterrogationIdOrderByOrderIndexAsc(Long interrogationId);
     Optional<CaseInterrogationQA> findByIdAndInterrogationId(Long id, Long interrogationId);
+
+    long countByIsReformulatedTrue();
 }

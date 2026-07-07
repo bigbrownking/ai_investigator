@@ -6,7 +6,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.auth.FaceLoginRequest;
 import org.di.digital.dto.request.auth.LivenessVerifyRequest;
-import org.di.digital.dto.response.JwtResponse;
+import org.di.digital.dto.response.auth.JwtResponse;
 import org.di.digital.dto.response.auth.ChallengeResponse;
 import org.di.digital.dto.response.auth.FaceStatusResponse;
 import org.di.digital.dto.response.auth.LivenessChallengeResponse;
@@ -84,7 +84,7 @@ public class FaceAuthServiceImpl implements FaceAuthService {
     @Override
     public ChallengeResponse generateChallenge(String iin) {
         userRepository.findByIin(iin)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
 
         String challengeId = UUID.randomUUID().toString();
         challengeStore.put(challengeId, iin);
@@ -102,7 +102,7 @@ public class FaceAuthServiceImpl implements FaceAuthService {
     @Override
     public LivenessChallengeResponse generateLivenessChallenge(String iin) {
         userRepository.findByIin(iin)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
 
         List<LivenessStep> steps = new java.util.ArrayList<>(ALL_STEPS);
         java.util.Collections.shuffle(steps);
@@ -185,7 +185,7 @@ public class FaceAuthServiceImpl implements FaceAuthService {
         }
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
 
         if (!user.getIin().equals(livenessData.getIin())) {
             throw new IllegalStateException("Liveness токен не соответствует пользователю");
@@ -232,7 +232,7 @@ public class FaceAuthServiceImpl implements FaceAuthService {
         }
 
         User user = userRepository.findByIin(request.getIin())
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
 
         if (!user.isActive()) {
             throw new IllegalStateException("Пользователь не активен");
@@ -243,10 +243,12 @@ public class FaceAuthServiceImpl implements FaceAuthService {
             throw new IllegalStateException("Face ID не настроен для данного пользователя");
         }
 
-        double minDistance = templates.stream()
-                .mapToDouble(t -> euclideanDistance(request.getDescriptor(), t.getDescriptor()))
-                .min()
-                .orElse(Double.MAX_VALUE);
+        UserFaceTemplate bestMatch = templates.stream()
+                .min(java.util.Comparator.comparingDouble(
+                        t -> euclideanDistance(request.getDescriptor(), t.getDescriptor())))
+                .orElseThrow(() -> new IllegalStateException("Face ID не настроен для данного пользователя"));
+
+        double minDistance = euclideanDistance(request.getDescriptor(), bestMatch.getDescriptor());
 
         if (minDistance > threshold) {
             logService.log(
@@ -255,6 +257,9 @@ public class FaceAuthServiceImpl implements FaceAuthService {
             );
             throw new IllegalStateException("Лицо не распознано");
         }
+
+        bestMatch.setLastUsedAt(LocalDateTime.now());
+        faceTemplateRepository.save(bestMatch);
 
         logService.log(
                 String.format("Face login success for iin %s", request.getIin()),
@@ -274,8 +279,13 @@ public class FaceAuthServiceImpl implements FaceAuthService {
     @Transactional
     public void removeFace(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
-        faceTemplateRepository.deleteByUser(user);
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
+
+        List<UserFaceTemplate> activeTemplates = faceTemplateRepository.findByUserAndRevokedAtIsNull(user);
+        LocalDateTime now = LocalDateTime.now();
+        activeTemplates.forEach(t -> t.setRevokedAt(now));
+        faceTemplateRepository.saveAll(activeTemplates);
+
         logService.log(
                 String.format("Face templates removed for user %s", email),
                 LogLevel.INFO, LogAction.FACE_REMOVE, null, email
@@ -285,7 +295,7 @@ public class FaceAuthServiceImpl implements FaceAuthService {
     @Override
     public FaceStatusResponse getFaceStatus(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
 
         List<UserFaceTemplate> templates = faceTemplateRepository.findByUserAndRevokedAtIsNull(user);
 
@@ -294,6 +304,7 @@ public class FaceAuthServiceImpl implements FaceAuthService {
                 .templatesCount(templates.size())
                 .build();
     }
+
 
     private void validateDescriptor(List<Double> descriptor) {
         if (descriptor == null || descriptor.size() != descriptorLength) {

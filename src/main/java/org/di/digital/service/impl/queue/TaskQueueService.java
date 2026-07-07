@@ -202,7 +202,7 @@ public class TaskQueueService {
     }
     public void failTask(Long caseFileId, String errorMessage) {
         List<TaskQueue> tasks = taskQueueRepository
-                .findByCaseFileIdAndStatus(caseFileId, TaskStatus.PROCESSING); // ← фильтр по статусу
+                .findByCaseFileIdAndStatus(caseFileId, TaskStatus.PROCESSING);
 
         if (!tasks.isEmpty()) {
             TaskQueue task = tasks.get(0);
@@ -223,5 +223,21 @@ public class TaskQueueService {
     public void deleteTasksByCaseId(Long caseId){ taskQueueRepository.deleteByCaseId(caseId);}
     public Long getProcessingTasksCount() {
         return taskQueueRepository.countByStatus(TaskStatus.PROCESSING);
+    }
+
+    public Double getAverageProcessingDuration() {
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(
+                        Criteria.where("status").is(TaskStatus.COMPLETED)
+                                .and("processingDurationSeconds").ne(null)
+                ),
+                Aggregation.group().avg("processingDurationSeconds").as("avgDuration")
+        );
+
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(aggregation, "task_queue", Document.class);
+
+        Document result = results.getUniqueMappedResult();
+        return result != null ? result.getDouble("avgDuration") : null;
     }
 }

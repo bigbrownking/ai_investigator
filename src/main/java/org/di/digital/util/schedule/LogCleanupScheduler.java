@@ -16,7 +16,7 @@ public class LogCleanupScheduler {
     private int cleanup;
 
     private final LogService logService;
-    @Scheduled(cron = "0 0 2 * * *")
+    @Scheduled(cron = "${scheduler.log.cleanup}", zone = "Asia/Almaty")
     public void cleanupOldLogs() {
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(cleanup);
         logService.deleteOldLogs(cutoffDate);

@@ -88,6 +88,11 @@ public class DictionaryController {
         return ResponseEntity.ok(professionRepository.findAllOrdered().stream().map(mapper::toProfessionDto).collect(Collectors.toList()));
     }
 
+    @GetMapping("/professionsAdmin")
+    public ResponseEntity<List<ProfessionDto>> getFullProfessions(){
+        return ResponseEntity.ok(professionRepository.findAllForAdmin().stream().map(mapper::toProfessionDto).collect(Collectors.toList()));
+    }
+
     @GetMapping("/ranks")
     public ResponseEntity<List<RankDto>> getRanks() {
         return ResponseEntity.ok(rankRepository.findAll().stream().map(mapper::toRankDto).collect(Collectors.toList()));

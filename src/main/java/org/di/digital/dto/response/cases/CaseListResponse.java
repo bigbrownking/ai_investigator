@@ -3,6 +3,7 @@ package org.di.digital.dto.response.cases;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.List;
 
 @Getter
 @Setter
@@ -25,4 +26,5 @@ public class CaseListResponse {
     private LocalDateTime lastActivityDate;
     private String lastActivityType;
     private String ownerEmail;
+    private List<String> participantEmails;
 }

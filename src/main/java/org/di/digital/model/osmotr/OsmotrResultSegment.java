@@ -6,14 +6,17 @@ import lombok.*;
 
 @Entity
 @Table(name = "osmotr_result_segments")
-@Getter @Setter @Builder @NoArgsConstructor @AllArgsConstructor
+@Getter
+@Setter
+@Builder
+@NoArgsConstructor
+@AllArgsConstructor
 public class OsmotrResultSegment {
-
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    private String docId;
+    private String title;
     private Integer startPage;
     private Integer endPage;
 
@@ -21,7 +24,11 @@ public class OsmotrResultSegment {
     private String inspectionText;
 
     @Builder.Default
-    private Boolean needed = true;
+    private Boolean evidenceNeeded = false;
+
+    @Builder.Default
+    private Boolean returnNeeded = false;
+
     private String fileUrl;
 
     @JsonIgnore

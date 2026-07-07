@@ -2,10 +2,10 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.osmotr.UpdateSegmentSelectionRequest;
-import org.di.digital.model.osmotr.OsmotrResult;
-import org.di.digital.repository.osmotr.OsmotrResultRepository;
-import org.di.digital.service.impl.queue.OsmotrService;
+import org.di.digital.dto.request.osmotr.DistributionRequest;
+import org.di.digital.dto.response.osmotr.OsmotrResultDto;
+import org.di.digital.model.enums.OsmotrFileType;
+import org.di.digital.service.OsmotrService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -27,62 +27,67 @@ public class OsmotrController {
     private final OsmotrService digitalOsmotrService;
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    public ResponseEntity<OsmotrResult> submit(
+    public ResponseEntity<OsmotrResultDto> submit(
             @PathVariable String caseNumber,
             @RequestParam("file") MultipartFile file,
-            Authentication authentication
-    ) throws Exception {
-        OsmotrResult result = digitalOsmotrService.submitDocument(
-                caseNumber, authentication.getName(), file
-        );
-        return ResponseEntity.accepted().body(result);
+            Authentication authentication) throws Exception {
+        return ResponseEntity.accepted().body(
+                digitalOsmotrService.submitDocument(caseNumber, authentication.getName(), file));
     }
 
     @GetMapping
-    public ResponseEntity<List<OsmotrResult>> getResults(@PathVariable String caseNumber,
-                                                         Authentication authentication) {
-        return ResponseEntity.ok(digitalOsmotrService.getResultsByCaseNumber(caseNumber, authentication.getName()));
+    public ResponseEntity<List<OsmotrResultDto>> getResults(
+            @PathVariable String caseNumber,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                digitalOsmotrService.getResultsByCaseNumber(caseNumber, authentication.getName()));
     }
 
     @GetMapping("/{resultId}")
-    public ResponseEntity<OsmotrResult> getResult(@PathVariable String caseNumber,
-                                                  @PathVariable Long resultId,
-                                                  Authentication authentication) {
+    public ResponseEntity<OsmotrResultDto> getResult(
+            @PathVariable String caseNumber,
+            @PathVariable Long resultId,
+            Authentication authentication) {
         return digitalOsmotrService.getResult(caseNumber, resultId, authentication.getName())
                 .map(ResponseEntity::ok)
                 .orElse(ResponseEntity.notFound().build());
     }
 
-    @PatchMapping("/{resultId}/segments")
-    public ResponseEntity<OsmotrResult> updateSegments(
+    @PutMapping("/{resultId}/distribution")
+    public ResponseEntity<OsmotrResultDto> updateDistribution(
             @PathVariable String caseNumber,
             @PathVariable Long resultId,
-            @RequestBody UpdateSegmentSelectionRequest request,
-            Authentication authentication
-    ) {
-        //TODO /api/submit-decisions model request
-        return ResponseEntity.ok(digitalOsmotrService.updateSegmentSelection(
-                caseNumber, resultId, request, authentication.getName()
-        ));
+            @RequestBody DistributionRequest request,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                digitalOsmotrService.updateDistribution(caseNumber, resultId, request, authentication.getName()));
+    }
+
+    @GetMapping("/{resultId}/segments/{segmentId}/download")
+    public ResponseEntity<byte[]> downloadSegment(
+            @PathVariable String caseNumber,
+            @PathVariable Long resultId,
+            @PathVariable Long segmentId,
+            Authentication authentication) {
+        byte[] pdf = digitalOsmotrService.downloadSegment(caseNumber, resultId, segmentId, authentication.getName());
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + encode("документ.pdf", StandardCharsets.UTF_8))
+                .contentType(MediaType.APPLICATION_PDF)
+                .body(pdf);
     }
 
     @GetMapping("/{resultId}/merge")
     public ResponseEntity<byte[]> mergeSegments(
             @PathVariable String caseNumber,
             @PathVariable Long resultId,
-            @RequestParam(defaultValue = "true") boolean needed,
-            Authentication authentication
-    ) throws Exception {
-        byte[] pdf = digitalOsmotrService.mergeSegments(
-                caseNumber, resultId, needed, authentication.getName()
-        );
-
-        String fileName = needed ? "вещественные_документы.pdf" : "возврат.pdf";
-
+            @RequestParam String type,
+            Authentication authentication) throws Exception {
+        byte[] pdf = digitalOsmotrService.mergeSegments(caseNumber, resultId, type, authentication.getName());
+        String fileName = "EVIDENCE".equals(type) ? "вещественные_документы.pdf" : "возврат.pdf";
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename*=UTF-8''" +
-                                encode(fileName, StandardCharsets.UTF_8))
+                        "attachment; filename*=UTF-8''" + encode(fileName, StandardCharsets.UTF_8))
                 .contentType(MediaType.APPLICATION_PDF)
                 .body(pdf);
     }
@@ -92,26 +97,19 @@ public class OsmotrController {
     public ResponseEntity<byte[]> downloadGeneratedFile(
             @PathVariable String caseNumber,
             @PathVariable Long resultId,
-            @RequestParam String fileType,
-            Authentication authentication
-    ) throws Exception {
+            @RequestParam OsmotrFileType fileType,
+            Authentication authentication) {
         byte[] file = digitalOsmotrService.downloadGeneratedFile(
-                caseNumber, resultId, fileType, authentication.getName()
-        );
-
+                caseNumber, resultId, fileType.getValue().toLowerCase(), authentication.getName());
         String fileName = switch (fileType) {
-            case "return" -> "возврат.docx";
-            case "evidence" -> "вещественные_документы.docx";
-            case "report" -> "отчет_осмотра.docx";
-            default -> throw new IllegalArgumentException("Unknown file_type: " + fileType);
+            case RETURN -> "возврат.docx";
+            case EVIDENCE -> "вещественные_документы.docx";
+            case REPORT -> "постановление.docx";
         };
-
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
-                        "attachment; filename*=UTF-8''" +
-                                encode(fileName, StandardCharsets.UTF_8))
+                        "attachment; filename*=UTF-8''" + encode(fileName, StandardCharsets.UTF_8))
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(file);
     }
-
 }

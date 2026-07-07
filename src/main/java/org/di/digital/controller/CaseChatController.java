@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.service.ChatService;
+import org.di.digital.service.impl.core.SseHeartbeatUtil;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
@@ -22,6 +23,7 @@ import java.util.concurrent.TimeUnit;
 public class CaseChatController {
 
     private final ChatService chatService;
+    private final SseHeartbeatUtil heartbeatUtil;
 
     @PostMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamChat(
@@ -32,7 +34,7 @@ public class CaseChatController {
         log.info("Starting chat stream for case: {} by user: {}", caseNumber, authentication.getName());
 
         SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(10));
-
+        heartbeatUtil.startHeartbeat(emitter);
         emitter.onCompletion(() -> log.info("Chat stream completed for case: {}", caseNumber));
         emitter.onTimeout(() -> {
             log.warn("Chat stream timed out for case: {}", caseNumber);

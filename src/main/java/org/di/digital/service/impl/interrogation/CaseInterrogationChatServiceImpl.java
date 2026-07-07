@@ -255,15 +255,67 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         CaseChatMessage message = chatMessageRepository.findById(messageId)
                 .orElseThrow(() -> new IllegalStateException("Сообщение не найдено: " + messageId));
 
+        if (Boolean.valueOf(selected).equals(message.getIsSelected())) {
+            return;
+        }
+
+        if (selected && MessageRole.ASSISTANT.equals(message.getRole())) {
+            CaseInterrogationChat chat = message.getInterrogationChat();
+            if (chat != null) {
+                List<CaseChatMessage> siblings = findGroupSiblings(chat.getId(), messageId);
+                siblings.forEach(s -> s.setIsSelected(false));
+                chatMessageRepository.saveAll(siblings);
+            }
+        }
+
         message.setIsSelected(selected);
+        chatMessageRepository.save(message);
+
         logService.log(
-                String.format("Message %s select in case %s", message.getContent(), caseEntity.getNumber()),
+                String.format("Message %s %s in case %s", messageId, selected ? "selected" : "deselected", caseEntity.getNumber()),
                 LogLevel.INFO,
                 LogAction.MESSAGE_SELECTED,
                 caseEntity.getNumber(),
                 user.getEmail()
         );
-        chatMessageRepository.save(message);
+    }
+
+    private List<CaseChatMessage> findGroupSiblings(Long chatId, Long targetMessageId) {
+        List<CaseChatMessage> all = chatMessageRepository
+                .findByInterrogationChatIdOrderByIdAsc(chatId, PageRequest.of(0, Integer.MAX_VALUE))
+                .getContent();
+
+        int targetIdx = -1;
+        for (int i = 0; i < all.size(); i++) {
+            if (all.get(i).getId().equals(targetMessageId)) {
+                targetIdx = i;
+                break;
+            }
+        }
+        if (targetIdx == -1) return List.of();
+
+        int start = targetIdx;
+        for (int i = targetIdx - 1; i >= 0; i--) {
+            if (MessageRole.USER.equals(all.get(i).getRole())) {
+                start = i + 1;
+                break;
+            }
+            if (i == 0) start = 0;
+        }
+
+        int end = all.size();
+        for (int i = targetIdx + 1; i < all.size(); i++) {
+            if (MessageRole.USER.equals(all.get(i).getRole())) {
+                end = i;
+                break;
+            }
+        }
+
+        return all.subList(start, end).stream()
+                .filter(m -> !m.getId().equals(targetMessageId))
+                .filter(m -> MessageRole.ASSISTANT.equals(m.getRole()))
+                .filter(m -> Boolean.TRUE.equals(m.getIsSelected()))
+                .toList();
     }
 
 
@@ -273,15 +325,15 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                                                     ChatRequest request, String userEmail,
                                                     SseEmitter emitter) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
 
         CaseInterrogationCaseChat chat = getOrCreateCaseInterrogationChat(interrogation, user);
 
@@ -332,9 +384,9 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     public CaseChatHistoryResponse getCaseInterrogationChatHistory(Long caseId, Long interrogationId,
                                                                    String userEmail, int page, int size) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         CaseInterrogationCaseChat chat = caseInterrogationCaseChatRepository
@@ -367,14 +419,14 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     @Transactional
     public void clearCaseInterrogationChatHistory(Long caseId, Long interrogationId, String userEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         CaseInterrogationCaseChat chat = caseInterrogationCaseChatRepository
                 .findByInterrogationIdAndUserId(interrogationId, user.getId())
-                .orElseThrow(() -> new RuntimeException("Чат не найден для допроса: " + interrogationId));
+                .orElseThrow(() -> new IllegalStateException("Чат не найден для допроса: " + interrogationId));
 
         chatMessageRepository.deleteAllByCaseInterrogationCaseChatId(chat.getId());
         chat.getMessages().clear();

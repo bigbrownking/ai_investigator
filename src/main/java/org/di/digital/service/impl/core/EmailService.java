@@ -32,7 +32,7 @@ public class EmailService {
             log.info("Reset password email sent to: {}", toEmail);
         } catch (Exception e) {
             log.error("Failed to send email to {}: {}", toEmail, e.getMessage());
-            throw new RuntimeException("Не удалось отправить письмо");
+            throw new IllegalStateException("Не удалось отправить письмо");
         }
     }
 }

@@ -1,7 +1,7 @@
 package org.di.digital.service.auth;
 
 import org.di.digital.dto.request.auth.*;
-import org.di.digital.dto.response.JwtResponse;
+import org.di.digital.dto.response.auth.JwtResponse;
 
 public interface AuthService {
     String signupAlisher(SignUpRequest request);

@@ -10,4 +10,6 @@ import java.util.Optional;
 @Repository
 public interface OsmotrResultRepository extends JpaRepository<OsmotrResult, Long> {
     List<OsmotrResult> findByCaseNumber(String caseNumber);
+    Optional<OsmotrResult> findFirstByCaseNumber(String caseNumber);
+
 }

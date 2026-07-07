@@ -287,7 +287,8 @@ public class PlanServiceImpl implements PlanService {
         boolean isAdvancedUser = user.hasRole("ADVANCED_USER");
 
         if (isAdvancedUser) {
-            caseEntity.setPlanStatus(PlanStatus.APPROVED_L1);
+            PlanStatus planStatus = user.getProfession().getId() == 3L ? PlanStatus.APPROVED_L1 : PlanStatus.APPROVED_L2;
+            caseEntity.setPlanStatus(planStatus);
             caseEntity.setPlanSubmittedAt(LocalDateTime.now());
             caseEntity.setPlanAgreedAt(LocalDateTime.now());
             caseEntity.setPlanReviewedBy(user);
@@ -296,8 +297,8 @@ public class PlanServiceImpl implements PlanService {
             caseRepository.save(caseEntity);
 
             userRepository
-                    .findActiveByProfessionIdAndRegionIdAndAdministrationId(
-                            ApprovalLevel.LEVEL_FINAL.getProfessionId(), regionId, administrationId)
+                    .findActiveByProfessionIdAndRegionId(
+                            ApprovalLevel.LEVEL_FINAL.getProfessionId(), regionId)
                     .forEach(a -> notificationService.notifyApproverPlanAwaiting(
                             caseEntity, a, ApprovalLevel.LEVEL_FINAL.getLevel()));
 
@@ -332,17 +333,16 @@ public class PlanServiceImpl implements PlanService {
     public List<ManagementPendingPlanDto> getManagementPendingPlans(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
-
-        if (user.getAdministration() == null) {
-            throw new IllegalStateException("У пользователя не назначено управление");
-        }
         List<Case> cases;
         if (user.hasRole("ADVANCED_USER")) {
-            cases = caseRepository.findByOwnerAdministrationId(user.getAdministration().getId());
-        } else {
-            cases = caseRepository.findByPlanStatusInAndOwnerAdministrationId(
-                    List.of(PlanStatus.APPROVED_L1, PlanStatus.APPROVED_L2, PlanStatus.APPROVED_L3),
+            cases = caseRepository.findByPlanStatusInAndOwnerRegionIdAndOwnerAdministrationId(
+                    List.of(PlanStatus.PENDING, PlanStatus.APPROVED_L1, PlanStatus.APPROVED_L2, PlanStatus.APPROVED_L3),
+                    user.getRegion().getId(),
                     user.getAdministration().getId());
+        } else {
+            cases = caseRepository.findByPlanStatusInAndOwnerRegionId(
+                    List.of(PlanStatus.APPROVED_L1, PlanStatus.APPROVED_L2, PlanStatus.APPROVED_L3),
+                    user.getRegion().getId());
         }
 
         return cases.stream()

@@ -2,7 +2,7 @@ package org.di.digital.service.impl.admin;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.UpdateProfileRequest;
+import org.di.digital.dto.request.user.UpdateProfileRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
@@ -21,13 +21,17 @@ import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.AppealStatus;
+import org.di.digital.model.enums.MessageRole;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.support.Review;
 import org.di.digital.model.support.SupportTicket;
 import org.di.digital.model.user.*;
 import org.di.digital.repository.*;
+import org.di.digital.repository.cases.CaseAnalyticsRepository;
+import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.interrogation.CaseInterrogationQARepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
@@ -36,6 +40,8 @@ import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.repository.user.*;
 import org.di.digital.service.AdminService;
+import org.di.digital.service.CaseAnalyticsService;
+import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.LocalizationHelper;
@@ -69,8 +75,11 @@ public class AdminServiceImpl implements AdminService {
     private final AdministrationRepository administrationRepository;
     private final RankRepository rankRepository;
     private final LogRepository logRepository;
+    private final CaseChatMessageRepository chatMessageRepository;
+    private final CaseInterrogationQARepository caseInterrogationQARepository;
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final CaseFileRepository caseFileRepository;
+    private final CaseAnalyticsRepository caseAnalyticsRepository;
     private final Mapper mapper;
     private final LocalizationHelper localizationHelper;
     private final SupportTicketRepository supportTicketRepository;
@@ -205,6 +214,11 @@ public class AdminServiceImpl implements AdminService {
         long totalIndictments = caseRepository.countByIndictmentIsNotEmpty();
         long totalAudios = caseInterrogationRepository.countWithAudio();
         long totalPages = caseFileRepository.countPages();
+        Double avgQualificationScore = caseAnalyticsRepository.getAverageQualificationScorePercent();
+        long totalAiMessages = chatMessageRepository.countByRole(MessageRole.ASSISTANT);
+        long totalSelectedMessages = chatMessageRepository.countByIsSelectedTrue();
+        long totalReformulatedMessages = caseInterrogationQARepository.countByIsReformulatedTrue();
+
         return AdminStatsDto.builder()
                 .totalUsers(totalUsers)
                 .activeUsers(activeUsers)
@@ -218,6 +232,10 @@ public class AdminServiceImpl implements AdminService {
                 .totalPages(totalPages)
                 .totalQualifications(totalQualifications)
                 .totalIndictments(totalIndictments)
+                .totalAiMessages(totalAiMessages)
+                .totalSelectedMessages(totalSelectedMessages)
+                .totalReformulatedMessages(totalReformulatedMessages)
+                .avgQualificationScorePercent(avgQualificationScore)
                 .build();
     }
 
@@ -300,7 +318,7 @@ public class AdminServiceImpl implements AdminService {
                 .orElseThrow(() -> new IllegalStateException("Админ не найден"));
 
         Appeal appeal = appealRepository.findById(appealId)
-                .orElseThrow(() -> new RuntimeException("Обращение не найдено"));
+                .orElseThrow(() -> new IllegalStateException("Обращение не найдено"));
 
         appeal.setStatus(AppealStatus.APPROVED);
         appeal.setReviewedBy(admin);
@@ -318,10 +336,10 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void rejectAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new RuntimeException("Админ не найден"));
+                .orElseThrow(() -> new IllegalStateException("Админ не найден"));
 
         Appeal appeal = appealRepository.findById(appealId)
-                .orElseThrow(() -> new RuntimeException("Обращение не найдено"));
+                .orElseThrow(() -> new IllegalStateException("Обращение не найдено"));
 
         appeal.setStatus(AppealStatus.REJECTED);
         appeal.setReviewedBy(admin);
@@ -335,7 +353,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public Page<LogDto> getUserLogs(String email, int page, int size) {
         userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
         return logRepository.findByEmail(email, PageRequest.of(page, size))
                 .map(mapper::toLogDto);
     }
@@ -352,7 +370,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public SupportTicketDto getSupportTicketDetail(Long id) {
         SupportTicket ticket = supportTicketRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Тикет не найден: " + id));
+                .orElseThrow(() -> new IllegalStateException("Тикет не найден: " + id));
         return mapper.mapToSupportTicketDto(ticket);
     }
 
@@ -368,7 +386,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public ReviewDto getReviewDetail(Long id) {
         Review review = reviewRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Рецензия не найдена: " + id));
+                .orElseThrow(() -> new IllegalStateException("Рецензия не найдена: " + id));
         return mapper.mapToReviewDto(review);
     }
 
@@ -376,10 +394,10 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void assignAdvancedUserRole(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
         Role role = roleRepository.findByName("ADVANCED_USER")
-                .orElseThrow(() -> new RuntimeException("Роль не найдена"));
+                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
 
         user.getRoles().add(role);
 
@@ -396,16 +414,16 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void assignRegAdminRole(String email, List<String> regions) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
         Role regAdminRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new RuntimeException("Роль не найдена"));
+                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
 
         user.getRoles().add(regAdminRole);
 
         for (String regionName : regions) {
             Region reg = regionRepository.findByRuName(regionName)
-                    .orElseThrow(() -> new RuntimeException("Регион не найден: " + regionName));
+                    .orElseThrow(() -> new IllegalStateException("Регион не найден: " + regionName));
 
             if (!reg.getAdmins().contains(user)) {
                 reg.getAdmins().add(user);
@@ -421,14 +439,14 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void removeRegAdminRole(String email, List<String> regions) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
         Role regAdminRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new RuntimeException("Роль не найдена"));
+                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
 
         for (String regionName : regions) {
             Region reg = regionRepository.findByRuName(regionName)
-                    .orElseThrow(() -> new RuntimeException("Регион не найден: " + regionName));
+                    .orElseThrow(() -> new IllegalStateException("Регион не найден: " + regionName));
 
             if (!reg.getAdmins().contains(user)) {
                 throw new IllegalStateException(
@@ -451,9 +469,39 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
-    public UserProfile updateUserProfile(String email, UpdateProfileRequest request) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+    public void changeOwner(Long caseId, String newOwnerEmail) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found"));
+
+        User newOwner = userRepository.findByEmail(newOwnerEmail)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + newOwnerEmail));
+
+        if (!newOwner.isActive()) {
+            throw new IllegalStateException("Нельзя назначить неактивного пользователя владельцем");
+        }
+
+        User oldOwner = caseEntity.getOwner();
+        caseEntity.setOwner(newOwner);
+
+        if (oldOwner != null && caseEntity.hasUser(oldOwner)) {
+            caseEntity.removeUser(oldOwner);
+        }
+
+        if (!caseEntity.hasUser(newOwner)) {
+            caseEntity.addUser(newOwner);
+        }
+
+        caseRepository.save(caseEntity);
+
+        log.info("Case {} owner changed from {} to {} by admin",
+                caseId, oldOwner != null ? oldOwner.getEmail() : "null", newOwner.getEmail());
+    }
+
+    @Override
+    @Transactional
+    public UserProfile updateUserProfile(Long id, UpdateProfileRequest request) {
+        User user = userRepository.findById(id)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + id));
 
         if (request.getName() != null) {
             user.setName(request.getName());

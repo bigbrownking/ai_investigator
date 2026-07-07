@@ -1,6 +1,7 @@
 package org.di.digital.util.requests;
 
 import lombok.experimental.UtilityClass;
+import org.di.digital.model.enums.TreeModuleType;
 
 @UtilityClass
 public class RequestUrlBuilder {
@@ -26,6 +27,9 @@ public class RequestUrlBuilder {
     public static String indictmentUrl(String host, String port) {
         return buildUrl(host, port, "/generate_akt");
     }
+    public static String indictmentSectionUrl(String host, String port) {
+        return buildUrl(host, port, "/generate_akt_section");
+    }
 
     public static String interrogationQuestionsUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, String.format("/interrogation/questions/%s", caseNumber));
@@ -47,17 +51,11 @@ public class RequestUrlBuilder {
     public static String figurantUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, String.format("/workspaces/%s/figurants?include_references=true", caseNumber));
     }
-    public static String osmotrUploadUrl(String host, String port) {
-        return buildUrl(host, port, "/api/upload");
-    }
-    public static String osmotrUpReportUrl(String host, String port) {
-        return buildUrl(host, port, "/api/generate-report");
-    }
     public static String osmotrDecisionUrl(String host, String port) {
         return buildUrl(host, port, "/api/submit-decisions");
     }
-    public static String osmotrDownloadUrl(String host, String port, String fileType, String sessionId) {
-        return buildUrl(host, port, String.format("/api/download/%s?session_id=%s", fileType, sessionId));
+    public static String osmotrDownloadUrl(String host, String port, String sessionId, String fileType) {
+        return buildUrl(host, port, String.format("/api/download/%s/%s", sessionId, fileType));
     }
 
     public static String interrogationReformulateUrl(String host, String port) {
@@ -66,8 +64,17 @@ public class RequestUrlBuilder {
     public static String interrogationCleanTranscriptUrl(String host, String port) {
         return buildUrl(host, port, "/api/interrogation/transcript/clean");
     }
+    public static String analyticsQualification(String host, String port, String caseNumber){
+        return buildUrl(host, port, String.format("/qualification/%s/analytics", caseNumber));
+    }
+    //TODO 9622 port
 
     public static String planUpdateUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, String.format("/api/plan/%s", caseNumber));
+    }
+
+    public static String buildModuleUrl(String host, String port, String caseNumber, TreeModuleType moduleType) {
+        String endpoint = moduleType.getEndpoint(caseNumber);
+        return String.format(HTTP_PROTOCOL + "%s:%s%s", host, port, endpoint);
     }
 }

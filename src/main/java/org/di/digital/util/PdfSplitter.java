@@ -2,49 +2,57 @@ package org.di.digital.util;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.io.RandomAccessReadBuffer;
+import org.apache.pdfbox.multipdf.PDFMergerUtility;
+import org.apache.pdfbox.multipdf.Splitter;
 import org.apache.pdfbox.pdmodel.PDDocument;
-import org.apache.pdfbox.pdmodel.PDPage;
 import org.springframework.stereotype.Component;
 
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
-import java.io.InputStream;
 import java.util.List;
 
 @Slf4j
 @Component
 public class PdfSplitter {
 
-    public byte[] extractPages(byte[] pdfBytes, int startPage, int endPage) throws IOException {
-        try (PDDocument source = Loader.loadPDF(pdfBytes);
-             PDDocument target = new PDDocument()) {
+    public byte[] mergeSegments(List<byte[]> pdfBytesList) throws IOException {
+        PDFMergerUtility merger = new PDFMergerUtility();
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        merger.setDestinationStream(out);
 
-            int totalPages = source.getNumberOfPages();
+        for (byte[] pdfBytes : pdfBytesList) {
+            merger.addSource(new RandomAccessReadBuffer(pdfBytes));
+        }
+        merger.mergeDocuments(null);
+
+        return out.toByteArray();
+    }
+
+    public byte[] extractPages(byte[] pdfBytes, int startPage, int endPage) throws IOException {
+        try (PDDocument doc = Loader.loadPDF(new RandomAccessReadBuffer(pdfBytes))) {
+            int totalPages = doc.getNumberOfPages();
             int from = Math.max(1, startPage);
             int to = Math.min(totalPages, endPage);
 
-            for (int i = from; i <= to; i++) {
-                PDPage page = source.getPage(i - 1);
-                target.addPage(page);
+            if (from > to) {
+                log.warn("Invalid page range: startPage={}, endPage={}, totalPages={}",
+                        startPage, endPage, totalPages);
+                return new byte[0];
             }
 
-            ByteArrayOutputStream out = new ByteArrayOutputStream();
-            target.save(out);
-            return out.toByteArray();
-        }
-    }
-
-    public byte[] mergeSegments(List<byte[]> pdfBytesList) throws IOException {
-        try (PDDocument merged = new PDDocument()) {
-            for (byte[] pdfBytes : pdfBytesList) {
-                try (PDDocument source = Loader.loadPDF(pdfBytes)) {
-                    for (PDPage page : source.getPages()) {
-                        merged.addPage(page);
-                    }
-                }
+            for (int i = totalPages - 1; i >= to; i--) {
+                doc.removePage(i);
             }
+
+            for (int i = from - 2; i >= 0; i--) {
+                doc.removePage(i);
+            }
+
+            log.info("Extracted pages {}-{} from {} total pages", from, to, totalPages);
+
             ByteArrayOutputStream out = new ByteArrayOutputStream();
-            merged.save(out);
+            doc.save(out);
             return out.toByteArray();
         }
     }

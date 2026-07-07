@@ -41,7 +41,7 @@ public class OsmotrResult {
     private Long processingDurationSeconds;
     private LocalDateTime createdAt;
 
-    @OneToMany(mappedBy = "osmotrResult", cascade = CascadeType.ALL, orphanRemoval = true)
+    @OneToMany(mappedBy = "osmotrResult", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     @Builder.Default
     private List<OsmotrResultSegment> segments = new ArrayList<>();
 

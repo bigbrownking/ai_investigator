@@ -17,4 +17,5 @@ public interface AppealRepository extends JpaRepository<Appeal, Long>,
     List<Appeal> findByUserId(Long userId);
     long countByStatus(AppealStatus status);
     long countByRegionIdAndStatus(Long regionId, AppealStatus status);
+    long countByRegionIdInAndStatus(List<Long> regionIds, AppealStatus status);
 }

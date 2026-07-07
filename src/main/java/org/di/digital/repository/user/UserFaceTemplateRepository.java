@@ -9,5 +9,4 @@ import java.util.List;
 @Repository
 public interface UserFaceTemplateRepository extends JpaRepository<UserFaceTemplate, Long> {
     List<UserFaceTemplate> findByUserAndRevokedAtIsNull(User user);
-    void deleteByUser(User user);
 }

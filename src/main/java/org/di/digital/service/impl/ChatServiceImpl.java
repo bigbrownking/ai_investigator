@@ -19,6 +19,7 @@ import org.di.digital.service.CaseService;
 import org.di.digital.service.ChatService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.StreamingService;
+import org.di.digital.service.impl.core.SseHeartbeatUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -46,6 +47,8 @@ public class ChatServiceImpl implements ChatService {
     private final CaseService caseService;
     private final StreamingService streamingService;
     private final LogService logService;
+
+    private final SseHeartbeatUtil heartbeatUtil;
 
     private final ObjectMapper objectMapper;
     @Value("${model.host}")
@@ -193,7 +196,7 @@ public class ChatServiceImpl implements ChatService {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
         clearChatHistory(caseEntity.getId(), user.getId());
 
@@ -209,7 +212,7 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public void clearChatHistory(Long caseId, Long userId) {
         CaseChat chat = caseChatRepository.findByCaseIdAndUserId(caseId, userId)
-                .orElseThrow(() -> new RuntimeException("Chat not found for case: " + caseId));
+                .orElseThrow(() -> new IllegalStateException("Chat not found for case: " + caseId));
         chatMessageRepository.deleteAllByChatId(chat.getId());
         chat.getMessages().clear();
         caseChatRepository.save(chat);
@@ -221,9 +224,9 @@ public class ChatServiceImpl implements ChatService {
         return caseChatRepository.findByCaseIdAndUserId(caseId, userId)
                 .orElseGet(() -> {
                     Case c = caseRepository.findById(caseId)
-                            .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                            .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
                     User u = userRepository.findById(userId)
-                            .orElseThrow(() -> new RuntimeException("User not found: " + userId));
+                            .orElseThrow(() -> new IllegalStateException("User not found: " + userId));
                     CaseChat newChat = CaseChat.builder().caseEntity(c).user(u).active(true).build();
                     log.info("Creating new chat for case {} and user {}", caseId, u.getEmail());
                     return caseChatRepository.save(newChat);
@@ -233,7 +236,7 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     protected void updateAssistantMessage(Long messageId, String fullContent) {
         CaseChatMessage message = chatMessageRepository.findById(messageId)
-                .orElseThrow(() -> new RuntimeException("Message not found: " + messageId));
+                .orElseThrow(() -> new IllegalStateException("Message not found: " + messageId));
         message.setContent(fullContent);
         message.setComplete(true);
         chatMessageRepository.save(message);

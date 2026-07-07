@@ -34,7 +34,7 @@ public class TranscriptionResultConsumer {
         try {
             CaseInterrogation interrogation = interrogationRepository
                     .findById(message.getInterrogationId())
-                    .orElseThrow(() -> new RuntimeException("Допрос не найден: " + message.getInterrogationId()));
+                    .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + message.getInterrogationId()));
 
             boolean isOtherAudio = message.getFieldName() != null;
 
@@ -57,12 +57,15 @@ public class TranscriptionResultConsumer {
                         transcribedText = null;
                     }
                     try {
+                        log.info("Before clean: {}", transcribedText);
                         CleanTranscriptRequest cleanRequest = CleanTranscriptRequest.builder()
                                 .text(transcribedText)
                                 .language(interrogation.getLanguage().equals("русском") ? "russian" : "kazakh")
                                 .build();
+                        log.info("Clean request: {}", cleanRequest);
                         CleanTranscriptResponse cleaned = caseInterrogationReformulateService.cleanTranscript(cleanRequest);
                         if (cleaned != null && cleaned.getCorrectedText() != null) {
+                            log.info("After clean: {}", cleaned.getCorrectedText());
                             transcribedText = cleaned.getCorrectedText();
                         }
 

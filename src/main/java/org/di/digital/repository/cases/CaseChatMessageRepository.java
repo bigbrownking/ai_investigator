@@ -1,6 +1,7 @@
 package org.di.digital.repository.cases;
 
 import org.di.digital.model.cases.CaseChatMessage;
+import org.di.digital.model.enums.MessageRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -44,4 +45,7 @@ public interface CaseChatMessageRepository extends JpaRepository<CaseChatMessage
     Page<CaseChatMessage> findByCaseInterrogationCaseChatIdOrderByIdAsc(Long chatId, Pageable pageable);
     long countByCaseInterrogationCaseChatId(Long chatId);
     void deleteAllByCaseInterrogationCaseChatId(Long chatId);
+
+    long countByRole(MessageRole role);
+    long countByIsSelectedTrue();
 }

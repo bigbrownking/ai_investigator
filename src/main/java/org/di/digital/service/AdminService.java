@@ -1,6 +1,6 @@
 package org.di.digital.service;
 
-import org.di.digital.dto.request.UpdateProfileRequest;
+import org.di.digital.dto.request.user.UpdateProfileRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
@@ -19,7 +19,6 @@ import org.di.digital.dto.response.user.UserProfile;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
-import java.util.Map;
 
 public interface AdminService {
     Page<UserProfile> getAllUsers(int page, int size, UserSearchRequest userSearchRequest);
@@ -44,7 +43,8 @@ public interface AdminService {
     void assignAdvancedUserRole(String email);
     void assignRegAdminRole(String email, List<String> regions);
     void removeRegAdminRole(String email, List<String> regions);
-    UserProfile updateUserProfile(String email, UpdateProfileRequest request);
+    void changeOwner(Long caseId, String newOwnerEmail);
+    UserProfile updateUserProfile(Long id, UpdateProfileRequest request);
     //жалал не админ
     String getIndictment(Long caseId);
     String getQualification(Long caseId);

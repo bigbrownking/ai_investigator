@@ -42,4 +42,15 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
             @Param("regionId") Long regionId,
             @Param("administrationId") Long administrationId
     );
+
+    @Query("SELECT u FROM User u WHERE u.profession.id = :professionId " +
+            "AND u.region.id = :regionId " +
+            "AND u.active = true")
+    List<User> findActiveByProfessionIdAndRegionId(
+            @Param("professionId") Long professionId,
+            @Param("regionId") Long regionId
+    );
+
+    long countByRegionIdIn(List<Long> regionIds);
+    long countByRegionIdInAndActiveTrue(List<Long> regionIds);
 }

@@ -26,6 +26,7 @@ import java.util.*;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "cases")
+@EqualsAndHashCode(of = "number")
 @EntityListeners(AuditingEntityListener.class)
 public class Case {
     @Id
@@ -64,6 +65,10 @@ public class Case {
 
     @Column(columnDefinition = "TEXT")
     private String indictment;
+
+    @Column(name = "indictment_sections", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<Map<String, Object>> indictmentSections;
 
     @Column(columnDefinition = "jsonb")
     @JdbcTypeCode(SqlTypes.JSON)
@@ -160,19 +165,21 @@ public class Case {
         this.lastActivityType = activityType;
     }
 
-    public List<String> getQualificationsUploaded(){
+    public List<String> getQualificationsUploaded() {
         List<String> qualificationNames = new ArrayList<>();
-        for(CaseFile caseFile : files){
-            if(caseFile.isQualification()){
+        for (CaseFile caseFile : files) {
+            if (caseFile.isQualification()) {
                 qualificationNames.add(caseFile.getOriginalFileName());
             }
         }
         return qualificationNames;
     }
+
     public void removeInterrogation(CaseInterrogation interrogation) {
         this.interrogations.remove(interrogation);
         interrogation.setCaseEntity(null);
     }
+
     public void addFigurant(CaseFigurant figurant) {
         this.figurants.add(figurant);
         figurant.setCaseEntity(this);
@@ -197,22 +204,33 @@ public class Case {
             }
         }
     }
+
     public boolean isAtLeastOneFileProcessed() {
         return files.stream()
                 .anyMatch(f -> CaseFileStatusEnum.COMPLETED.equals(f.getStatus()));
     }
+
     public long audioUsedCount() {
         return interrogations.stream()
                 .filter(CaseInterrogation::isAudioUsed)
                 .count();
     }
-    public boolean hasQualification(){
+
+    public boolean hasQualification() {
         return qualification != null;
     }
-    public boolean hasIndictment(){
-        return indictment != null;
+
+    public boolean hasIndictment() {
+        return indictment != null || indictmentSections != null;
     }
-    public boolean hasPlan(){
+
+    public boolean hasPlan() {
         return plan != null;
+    }
+
+    public boolean hasBothQualifications() {
+        boolean hasHumanQualificationFile = files.stream()
+                .anyMatch(CaseFile::isQualification);
+        return hasQualification() && hasHumanQualificationFile;
     }
 }

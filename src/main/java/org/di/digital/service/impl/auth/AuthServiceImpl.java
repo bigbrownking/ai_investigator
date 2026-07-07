@@ -3,7 +3,7 @@ package org.di.digital.service.impl.auth;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.auth.*;
-import org.di.digital.dto.response.JwtResponse;
+import org.di.digital.dto.response.auth.JwtResponse;
 import org.di.digital.model.enums.*;
 import org.di.digital.model.user.*;
 import org.di.digital.repository.user.*;
@@ -118,16 +118,20 @@ public class AuthServiceImpl implements AuthService {
         Role userRole = roleRepository.findByName("USER")
                 .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
 
-        Region region = null;
-        if (request.getRegionId() != null) {
-            region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new IllegalStateException("Регион не найден"));
-        }
-
+        boolean isZamDep = false;
         Profession profession = null;
         if (request.getProfessionId() != null) {
             profession = professionRepository.findById(request.getProfessionId())
                     .orElseThrow(() -> new IllegalStateException("Профессия не найдена"));
+            if(profession.getId() == 7){
+                isZamDep = true;
+            }
+        }
+
+        Region region = null;
+        if (request.getRegionId() != null) {
+            region = regionRepository.findById(request.getRegionId())
+                    .orElseThrow(() -> new IllegalStateException("Регион не найден"));
         }
 
         Rank rank = null;
@@ -137,7 +141,7 @@ public class AuthServiceImpl implements AuthService {
         }
 
         Administration administration = null;
-        if (request.getAdministrationId() != null) {
+        if (request.getAdministrationId() != null && !isZamDep) {
             administration = administrationRepository.findById(request.getAdministrationId())
                     .orElseThrow(() -> new IllegalStateException("Управление не найдено"));
         }
@@ -214,19 +218,19 @@ public class AuthServiceImpl implements AuthService {
         Region region = null;
         if (request.getRegionId() != null) {
             region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new RuntimeException("Регион не найден"));
+                    .orElseThrow(() -> new IllegalStateException("Регион не найден"));
         }
 
         Profession profession = null;
         if (request.getProfessionId() != null) {
             profession = professionRepository.findById(request.getProfessionId())
-                    .orElseThrow(() -> new RuntimeException("Профессия не найдена"));
+                    .orElseThrow(() -> new IllegalStateException("Профессия не найдена"));
         }
 
         Administration administration = null;
         if (request.getAdministrationId() != null) {
             administration = administrationRepository.findById(request.getAdministrationId())
-                    .orElseThrow(() -> new RuntimeException("Управление не найдено"));
+                    .orElseThrow(() -> new IllegalStateException("Управление не найдено"));
         }
 
         User user = User.builder()
@@ -306,13 +310,13 @@ public class AuthServiceImpl implements AuthService {
 
         if (!jwtTokenUtil.validateRefreshToken(refreshToken)) {
             log.error("Invalid refresh token");
-            throw new RuntimeException("Invalid refresh token");
+            throw new IllegalStateException("Invalid refresh token");
         }
 
         String username = jwtTokenUtil.getUsernameFromJwtToken(refreshToken);
 
         User user = userRepository.findByEmail(username)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + username));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + username));
 
         boolean faceEnabled = !faceTemplateRepository.findByUserAndRevokedAtIsNull(user).isEmpty();
 
@@ -334,7 +338,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public String forgotPassword(ForgotPasswordRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
 
         String token = UUID.randomUUID().toString();
         user.setResetToken(token);
@@ -352,7 +356,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public String resetPassword(ResetPasswordRequest request) {
         User user = userRepository.findByResetToken(request.getToken())
-                .orElseThrow(() -> new RuntimeException("Неверный токен"));
+                .orElseThrow(() -> new IllegalStateException("Неверный токен"));
 
         if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
             throw new IllegalStateException("Срок действия ссылки истёк");

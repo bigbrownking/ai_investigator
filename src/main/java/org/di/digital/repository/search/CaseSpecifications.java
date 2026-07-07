@@ -8,6 +8,7 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.util.List;
 
 public class CaseSpecifications {
 
@@ -31,6 +32,21 @@ public class CaseSpecifications {
                 .and(createdAfter(req.getCreatedFrom()))
                 .and(createdBefore(req.getCreatedTo()))
                 .and(hasOwnerName(req.getOwnerName()));
+    }
+    public static Specification<Case> buildForRegions(List<Long> regionIds, CaseSearchRequest req) {
+        return Specification
+                .where(inRegions(regionIds))
+                .and(hasNumber(req.getNumber()))
+                .and(hasTitle(req.getTitle()))
+                .and(isActive(req.getStatus()))
+                .and(createdAfter(req.getCreatedFrom()))
+                .and(createdBefore(req.getCreatedTo()))
+                .and(hasOwnerName(req.getOwnerName()));
+    }
+
+    private static Specification<Case> inRegions(List<Long> regionIds) {
+        return (root, query, cb) ->
+                root.get("owner").get("region").get("id").in(regionIds);
     }
 
     private static Specification<Case> inRegion(Long regionId) {

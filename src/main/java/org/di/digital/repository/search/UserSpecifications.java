@@ -7,6 +7,8 @@ import org.di.digital.model.user.User;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
+import java.util.List;
+
 public class UserSpecifications {
 
     public static Specification<User> build(UserSearchRequest req) {
@@ -22,6 +24,23 @@ public class UserSpecifications {
                 .and(isActive(req.getActive()));
     }
 
+    public static Specification<User> buildForRegions(List<Long> regionIds, UserSearchRequest req) {
+        return Specification
+                .where(inRegions(regionIds))
+                .and(hasIin(req.getIin()))
+                .and(hasName(req.getName()))
+                .and(hasSurname(req.getSurname()))
+                .and(hasFathername(req.getFathername()))
+                .and(hasEmail(req.getEmail()))
+                .and(hasProfession(req.getProfession()))
+                .and(hasAdministration(req.getAdministration()))
+                .and(isActive(req.getActive()));
+    }
+
+    private static Specification<User> inRegions(List<Long> regionIds) {
+        return (root, query, cb) ->
+                root.get("region").get("id").in(regionIds);
+    }
     public static Specification<User> buildForRegion(Long regionId, UserSearchRequest req) {
         return Specification
                 .where(inRegion(regionId))

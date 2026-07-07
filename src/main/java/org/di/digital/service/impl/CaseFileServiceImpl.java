@@ -2,9 +2,13 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseFileRepository;
+import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.CaseFileService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.di.digital.service.impl.queue.TaskQueueService;
@@ -13,11 +17,15 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 
+import static org.di.digital.util.requests.UserUtil.validateUserAccess;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class CaseFileServiceImpl implements CaseFileService {
     private final CaseFileRepository caseFileRepository;
+    private final CaseRepository caseRepository;
+    private final UserRepository userRepository;
     private final TaskQueueService taskQueueService;
     private final NotificationService notificationService;
 
@@ -91,5 +99,24 @@ public class CaseFileServiceImpl implements CaseFileService {
         );
 
         log.info("File {} re-queued for processing by user: {}", caseFileId, email);
+    }
+
+    @Transactional
+    public void setQualification(Long caseId, Long fileId, boolean isQualification, String email) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+        validateUserAccess(caseEntity, user);
+
+        CaseFile file = caseEntity.getFiles().stream()
+                .filter(f -> f.getId().equals(fileId))
+                .findFirst()
+                .orElseThrow(() -> new IllegalStateException("File not found: " + fileId));
+
+        file.setQualification(isQualification);
+        caseFileRepository.save(file);
+
+        log.info("File {} in case {} marked as qualification={}", fileId, caseId, isQualification);
     }
 }

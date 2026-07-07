@@ -1,4 +1,4 @@
-package org.di.digital.dto.response;
+package org.di.digital.dto.response.tree;
 
 import lombok.*;
 

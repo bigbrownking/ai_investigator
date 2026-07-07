@@ -4,9 +4,12 @@ import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.user.Appeal;
+import org.di.digital.model.user.Region;
 import org.di.digital.model.user.User;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
+import org.di.digital.repository.user.RegionRepository;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.LogService;
 import org.springframework.security.access.AccessDeniedException;
@@ -16,6 +19,7 @@ import org.springframework.stereotype.Component;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.context.request.ServletRequestAttributes;
 
+import java.util.List;
 import java.util.StringTokenizer;
 
 @Slf4j
@@ -62,31 +66,58 @@ public class UserUtil {
             throw new AccessDeniedException("У вас нет доступа к этому делу");
         }
     }
-    public static void validateRegionAccess(User admin,
-                                      Case caseEntity) {
-
+    public static void validateRegionAccess(User admin, Case caseEntity, RegionRepository regionRepository) {
         if (admin.getRegion() == null) {
             throw new AccessDeniedException("У администратора нет региона");
         }
 
         User owner = caseEntity.getOwner();
+        if (owner == null || owner.getRegion() == null) {
+            throw new AccessDeniedException("Дело не принадлежит вашему региону");
+        }
 
-        if (owner == null || owner.getRegion() == null
-                || !owner.getRegion().getId().equals(admin.getRegion().getId())) {
+        List<Region> adminRegions = regionRepository.findByAdminsContaining(admin);
+        boolean hasAccess = adminRegions.stream()
+                .anyMatch(r -> r.getId().equals(owner.getRegion().getId()));
+
+        if (!hasAccess) {
             throw new AccessDeniedException("Дело не принадлежит вашему региону");
         }
     }
-    public static void validateUserRegionAccess(User admin, User user) {
-        if (admin.getRegion() == null) {
-            throw new AccessDeniedException("У администратора нет региона");
+    public static void validateUserRegionAccess(User admin, User user, RegionRepository regionRepository) {
+        List<Region> adminRegions = regionRepository.findByAdminsContaining(admin);
+
+        if (adminRegions.isEmpty()) {
+            throw new AccessDeniedException("У администратора нет регионов");
         }
-        if (user.getRegion() == null ||
-                !user.getRegion().getId().equals(admin.getRegion().getId())) {
+
+        List<Long> regionIds = adminRegions.stream().map(Region::getId).toList();
+
+        if (user.getRegion() == null || !regionIds.contains(user.getRegion().getId())) {
             throw new AccessDeniedException("Этот пользователь не принадлежит вашему региону");
+        }
+    }
+    public static List<Long> getAdminRegionIds(User admin, RegionRepository regionRepository) {
+        return regionRepository.findByAdminsContaining(admin)
+                .stream().map(Region::getId).toList();
+    }
+
+    public static void validateAppealRegionAccess(User admin, Appeal appeal, RegionRepository regionRepository) {
+        List<Long> regionIds = getAdminRegionIds(admin, regionRepository);
+
+        if (appeal.getRegion() == null || !regionIds.contains(appeal.getRegion().getId())) {
+            throw new AccessDeniedException("Это обращение не принадлежит вашему региону");
         }
     }
     public static boolean isRegAdmin(User user) {
         return user.getRoles().stream()
                 .anyMatch(r -> r.getName().equals(ROLE_REG_ADMIN));
+    }
+    public static List<Region> getAdminRegions(User admin, RegionRepository regionRepository) {
+        List<Region> regions = regionRepository.findByAdminsContaining(admin);
+        if (regions.isEmpty()) {
+            throw new IllegalStateException("У админа нет ответственных регионов");
+        }
+        return regions;
     }
 }

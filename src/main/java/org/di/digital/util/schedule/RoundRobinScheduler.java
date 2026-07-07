@@ -24,7 +24,7 @@ public class RoundRobinScheduler {
     private final CaseFileRepository caseFileRepository;
     private final NotificationService notificationService;
 
-    @Scheduled(fixedDelayString = "${scheduler.round-robin.delay-seconds}", timeUnit = java.util.concurrent.TimeUnit.SECONDS)
+    @Scheduled(fixedDelayString = "${scheduler.round-robin.delay-seconds}", timeUnit = java.util.concurrent.TimeUnit.SECONDS, zone = "Asia/Almaty")
     @Transactional
     public void processTasksRoundRobin() {
         long processingCount = taskQueueService.getProcessingTasksCount();

@@ -1,14 +1,13 @@
 package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
+import org.di.digital.dto.request.interrogation.MarkReformulatedRequest;
 import org.di.digital.dto.request.interrogation.ReformulateQuestionRequest;
 import org.di.digital.dto.response.interrogation.ReformulateQuestionResponse;
 import org.di.digital.service.interrogation.CaseInterrogationReformulateService;
 import org.springframework.http.ResponseEntity;
-import org.springframework.web.bind.annotation.PostMapping;
-import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.springframework.security.core.Authentication;
+import org.springframework.web.bind.annotation.*;
 
 @RestController
 @RequestMapping("/interrogation")
@@ -21,5 +20,13 @@ public class CaseInterrogationReformulateController {
     public ResponseEntity<ReformulateQuestionResponse> reformulateQuestion(
             @RequestBody ReformulateQuestionRequest request) {
         return ResponseEntity.ok(caseInterrogationReformulateService.reformulateQuestion(request));
+    }
+
+    @PatchMapping("/question/reformulate/accept")
+    public ResponseEntity<Void> markAsReformulated(
+            @RequestBody MarkReformulatedRequest request,
+            Authentication authentication) {
+        caseInterrogationReformulateService.markAsReformulated(request, authentication.getName());
+        return ResponseEntity.ok().build();
     }
 }

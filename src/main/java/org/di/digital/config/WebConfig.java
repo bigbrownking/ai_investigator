@@ -110,7 +110,7 @@ public class WebConfig {
     public WebClient.Builder webClientBuilder() {
         HttpClient httpClient = HttpClient.create()
                 .option(ChannelOption.CONNECT_TIMEOUT_MILLIS, 10000)
-                .responseTimeout(Duration.ofMinutes(30));
+                .responseTimeout(Duration.ofHours(1));
 
         return WebClient.builder()
                 .clientConnector(new ReactorClientHttpConnector(httpClient))

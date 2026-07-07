@@ -17,13 +17,6 @@ import java.util.Set;
 
 @Repository
 public interface CaseRepository extends JpaRepository<Case, Long>, JpaSpecificationExecutor<Case> {
-    List<Case> findByOwner(User user);
-
-    @Query("SELECT c FROM Case c LEFT JOIN FETCH c.users WHERE c.number = :number")
-    Optional<Case> findByNumberWithUsers(@Param("number") String number);
-
-    @Query("SELECT c FROM Case c LEFT JOIN FETCH c.users LEFT JOIN FETCH c.owner WHERE c.number = :number")
-    Optional<Case> findByNumberWithUsersAndOwner(@Param("number") String number);
 
     @Query("SELECT c FROM Case c " +
             "LEFT JOIN c.users u " +
@@ -58,28 +51,47 @@ public interface CaseRepository extends JpaRepository<Case, Long>, JpaSpecificat
 
     boolean existsByNumber(String number);
 
-    @Query("SELECT c FROM Case c JOIN c.users u WHERE u.id = :userId")
-    List<Case> findByUserId(@Param("userId") Long userId);
-
-    @Query("SELECT c FROM Case c JOIN c.users u WHERE u.id = :userId")
-    Page<Case> findByUserId(@Param("userId") Long userId, Pageable pageable);
-
     @Query("SELECT c FROM Case c WHERE c.owner.region.id = :regionId")
     Page<Case> findByOwnerRegionId(@Param("regionId") Long regionId, Pageable pageable);
 
     @Query("SELECT COUNT(*) FROM Case c WHERE c.owner.region.id = :regionId")
     long countByRegionId(Long regionId);
+
     @Query("SELECT COUNT(c) FROM Case c WHERE c.qualification IS NOT NULL AND c.qualification <> ''")
     long countByQualificationIsNotEmpty();
+
     @Query("SELECT COUNT(c) FROM Case c WHERE c.indictment IS NOT NULL AND c.qualification <> ''")
     long countByIndictmentIsNotEmpty();
 
     @Query("SELECT c FROM Case c WHERE c.planStatus IN :statuses " +
-            "AND c.owner.administration.id = :administrationId")
-    List<Case> findByPlanStatusInAndOwnerAdministrationId(
+            "AND c.owner.region.id = :regionId")
+    List<Case> findByPlanStatusInAndOwnerRegionId(
             @Param("statuses") List<PlanStatus> statuses,
+            @Param("regionId") Long regionId
+    );
+
+    @Query("SELECT c FROM Case c WHERE c.planStatus IN :statuses " +
+            "AND c.owner.region.id = :regionId " +
+            "AND c.owner.administration.id = :administrationId")
+    List<Case> findByPlanStatusInAndOwnerRegionIdAndOwnerAdministrationId(
+            @Param("statuses") List<PlanStatus> statuses,
+            @Param("regionId") Long regionId,
             @Param("administrationId") Long administrationId
     );
-    List<Case> findByOwnerAdministrationId(Long administrationId);
+
     List<Case> findByPlanStatusIn(List<PlanStatus> statuses);
+
+    @Query("SELECT COUNT(c) FROM Case c WHERE c.owner.region.id IN :regionIds")
+    long countByRegionIdIn(@Param("regionIds") List<Long> regionIds);
+
+    @Query("""
+                SELECT c FROM Case c
+                WHERE c.qualification IS NOT NULL
+                AND EXISTS (
+                    SELECT f FROM CaseFile f
+                    WHERE f.caseEntity = c
+                    AND f.isQualification = true
+                )
+            """)
+    List<Case> findAllWithBothQualifications();
 }

@@ -3,7 +3,7 @@ package org.di.digital.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.auth.*;
-import org.di.digital.dto.response.JwtResponse;
+import org.di.digital.dto.response.auth.JwtResponse;
 import org.di.digital.dto.response.auth.ChallengeResponse;
 import org.di.digital.dto.response.auth.FaceStatusResponse;
 import org.di.digital.dto.response.auth.LivenessChallengeResponse;

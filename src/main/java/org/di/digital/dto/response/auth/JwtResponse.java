@@ -1,4 +1,4 @@
-package org.di.digital.dto.response;
+package org.di.digital.dto.response.auth;
 
 import lombok.Builder;
 import lombok.Getter;

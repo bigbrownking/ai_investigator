@@ -12,4 +12,5 @@ public class OsmotrProcessingMessage {
     private String originalFileName;
     private String fileUrl;
     private String userEmail;
+    private Long userId;
 }

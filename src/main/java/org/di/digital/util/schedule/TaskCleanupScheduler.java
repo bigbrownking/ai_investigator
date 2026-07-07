@@ -8,15 +8,17 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
+
 @Component
 @RequiredArgsConstructor
-public class Scheduler {
+public class TaskCleanupScheduler {
 
     @Value("${old.log.cleanup}")
     private int cleanup;
 
     private final TaskQueueRepository taskQueueRepository;
-    @Scheduled(cron = "0 0 2 * * ?") // Каждый день в 2 ночи
+
+    @Scheduled(cron = "${scheduler.task.cleanup}", zone = "Asia/Almaty")
     public void cleanupOldTasks() {
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(cleanup);
         taskQueueRepository.deleteByStatusAndCompletedAtBefore(

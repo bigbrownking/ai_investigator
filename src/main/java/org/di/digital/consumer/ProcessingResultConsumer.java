@@ -29,7 +29,7 @@ public class ProcessingResultConsumer {
 
         try {
             CaseFile caseFile = caseFileRepository.findById(message.getCaseFileId())
-                    .orElseThrow(() -> new RuntimeException("Файл не найден: " + message.getCaseFileId()));
+                    .orElseThrow(() -> new IllegalStateException("Файл не найден: " + message.getCaseFileId()));
 
             switch (message.getStatus()) {
                 case PENDING -> handlePending(message, caseFile);

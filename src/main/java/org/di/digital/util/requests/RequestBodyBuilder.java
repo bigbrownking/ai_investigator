@@ -21,7 +21,8 @@ public class RequestBodyBuilder {
         return body;
     }
 
-    public static Map<String, Object> indictmentBody(String caseNumber, List<String> qualoNames, long userId, boolean isDone) {
+    public static Map<String, Object> indictmentBody(String caseNumber, List<String> qualoNames,
+                                                     long userId, boolean isDone, String language) {
         Map<String, Object> body = new HashMap<>();
         body.put("working_dir", caseNumber);
         body.put("mode", "hybrid");
@@ -29,6 +30,21 @@ public class RequestBodyBuilder {
         body.put("stream", false);
         body.put("user_id", userId);
         body.put("is_done", isDone);
+        body.put("language", language);
+        return body;
+    }
+
+    public static Map<String, Object> indictmentSectionBody(String caseNumber, List<String> qualoNames,
+                                                     long userId, boolean isDone, String language, int id) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("working_dir", caseNumber);
+        body.put("mode", "hybrid");
+        body.put("qual_name", qualoNames);
+        body.put("stream", false);
+        body.put("user_id", userId);
+        body.put("is_done", isDone);
+        body.put("language", language);
+        body.put("id", id);
         return body;
     }
 

@@ -19,7 +19,7 @@ public class PlanActionScheduler {
     private final CaseRepository caseRepository;
     private final PlanActionNotifier planActionNotifier;
 
-    @Scheduled(cron = "0 0 9,15,18 * * *", zone = "Asia/Almaty")
+    @Scheduled(cron = "${scheduler.plan.action}", zone = "Asia/Almaty")
     public void checkRedActions() {
         log.info("Scheduled red action check started");
 

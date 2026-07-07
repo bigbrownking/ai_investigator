@@ -10,8 +10,6 @@ public interface CaseInterrogationChatService {
     CaseChatHistoryResponse getChatHistory(Long caseId, Long interrogationId, String userEmail, int page, int size);
     void clearChatHistory(Long caseId, Long interrogationId, String userEmail);
     void toggleMessageSelected(Long caseId, Long interrogationId, Long messageId, boolean selected, String userEmail);
-
-
     void streamCaseInterrogationChatResponse(Long caseId, Long interrogationId, ChatRequest request, String userEmail, SseEmitter emitter);
     CaseChatHistoryResponse getCaseInterrogationChatHistory(Long caseId, Long interrogationId, String userEmail, int page, int size);
     void clearCaseInterrogationChatHistory(Long caseId, Long interrogationId, String userEmail);

@@ -12,6 +12,7 @@ import java.util.Map;
 
 public interface CaseInterrogationService {
     CaseInterrogationFullResponse addInterrogation(Long caseId, AddInterrogationRequest request, String email);
+    QAResponse createQA(Long caseId, Long interrogationId, String email);
 
     void deleteInterrogation(Long caseId, Long interrogationId, String email);
 
@@ -19,7 +20,7 @@ public interface CaseInterrogationService {
 
     void updateProtocolField(Long caseId, Long interrogationId, UpdateProtocolFieldRequest request, String email);
     void updateOtherField(Long caseId, Long interrogationId, UpdateProtocolFieldRequest request,  String email);
-    QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, Long qaId, String question, MultipartFile file, String email);
+    QAResponse uploadAudioAndEnqueue(Long caseId, Long interrogationId, Long qaId, MultipartFile file, String email);
     OtherAudioResponse uploadOtherAudioAndEnqueue(Long caseId, Long interrogationId, Long qaId, String fieldName, MultipartFile file, String language, String email);
     QAResponse editTranscribedText(Long caseId, Long interrogationId, EditAudioTranscribedTextRequest request, String email);
     OtherAudioResponse editOtherAudioText(Long caseId, Long interrogationId, Long otherAudioId, String text, String email);

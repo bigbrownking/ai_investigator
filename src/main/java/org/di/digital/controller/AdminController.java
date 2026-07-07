@@ -2,7 +2,8 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.UpdateProfileRequest;
+import org.di.digital.dto.request.cases.ChangeOwnerRequest;
+import org.di.digital.dto.request.user.UpdateProfileRequest;
 import org.di.digital.dto.request.auth.SignUpRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
@@ -36,7 +37,7 @@ import java.util.List;
 @Slf4j
 @RestController
 @RequiredArgsConstructor
-@RequestMapping("/admin/")
+@RequestMapping("/admin")
 public class AdminController {
 
     private final AdminService adminService;
@@ -196,11 +197,19 @@ public class AdminController {
         return ResponseEntity.ok().build();
     }
 
-    @PutMapping("/users/profile")
+    @PatchMapping("/cases/{caseId}/owner")
+    public ResponseEntity<Void> changeOwner(
+            @PathVariable Long caseId,
+            @RequestBody ChangeOwnerRequest request) {
+        adminService.changeOwner(caseId, request.getNewOwnerEmail());
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/users/{userId}/profile")
     public ResponseEntity<UserProfile> updateUserProfile(
-            @RequestBody UpdateProfileRequest request,
-            Authentication authentication){
-        return ResponseEntity.ok(adminService.updateUserProfile(authentication.getName(), request));
+            @PathVariable Long userId,
+            @RequestBody UpdateProfileRequest request){
+        return ResponseEntity.ok(adminService.updateUserProfile(userId, request));
     }
 
 

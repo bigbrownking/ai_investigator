@@ -10,6 +10,7 @@ import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.List;
 
 public class AppealSpecifications {
     public static Specification<Appeal> build(AppealSearchRequest req) {
@@ -19,6 +20,19 @@ public class AppealSpecifications {
                 .and(hasFrom(req.getFrom()))
                 .and(hasTo(req.getTo()))
                 .and(createdOnDate(req.getCreatedAt()));
+    }
+    public static Specification<Appeal> buildForRegions(List<Long> regionIds, AppealSearchRequest req) {
+        return Specification
+                .where(inRegions(regionIds))
+                .and(hasStatus(req.getStatus()))
+                .and(hasFrom(req.getFrom()))
+                .and(hasTo(req.getTo()))
+                .and(createdOnDate(req.getCreatedAt()));
+    }
+
+    private static Specification<Appeal> inRegions(List<Long> regionIds) {
+        return (root, query, cb) ->
+                root.get("region").get("id").in(regionIds);
     }
 
     public static Specification<Appeal> buildForRegion(Long regionId, AppealSearchRequest req) {

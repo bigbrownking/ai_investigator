@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
+import org.di.digital.service.impl.core.SseHeartbeatUtil;
 import org.di.digital.service.interrogation.CaseInterrogationChatService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -17,6 +18,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RequiredArgsConstructor
 public class CaseInterrogationChatController {
 
+    private final SseHeartbeatUtil heartbeatUtil;
     private final CaseInterrogationChatService interrogationChatService;
 
     @PostMapping(value = "/{caseId}/interrogations/{interrogationId}/chat",
@@ -28,6 +30,8 @@ public class CaseInterrogationChatController {
             Authentication authentication
     ) {
         SseEmitter emitter = new SseEmitter(0L);
+        heartbeatUtil.startHeartbeat(emitter);
+
         log.info("Starting chat stream for interrogation {} in case {}", interrogationId, caseId);
         interrogationChatService.streamInterrogationChatResponse(
                 caseId, interrogationId, request, authentication.getName(), emitter

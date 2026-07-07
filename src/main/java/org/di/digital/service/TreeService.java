@@ -1,7 +1,7 @@
 package org.di.digital.service;
 
-import org.di.digital.dto.response.TreeDataResponse;
-import org.di.digital.dto.response.TreeModuleResponse;
+import org.di.digital.dto.response.tree.TreeDataResponse;
+import org.di.digital.dto.response.tree.TreeModuleResponse;
 import org.di.digital.model.enums.TreeModuleType;
 
 import java.util.List;

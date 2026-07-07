@@ -2,8 +2,8 @@ package org.di.digital.service.impl;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.UpdateProfileRequest;
-import org.di.digital.dto.request.UserSettingsRequest;
+import org.di.digital.dto.request.user.UpdateProfileRequest;
+import org.di.digital.dto.request.user.UserSettingsRequest;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.model.enums.*;
 import org.di.digital.model.user.*;

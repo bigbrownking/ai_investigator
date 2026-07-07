@@ -66,7 +66,7 @@ public class TranscriptionUpdateService {
         }
 
         CaseInterrogationOtherAudio otherAudio = otherAudioRepository.findById(qaId)
-                .orElseThrow(() -> new RuntimeException("Вопрос/ответ не найден: " + qaId));
+                .orElseThrow(() -> new IllegalStateException("Вопрос/ответ не найден: " + qaId));
 
         otherAudio.setStatus(status);
 

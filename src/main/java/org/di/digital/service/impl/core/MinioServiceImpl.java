@@ -112,7 +112,7 @@ public class MinioServiceImpl implements MinioService {
 
         } catch (Exception e) {
             log.error("Error uploading file: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to upload file", e);
+            throw new IllegalStateException("Failed to upload file", e);
         }
     }
     public String uploadAudio(MultipartFile file, String folder, String fio) {
@@ -143,7 +143,7 @@ public class MinioServiceImpl implements MinioService {
 
         } catch (Exception e) {
             log.error("Error uploading audio file: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to upload audio file", e);
+            throw new IllegalStateException("Failed to upload audio file", e);
         }
     }
 
@@ -169,7 +169,7 @@ public class MinioServiceImpl implements MinioService {
 
         } catch (Exception e) {
             log.error("Error generating presigned preview URL for: {}", objectPath, e);
-            throw new RuntimeException("Failed to generate presigned preview URL", e);
+            throw new IllegalStateException("Failed to generate presigned preview URL", e);
         }
     }
 
@@ -192,7 +192,7 @@ public class MinioServiceImpl implements MinioService {
 
         } catch (Exception e) {
             log.error("Error generating presigned download URL for: {}", objectPath, e);
-            throw new RuntimeException("Failed to generate presigned download URL", e);
+            throw new IllegalStateException("Failed to generate presigned download URL", e);
         }
     }
 
@@ -268,7 +268,7 @@ public class MinioServiceImpl implements MinioService {
             log.info("✅ Deleted ALL {} files for case: {}", objectsToDelete.size(), caseNumber);
         } catch (Exception e) {
             log.error("❌ Error deleting files for case: {}", caseNumber, e);
-            throw new RuntimeException("Failed to delete files", e);
+            throw new IllegalStateException("Failed to delete files", e);
         }
     }
 
@@ -305,7 +305,7 @@ public class MinioServiceImpl implements MinioService {
             );
         } catch (Exception e) {
             log.error("Error downloading file from Minio: {}", e.getMessage(), e);
-            throw new RuntimeException("Failed to download file", e);
+            throw new IllegalStateException("Failed to download file", e);
         }
     }
     public String uploadOsmotrFile(byte[] bytes, String caseNumber, String fileName, String subfolder) {

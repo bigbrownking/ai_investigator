@@ -20,4 +20,8 @@ public class AdminStatsDto {
     private long totalAudios;
     private long totalQualifications;
     private long totalIndictments;
+    private long totalAiMessages;
+    private long totalSelectedMessages;
+    private long totalReformulatedMessages;
+    private Double avgQualificationScorePercent;
 }

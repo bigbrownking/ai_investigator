@@ -2,6 +2,7 @@ package org.di.digital.repository.queue;
 
 import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.TaskStatus;
+import org.springframework.data.mongodb.repository.Aggregation;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 
@@ -20,10 +21,7 @@ public interface TaskQueueRepository extends MongoRepository<TaskQueue, String> 
     List<TaskQueue> findByCaseFileIdAndStatus(Long caseFileId, TaskStatus status);
     boolean existsByCaseFileIdAndStatusIn(Long caseFileId, List<TaskStatus> statuses);
     List<TaskQueue> findByStatus(TaskStatus status);
-    List<TaskQueue> findByUserEmailAndStatusOrderByPriorityDescCreatedAtAsc(
-            String userEmail, TaskStatus status
-    );
-
+    List<TaskQueue> findByCaseIdAndStatus(Long caseId, TaskStatus status);
     List<TaskQueue> findByUserEmailAndStatusAndPriorityOrderByCreatedAtAsc(
             String userEmail, TaskStatus status, int priority);
 }

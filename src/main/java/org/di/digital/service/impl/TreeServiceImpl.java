@@ -3,8 +3,8 @@ package org.di.digital.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.response.TreeDataResponse;
-import org.di.digital.dto.response.TreeModuleResponse;
+import org.di.digital.dto.response.tree.TreeDataResponse;
+import org.di.digital.dto.response.tree.TreeModuleResponse;
 import org.di.digital.model.TreeData;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.TreeModuleType;
@@ -13,7 +13,6 @@ import org.di.digital.repository.TreeDataRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.TreeService;
-import org.di.digital.util.TreeUrlBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.AccessDeniedException;
@@ -23,11 +22,12 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.reactive.function.client.WebClientResponseException;
 import reactor.core.publisher.Mono;
 
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.di.digital.util.requests.RequestUrlBuilder.buildModuleUrl;
 
 @Slf4j
 @Service
@@ -158,7 +158,7 @@ public class TreeServiceImpl implements TreeService {
     // ==================== PRIVATE METHODS ====================
 
     private TreeModuleResponse fetchAndSaveModuleInternal(Case caseEntity, TreeModuleType moduleType) {
-        String url = TreeUrlBuilder.buildModuleUrl(pythonHost, treePort, caseEntity.getNumber(), moduleType);
+        String url = buildModuleUrl(pythonHost, treePort, caseEntity.getNumber(), moduleType);
 
         log.info("Fetching module: {} from URL: {}", moduleType, url);
 
@@ -171,7 +171,7 @@ public class TreeServiceImpl implements TreeService {
                     .bodyToMono(String.class)
                     .onErrorResume(WebClientResponseException.class, e -> {
                         log.error("API error for {}: {} - {}", moduleType, e.getStatusCode(), e.getResponseBodyAsString());
-                        return Mono.error(new RuntimeException(
+                        return Mono.error(new IllegalStateException(
                                 String.format("API returned error %s: %s", e.getStatusCode(), e.getMessage())));
                     })
                     .block();

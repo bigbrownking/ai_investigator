@@ -20,6 +20,7 @@ import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
+import org.di.digital.service.CaseAnalyticsService;
 import org.di.digital.service.CaseService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.MinioService;
@@ -59,6 +60,8 @@ public class CaseServiceImpl implements CaseService {
     private final Mapper mapper;
     private final PageCounter pageCounter;
     private final CaseFileRepository caseFileRepository;
+    private final CaseAnalyticsService caseAnalyticsService;
+
 
     private static final int MAX_PAGES_PER_TOM = 180;
 
@@ -327,8 +330,8 @@ public class CaseServiceImpl implements CaseService {
                 caseEntity.getFiles().stream()
                         .sorted(Comparator
                                 .comparing(CaseFile::getTom, Comparator.nullsLast(Integer::compareTo))
-                                .thenComparing(CaseFile::getOrderIndex,
-                                        Comparator.nullsLast(Integer::compareTo)))
+                                .thenComparing(CaseFile::getOrderIndex, Comparator.nullsLast(Integer::compareTo))
+                                .thenComparing(CaseFile::getUploadedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                         .collect(Collectors.groupingBy(
                                 file -> file.getTom() == null ? 0 : file.getTom(),
                                 LinkedHashMap::new,
@@ -401,7 +404,11 @@ public class CaseServiceImpl implements CaseService {
                 ? Comparator.comparing(Case::getCreatedDate, Comparator.nullsLast(Comparator.naturalOrder()))
                 : Comparator.comparing(Case::getCreatedDate, Comparator.nullsLast(Comparator.reverseOrder()));
 
-        return user.getCases().stream()
+        Set<Case> allCases = new HashSet<>();
+        allCases.addAll(user.getCases());
+        allCases.addAll(user.getOwnedCases());
+
+        return allCases.stream()
                 .sorted(comparator)
                 .map(mapper::mapToCaseResponse)
                 .collect(Collectors.toList());
@@ -544,7 +551,7 @@ public class CaseServiceImpl implements CaseService {
     public GroupedCaseFileResponse reorderCaseFiles(Long caseId, ReorderCaseFilesRequest request,
                                                     String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
@@ -727,7 +734,7 @@ public class CaseServiceImpl implements CaseService {
                     caseEntity.getNumber(),
                     currentUserEmail
             );
-            throw new IllegalStateException("User is already added to this case");
+            throw new IllegalStateException("Следователь уже есть в деле!");
         }
 
         String caseNumber = caseEntity.getNumber();

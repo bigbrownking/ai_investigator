@@ -3,6 +3,7 @@ package org.di.digital.service.impl;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseActivityType;
@@ -11,6 +12,7 @@ import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.service.*;
 import org.di.digital.service.export.DocumentFormatterService;
+import org.di.digital.service.impl.core.SseHeartbeatUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -38,6 +40,10 @@ public class QualificationServiceImpl implements QualificationService {
     private final CaseService caseService;
     private final StreamingService streamingService;
     private final LogService logService;
+    private final CaseAnalyticsService caseAnalyticsService;
+
+
+    private final SseHeartbeatUtil heartbeatUtil;
 
     private final ExecutorService executor = Executors.newCachedThreadPool();
 
@@ -50,6 +56,9 @@ public class QualificationServiceImpl implements QualificationService {
     @Override
     public SseEmitter generateQualification(String caseNumber, String email) {
         SseEmitter emitter = new SseEmitter(0L);
+
+        heartbeatUtil.startHeartbeat(emitter);
+
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
         executor.execute(() -> {
             RequestContextHolder.setRequestAttributes(requestAttributes);
@@ -97,7 +106,7 @@ public class QualificationServiceImpl implements QualificationService {
                                 caseNumber,
                                 userEmail
                         );
-                    }finally {
+                    } finally {
                         RequestContextHolder.resetRequestAttributes();
                     }
                 },
@@ -131,9 +140,10 @@ public class QualificationServiceImpl implements QualificationService {
     private String extractChunk(String chunk) {
         try {
             var node = mapper.readTree(chunk);
-            if (node.has("delta"))  return node.get("delta").asText();
+            if (node.has("delta")) return node.get("delta").asText();
             if (node.has("answer")) return node.get("answer").asText();
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         return chunk;
     }
 
@@ -159,7 +169,7 @@ public class QualificationServiceImpl implements QualificationService {
                     documentFormatterService.generateQualificationDocument(getQualification(caseNumber))
             );
         } catch (IOException e) {
-            throw new RuntimeException(e);
+            throw new IllegalStateException(e);
         }
     }
 

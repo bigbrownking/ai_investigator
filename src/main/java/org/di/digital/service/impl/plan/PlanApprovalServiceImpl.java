@@ -52,20 +52,19 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
 
         PlanStatus previous = caseEntity.getPlanStatus();
 
-        caseEntity.setPlanStatus(PlanStatus.APPROVED_L1);
+        caseEntity.setPlanStatus(lvl.getApprovedStatus());
         caseEntity.setPlanReviewedBy(approver);
         caseEntity.setPlanReviewedAt(LocalDateTime.now());
         caseEntity.setPlanAgreedAt(LocalDateTime.now());
         caseEntity.setPlanReviewComment(null);
         caseRepository.save(caseEntity);
 
-        saveHistory(caseEntity, approver, previous, PlanStatus.APPROVED_L1, lvl.getLevel(), null);
+        saveHistory(caseEntity, approver, previous, lvl.getApprovedStatus(), lvl.getLevel(), null);
         notificationService.notifyPlanApproved(caseEntity, approver, lvl.getLevel());
 
         Long regionId = caseEntity.getOwner().getRegion().getId();
-        Long administrationId = caseEntity.getOwner().getAdministration().getId();
         userRepository
-                .findActiveByProfessionIdAndRegionIdAndAdministrationId(ApprovalLevel.LEVEL_FINAL.getProfessionId(), regionId, administrationId)
+                .findActiveByProfessionIdAndRegionId(ApprovalLevel.LEVEL_FINAL.getProfessionId(), regionId)
                 .forEach(a -> notificationService.notifyApproverPlanAwaiting(
                         caseEntity, a, ApprovalLevel.LEVEL_FINAL.getLevel()));
 

@@ -117,21 +117,29 @@ public class CaseInterrogationController {
         caseInterrogationService.deleteInterrogation(caseId, interrogationId, authentication.getName());
         return ResponseEntity.ok().build();
     }
+    @PostMapping("/{caseId}/interrogations/{interrogationId}/qa")
+    public ResponseEntity<QAResponse> createQA(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(caseInterrogationService
+                .createQA(caseId, interrogationId, authentication.getName()));
+    }
 
-    @PostMapping(value = "/{caseId}/interrogations/{interrogationId}/audio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PostMapping(value = "/{caseId}/interrogations/{interrogationId}/audio",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<QAResponse> uploadAudio(
             @PathVariable Long caseId,
             @PathVariable Long interrogationId,
-            @RequestParam(required = false) Long qaId,
-            @RequestParam String question,
+            @RequestParam Long qaId,
             @RequestParam("file") MultipartFile file,
             Authentication authentication
     ) {
-        log.info("Uploading audio for interrogation: {}, case: {}", interrogationId, caseId);
-        QAResponse response = caseInterrogationService.uploadAudioAndEnqueue(
-                caseId, interrogationId, qaId, question, file, authentication.getName()
+        return ResponseEntity.accepted().body(
+                caseInterrogationService.uploadAudioAndEnqueue(
+                        caseId, interrogationId, qaId, file, authentication.getName())
         );
-        return ResponseEntity.accepted().body(response);
     }
 
     @PostMapping(value = "/{caseId}/interrogations/{interrogationId}/otherAudio", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)

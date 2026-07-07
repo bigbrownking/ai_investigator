@@ -8,6 +8,8 @@ import org.di.digital.dto.response.cases.CaseListResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.cases.CaseUserResponse;
 import org.di.digital.dto.response.interrogation.*;
+import org.di.digital.dto.response.osmotr.OsmotrResultDto;
+import org.di.digital.dto.response.osmotr.OsmotrResultSegmentDto;
 import org.di.digital.dto.response.plan.ManagementPendingPlanDto;
 import org.di.digital.dto.response.plan.PlanApprovalHistoryDto;
 import org.di.digital.dto.response.plan.PlanEditHistoryDto;
@@ -15,8 +17,11 @@ import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.support.SupportTicketPhotoDto;
 import org.di.digital.dto.response.user.*;
+import org.di.digital.model.enums.TaskStatus;
+import org.di.digital.model.osmotr.OsmotrResult;
 import org.di.digital.model.plan.PlanApprovalHistory;
 import org.di.digital.model.plan.PlanEditHistory;
+import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.user.Administration;
 import org.di.digital.model.user.Appeal;
 import org.di.digital.model.cases.Case;
@@ -33,6 +38,7 @@ import org.di.digital.model.interrogation.*;
 import org.di.digital.model.support.Review;
 import org.di.digital.model.support.SupportTicket;
 import org.di.digital.model.user.*;
+import org.di.digital.repository.queue.TaskQueueRepository;
 import org.di.digital.repository.user.RegionRepository;
 import org.di.digital.repository.user.UserFaceTemplateRepository;
 import org.di.digital.service.MinioService;
@@ -41,10 +47,7 @@ import org.springframework.stereotype.Component;
 
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
-import java.util.Comparator;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 import java.util.stream.Collectors;
 
 import static org.di.digital.util.requests.UserUtil.getCurrentUser;
@@ -56,6 +59,8 @@ public class Mapper {
     private final LocalizationHelper localizationHelper;
     private final UserFaceTemplateRepository faceTemplateRepository;
     private final RegionRepository regionRepository;
+    private final TaskQueueRepository taskQueueRepository;
+
 
     @Value("${last.seen.ttl}")
     private int ttl;
@@ -193,11 +198,13 @@ public class Mapper {
     }
 
     public CaseResponse mapToCaseResponse(Case caseEntity) {
-        User approvedBy = caseEntity.getPlanApprovedBy();
-        User reviewedBy = caseEntity.getPlanReviewedBy();
-
-        String approvedByName =  approvedBy == null ? null : approvedBy.getSurname() + " " + approvedBy.getName().charAt(0) + ". " + approvedBy.getFathername().charAt(0) + ".";
-        String reviewedByName = reviewedBy == null ? null : reviewedBy.getSurname() + " " + reviewedBy.getName().charAt(0) + ". " + reviewedBy.getFathername().charAt(0) + ".";
+//        Long totalProcessingDuration = taskQueueRepository
+//                .findByCaseIdAndStatus(caseEntity.getId(), TaskStatus.COMPLETED)
+//                .stream()
+//                .map(TaskQueue::getProcessingDurationSeconds)
+//                .filter(Objects::nonNull)
+//                .mapToLong(Long::longValue)
+//                .sum();
 
         return CaseResponse.builder()
                 .id(caseEntity.getId())
@@ -600,6 +607,9 @@ public class Mapper {
                 .lastActivityDate(c.getLastActivityDate())
                 .lastActivityType(c.getLastActivityType())
                 .ownerEmail(c.getOwner() != null ? c.getOwner().getEmail() : null)
+                .participantEmails(c.getUsers().stream()
+                        .map(User::getEmail)
+                        .toList())
                 .build();
     }
 
@@ -691,6 +701,32 @@ public class Mapper {
                 .oldValue(h.getOldValue())
                 .newValue(h.getNewValue())
                 .editedAt(h.getEditedAt())
+                .build();
+    }
+    public OsmotrResultDto toOsmotrResultDto(OsmotrResult result) {
+        return OsmotrResultDto.builder()
+                .id(result.getId())
+                .sessionId(result.getSessionId())
+                .caseNumber(result.getCaseNumber())
+                .originalFileName(result.getOriginalFileName())
+                .userEmail(result.getUserEmail())
+                .status(result.getStatus())
+                .reportTxt(result.getReportTxt())
+                .errorMessage(result.getErrorMessage())
+                .processingDurationSeconds(result.getProcessingDurationSeconds())
+                .createdAt(result.getCreatedAt())
+                .segments(result.getSegments().stream()
+                        .map(s -> OsmotrResultSegmentDto.builder()
+                                .id(s.getId())
+                                .title(s.getTitle())
+                                .startPage(s.getStartPage())
+                                .endPage(s.getEndPage())
+                                .inspectionText(s.getInspectionText())
+                                .evidenceNeeded(s.getEvidenceNeeded())
+                                .returnNeeded(s.getReturnNeeded())
+                                .fileUrl(s.getFileUrl())
+                                .build())
+                        .toList())
                 .build();
     }
 }

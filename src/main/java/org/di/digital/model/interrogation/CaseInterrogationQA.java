@@ -31,6 +31,9 @@ public class CaseInterrogationQA {
 
     private Boolean isEdited;
 
+    @Builder.Default
+    private Boolean isReformulated = false;
+
     @Enumerated(EnumType.STRING)
     private QAStatusEnum status;
 

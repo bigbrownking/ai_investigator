@@ -1,4 +1,4 @@
-package org.di.digital.dto.request;
+package org.di.digital.dto.request.user;
 
 import lombok.*;
 

@@ -115,4 +115,10 @@ public class DevController {
         devService.syncAllFigurants();
         return ResponseEntity.ok("Done");
     }
+
+    @PostMapping("/fetch-qual")
+    public ResponseEntity<String> fetchQual(){
+        devService.fetchQualPercent();
+        return ResponseEntity.ok("Done");
+    }
 }

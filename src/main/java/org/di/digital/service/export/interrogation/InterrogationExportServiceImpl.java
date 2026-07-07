@@ -116,7 +116,7 @@ public class InterrogationExportServiceImpl implements InterrogationExportServic
             return out.toByteArray();
 
         } catch (Exception e) {
-            throw new RuntimeException("Ошибка при генерации DOCX", e);
+            throw new IllegalStateException("Ошибка при генерации DOCX", e);
         }
     }
 

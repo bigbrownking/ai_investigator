@@ -11,6 +11,7 @@ import org.di.digital.model.enums.TaskStatus;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.queue.TaskQueueRepository;
+import org.di.digital.service.CaseAnalyticsService;
 import org.di.digital.util.PageCounter;
 import org.springframework.data.mongodb.core.MongoTemplate;
 import org.springframework.data.mongodb.core.aggregation.Aggregation;
@@ -33,6 +34,7 @@ import java.util.stream.Collectors;
 public class DevService {
 
     private final TaskQueueRepository taskQueueRepository;
+    private final CaseAnalyticsService caseAnalyticsService;
     private final CaseRepository caseRepository;
     private final CaseFileRepository caseFileRepository;
     private final MongoTemplate mongoTemplate;
@@ -252,5 +254,29 @@ public class DevService {
         for(Case c : allCases){
             figurantSyncService.sync(c.getNumber());
         }
+    }
+
+    public void fetchQualPercent(){
+        log.info("Starting qualification analytics recalculation");
+
+        List<Case> cases = caseRepository.findAllWithBothQualifications();
+
+        log.info("Found {} cases with both qualifications", cases.size());
+
+        int success = 0;
+        int failed = 0;
+
+        for (Case caseEntity : cases) {
+            try {
+                caseAnalyticsService.recalculateQualification(caseEntity);
+                success++;
+            } catch (Exception e) {
+                log.error("Failed to recalculate analytics for case {}", caseEntity.getNumber(), e);
+                failed++;
+            }
+        }
+
+        log.info("Qualification analytics recalculation finished: success={}, failed={}", success, failed);
+
     }
 }

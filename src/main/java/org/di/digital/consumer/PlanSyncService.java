@@ -35,7 +35,7 @@ public class PlanSyncService {
     public void sync(String caseNumber) {
         try {
             Case caseEntity = caseRepository.findByNumber(caseNumber)
-                    .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+                    .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
 
             if (caseEntity.getPlan() == null) {
                 log.info("No plan exists yet for case {}, skipping append sync", caseNumber);
