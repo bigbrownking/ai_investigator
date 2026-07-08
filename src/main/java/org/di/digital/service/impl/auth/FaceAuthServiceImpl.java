@@ -26,10 +26,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.List;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Service
@@ -64,6 +65,8 @@ public class FaceAuthServiceImpl implements FaceAuthService {
     private final Map<String, String> challengeStore = new ConcurrentHashMap<>();
     private final Map<String, LivenessSession> livenessStore = new ConcurrentHashMap<>();
     private final Map<String, LivenessTokenData> livenessTokenStore = new ConcurrentHashMap<>();
+    private final ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+
 
     @Data
     @AllArgsConstructor
@@ -89,10 +92,11 @@ public class FaceAuthServiceImpl implements FaceAuthService {
         String challengeId = UUID.randomUUID().toString();
         challengeStore.put(challengeId, iin);
 
-        new Thread(() -> {
-            try { Thread.sleep(challengeTtlMillis); } catch (InterruptedException ignored) {}
-            challengeStore.remove(challengeId);
-        }).start();
+        scheduler.schedule(
+                () -> challengeStore.remove(challengeId),
+                challengeTtlMillis,
+                TimeUnit.MILLISECONDS
+        );
 
         return ChallengeResponse.builder()
                 .challengeId(challengeId)
@@ -112,10 +116,11 @@ public class FaceAuthServiceImpl implements FaceAuthService {
 
         livenessStore.put(livenessId, new LivenessSession(iin, steps, expiresAt, false));
 
-        new Thread(() -> {
-            try { Thread.sleep(livenessTtlSeconds * 1000L); } catch (InterruptedException ignored) {}
-            livenessStore.remove(livenessId);
-        }).start();
+        scheduler.schedule(
+                () -> livenessStore.remove(livenessId),
+                livenessTtlSeconds,
+                TimeUnit.SECONDS
+        );
 
         return LivenessChallengeResponse.builder()
                 .livenessId(livenessId)
@@ -126,14 +131,29 @@ public class FaceAuthServiceImpl implements FaceAuthService {
 
     @Override
     public LivenessVerifyResponse verifyLiveness(LivenessVerifyRequest request) {
-        LivenessSession session = livenessStore.get(request.getLivenessId());
 
-        if (session == null) {
+        boolean[] alreadyUsed = {false};
+        LivenessSession[] capturedSession = {null};
+
+        livenessStore.computeIfPresent(request.getLivenessId(), (key, session) -> {
+            if (session.isUsed()) {
+                alreadyUsed[0] = true;
+                return session;
+            }
+            session.setUsed(true);
+            capturedSession[0] = session;
+            return session;
+        });
+
+        if (capturedSession[0] == null && !alreadyUsed[0]) {
             throw new IllegalStateException("Сессия liveness не найдена или истекла");
         }
-        if (session.isUsed()) {
+        if (alreadyUsed[0]) {
             throw new IllegalStateException("Сессия liveness уже использована");
         }
+
+        LivenessSession session = capturedSession[0];
+
         if (session.getExpiresAt().isBefore(LocalDateTime.now())) {
             livenessStore.remove(request.getLivenessId());
             throw new IllegalStateException("Сессия liveness истекла");
@@ -146,23 +166,21 @@ public class FaceAuthServiceImpl implements FaceAuthService {
                 .map(LivenessVerifyRequest.LivenessFrame::getStep)
                 .toList();
 
-        if (!receivedSteps.equals(session.getSteps())) {
+        if (!new HashSet<>(receivedSteps).equals(new HashSet<>(session.getSteps()))) {
             throw new IllegalStateException("Шаги liveness не соответствуют ожидаемым");
         }
 
         String livenessToken = UUID.randomUUID().toString();
 
-        session.setUsed(true);
-        livenessStore.put(request.getLivenessId(), session);
-
         livenessTokenStore.put(livenessToken,
                 new LivenessTokenData(request.getIin(),
                         LocalDateTime.now().plusMinutes(livenessTokenTtlMinutes)));
 
-        new Thread(() -> {
-            try { Thread.sleep(livenessTokenTtlMinutes * 60 * 1000L); } catch (InterruptedException ignored) {}
-            livenessTokenStore.remove(livenessToken);
-        }).start();
+        scheduler.schedule(
+                () -> livenessTokenStore.remove(livenessToken),
+                livenessTokenTtlMinutes,
+                TimeUnit.MINUTES
+        );
 
         log.info("Liveness verified for iin: {}", request.getIin());
 
@@ -176,13 +194,14 @@ public class FaceAuthServiceImpl implements FaceAuthService {
     public void enroll(String email, List<Double> descriptor, String livenessToken) {
         validateDescriptor(descriptor);
 
-        LivenessTokenData livenessData = livenessTokenStore.remove(livenessToken);
+        LivenessTokenData livenessData = livenessTokenStore.get(livenessToken);
         if (livenessData == null) {
             throw new IllegalStateException("Liveness токен не найден или уже использован");
         }
         if (livenessData.getExpiresAt().isBefore(LocalDateTime.now())) {
             throw new IllegalStateException("Liveness токен истёк");
         }
+        livenessTokenStore.remove(livenessToken, livenessData);
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
@@ -215,12 +234,20 @@ public class FaceAuthServiceImpl implements FaceAuthService {
     public JwtResponse faceLogin(FaceLoginRequest request) {
         validateDescriptor(request.getDescriptor());
 
-        String storedIin = challengeStore.remove(request.getChallengeId());
-        if (storedIin == null || !storedIin.equals(request.getIin())) {
+        String[] removedIin = {null};
+        challengeStore.computeIfPresent(request.getChallengeId(), (key, storedIin) -> {
+            if (storedIin.equals(request.getIin())) {
+                removedIin[0] = storedIin;
+                return null;
+            }
+            return storedIin;
+        });
+
+        if (removedIin[0] == null) {
             throw new IllegalStateException("Неверный или истёкший challenge");
         }
 
-        LivenessTokenData livenessData = livenessTokenStore.remove(request.getLivenessToken());
+        LivenessTokenData livenessData = livenessTokenStore.get(request.getLivenessToken());
         if (livenessData == null) {
             throw new IllegalStateException("Liveness токен не найден или уже использован");
         }
@@ -228,8 +255,11 @@ public class FaceAuthServiceImpl implements FaceAuthService {
             throw new IllegalStateException("Liveness токен не соответствует ИИН");
         }
         if (livenessData.getExpiresAt().isBefore(LocalDateTime.now())) {
+            livenessTokenStore.remove(request.getLivenessToken());
             throw new IllegalStateException("Liveness токен истёк");
         }
+
+        livenessTokenStore.remove(request.getLivenessToken(), livenessData);
 
         User user = userRepository.findByIin(request.getIin())
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
@@ -244,7 +274,7 @@ public class FaceAuthServiceImpl implements FaceAuthService {
         }
 
         UserFaceTemplate bestMatch = templates.stream()
-                .min(java.util.Comparator.comparingDouble(
+                .min(Comparator.comparingDouble(
                         t -> euclideanDistance(request.getDescriptor(), t.getDescriptor())))
                 .orElseThrow(() -> new IllegalStateException("Face ID не настроен для данного пользователя"));
 
