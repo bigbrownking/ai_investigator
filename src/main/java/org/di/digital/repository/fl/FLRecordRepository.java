@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.fl.FLDocument;
 import org.di.digital.model.fl.FLRecord;
 import org.di.digital.model.fl.IssueOrganizationEnum;
+import org.di.digital.util.IinParser;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Repository;
@@ -42,101 +43,107 @@ public class FLRecordRepository {
         String docSql = "";
         if(language.equals("русском")){
             personSql = """
-            SELECT
-                p.iin as iin, p.sex_id as sexId, p.surname as surname, p.first_name as firstname,
-                p.second_name as secondname, toDate(toDateTime(toInt64(p.birth_date) / 1000)) AS birthdate,
-                citizenship.RU_NAME AS citizenship,
-                birthCountry.RU_NAME AS birthCountry,
-                region.RU_NAME AS birthRegion,
-                district.RU_NAME AS birthDistricts,
-                nat.RU_NAME AS nationality
-            FROM fldb.person_info_gbdfl p
-            LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY citizenship ON citizenship.CODE = p.citizenship_id
-            LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY birthCountry ON birthCountry.CODE = p.birth_country_id
-            LEFT JOIN db_fl_ul_dpar.DIC_REGION region ON region.CODE = p.birth_region_id
-            LEFT JOIN db_fl_ul_dpar.DIC_DISTRICTS district ON district.CODE = p.birth_districts_id
-            LEFT JOIN db_fl_ul_dpar.nationality nat
-                ON nat.CODE = p.nationality_id
-                AND nat.SEX = p.sex_id
-            WHERE p.iin = ?
-            LIMIT 1
-            """;
+        SELECT
+            p.iin as iin, p.sex_id as sexId, p.surname as surname, p.first_name as firstname,
+            p.second_name as secondname,
+            citizenship.RU_NAME AS citizenship,
+            birthCountry.RU_NAME AS birthCountry,
+            region.RU_NAME AS birthRegion,
+            district.RU_NAME AS birthDistricts,
+            nat.RU_NAME AS nationality
+        FROM fldb.person_info_gbdfl p
+        LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY citizenship ON citizenship.CODE = p.citizenship_id
+        LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY birthCountry ON birthCountry.CODE = p.birth_country_id
+        LEFT JOIN db_fl_ul_dpar.DIC_REGION region ON region.CODE = p.birth_region_id
+        LEFT JOIN db_fl_ul_dpar.DIC_DISTRICTS district ON district.CODE = p.birth_districts_id
+        LEFT JOIN db_fl_ul_dpar.nationality nat
+            ON nat.CODE = p.nationality_id
+            AND nat.SEX = p.sex_id
+        WHERE p.iin = ?
+        LIMIT 1
+        """;
 
             docSql = """
-            SELECT
-                doc_type.RU_NAME AS documentType,
-                pd.DOCUMENT_NUMBER AS documentNumber,
-                pd.DOCUMENT_BEGIN_DATE AS beginDate,
-                pd.DOCUMENT_END_DATE AS endDate,
-                pd.ISSUE_ORGANIZATION_ID AS issueOrg,
-                doc_invalid.RU_NAME AS invalidityReason,
-                pd.DOCUMENT_INVALIDITY_DATE AS invalidityDate
-            FROM gbd_fl_30_09_25.person_documents pd
-            LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_type ON doc_type.ID = pd.DOCUMENT_TYPE_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_INVALIDITY doc_invalid ON doc_invalid.ID = pd.DOCUMENT_INVALIDITY_ID
-            WHERE pd.IIN = ?
-            ORDER BY
-                CASE WHEN doc_invalid.RU_NAME = 'ДОКУМЕНТ ДЕЙСТВИТЕЛЕН' THEN 0 ELSE 1 END ASC, 
-                pd.DOCUMENT_END_DATE DESC
-            LIMIT 1
-            """;
+        SELECT
+            doc_type.RU_NAME AS documentType,
+            pd.DOCUMENT_NUMBER AS documentNumber,
+            pd.DOCUMENT_BEGIN_DATE AS beginDate,
+            pd.DOCUMENT_END_DATE AS endDate,
+            pd.ISSUE_ORGANIZATION_ID AS issueOrg,
+            doc_invalid.RU_NAME AS invalidityReason,
+            pd.DOCUMENT_INVALIDITY_DATE AS invalidityDate
+        FROM gbd_fl_30_09_25.person_documents pd
+        LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_type ON doc_type.ID = pd.DOCUMENT_TYPE_ID
+        LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_INVALIDITY doc_invalid ON doc_invalid.ID = pd.DOCUMENT_INVALIDITY_ID
+        WHERE pd.IIN = ?
+        ORDER BY
+            CASE WHEN doc_invalid.RU_NAME = 'ДОКУМЕНТ ДЕЙСТВИТЕЛЕН' THEN 0 ELSE 1 END ASC, 
+            pd.DOCUMENT_END_DATE DESC
+        LIMIT 1
+        """;
         }else if(language.equals("казахском")){
             personSql = """
-            SELECT
-                p.iin as iin, p.sex_id as sexId, p.surname as surname, p.first_name as firstname,
-                p.second_name as secondname, toDate(toDateTime(toInt64(p.birth_date) / 1000)) AS birthdate,
-                citizenship.KZ_NAME AS citizenship,
-                birthCountry.KZ_NAME AS birthCountry,
-                region.KZ_NAME AS birthRegion,
-                district.KZ_NAME AS birthDistricts,
-                nat.KZ_NAME AS nationality
-            FROM fldb.person_info_gbdfl p
-            LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY citizenship ON citizenship.CODE = p.citizenship_id
-            LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY birthCountry ON birthCountry.CODE = p.birth_country_id
-            LEFT JOIN db_fl_ul_dpar.DIC_REGION region ON region.CODE = p.birth_region_id
-            LEFT JOIN db_fl_ul_dpar.DIC_DISTRICTS district ON district.CODE = p.birth_districts_id
-            LEFT JOIN db_fl_ul_dpar.nationality nat
-                ON nat.CODE = p.nationality_id
-                AND nat.SEX = p.sex_id
-            WHERE p.iin = ?
-            LIMIT 1
-            """;
+        SELECT
+            p.iin as iin, p.sex_id as sexId, p.surname as surname, p.first_name as firstname,
+            p.second_name as secondname,
+            citizenship.KZ_NAME AS citizenship,
+            birthCountry.KZ_NAME AS birthCountry,
+            region.KZ_NAME AS birthRegion,
+            district.KZ_NAME AS birthDistricts,
+            nat.KZ_NAME AS nationality
+        FROM fldb.person_info_gbdfl p
+        LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY citizenship ON citizenship.CODE = p.citizenship_id
+        LEFT JOIN db_fl_ul_dpar.DIC_COUNTRY birthCountry ON birthCountry.CODE = p.birth_country_id
+        LEFT JOIN db_fl_ul_dpar.DIC_REGION region ON region.CODE = p.birth_region_id
+        LEFT JOIN db_fl_ul_dpar.DIC_DISTRICTS district ON district.CODE = p.birth_districts_id
+        LEFT JOIN db_fl_ul_dpar.nationality nat
+            ON nat.CODE = p.nationality_id
+            AND nat.SEX = p.sex_id
+        WHERE p.iin = ?
+        LIMIT 1
+        """;
 
             docSql = """
-            SELECT
-                doc_type.KZ_NAME AS documentType,
-                pd.DOCUMENT_NUMBER AS documentNumber,
-                pd.DOCUMENT_BEGIN_DATE AS beginDate,
-                pd.DOCUMENT_END_DATE AS endDate,
-                pd.ISSUE_ORGANIZATION_ID AS issueOrg,
-                doc_invalid.KZ_NAME AS invalidityReason,
-                pd.DOCUMENT_INVALIDITY_DATE AS invalidityDate
-            FROM gbd_fl_30_09_25.person_documents pd
-            LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_type ON doc_type.ID = pd.DOCUMENT_TYPE_ID
-            LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_INVALIDITY doc_invalid ON doc_invalid.ID = pd.DOCUMENT_INVALIDITY_ID
-            WHERE pd.IIN = ?
-            ORDER BY
-                CASE WHEN doc_invalid.KZ_NAME = 'ҚҰЖАТ ЖАРАМДЫ' THEN 0 ELSE 1 END ASC, 
-                pd.DOCUMENT_END_DATE DESC
-            LIMIT 1
-            """;
+        SELECT
+            doc_type.KZ_NAME AS documentType,
+            pd.DOCUMENT_NUMBER AS documentNumber,
+            pd.DOCUMENT_BEGIN_DATE AS beginDate,
+            pd.DOCUMENT_END_DATE AS endDate,
+            pd.ISSUE_ORGANIZATION_ID AS issueOrg,
+            doc_invalid.KZ_NAME AS invalidityReason,
+            pd.DOCUMENT_INVALIDITY_DATE AS invalidityDate
+        FROM gbd_fl_30_09_25.person_documents pd
+        LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_TYPE doc_type ON doc_type.ID = pd.DOCUMENT_TYPE_ID
+        LEFT JOIN gbd_fl_30_09_25.DIC_DOCUMENT_INVALIDITY doc_invalid ON doc_invalid.ID = pd.DOCUMENT_INVALIDITY_ID
+        WHERE pd.IIN = ?
+        ORDER BY
+            CASE WHEN doc_invalid.KZ_NAME = 'ҚҰЖАТ ЖАРАМДЫ' THEN 0 ELSE 1 END ASC, 
+            pd.DOCUMENT_END_DATE DESC
+        LIMIT 1
+        """;
         }
 
-        FLRecord record = flJdbcTemplate.queryForObject(personSql, (rs, rowNum) -> FLRecord.builder()
-                .iin(rs.getString("iin"))
-                .sexId(rs.getString("sexId"))
-                .fio(String.join(" ",
-                        nullToEmpty(rs.getString("surname")),
-                        nullToEmpty(rs.getString("firstname")),
-                        nullToEmpty(rs.getString("secondname"))
-                ).trim())
-                .birthDate(parseDate(rs.getString("birthdate")))
-                .citizenship(rs.getString("citizenship"))
-                .birthCountry(rs.getString("birthCountry"))
-                .birthRegion(rs.getString("birthRegion"))
-                .birthDistricts(rs.getString("birthDistricts"))
-                .nationality(rs.getString("nationality"))
-                .build(), iin);
+        FLRecord record = flJdbcTemplate.queryForObject(personSql, (rs, rowNum) -> {
+            String recordIin = rs.getString("iin");
+
+            LocalDate birthDate = IinParser.parseBirthDate(recordIin);
+
+            return FLRecord.builder()
+                    .iin(recordIin)
+                    .sexId(rs.getString("sexId"))
+                    .fio(String.join(" ",
+                            nullToEmpty(rs.getString("surname")),
+                            nullToEmpty(rs.getString("firstname")),
+                            nullToEmpty(rs.getString("secondname"))
+                    ).trim())
+                    .birthDate(birthDate)
+                    .citizenship(rs.getString("citizenship"))
+                    .birthCountry(rs.getString("birthCountry"))
+                    .birthRegion(rs.getString("birthRegion"))
+                    .birthDistricts(rs.getString("birthDistricts"))
+                    .nationality(rs.getString("nationality"))
+                    .build();
+        }, iin);
 
         if (record == null) return null;
 

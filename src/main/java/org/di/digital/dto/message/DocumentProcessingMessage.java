@@ -16,4 +16,5 @@ public class DocumentProcessingMessage implements Serializable {
     private String originalFileName;
     private String userEmail;
     private String caseNumber;
+    private String language;
 }

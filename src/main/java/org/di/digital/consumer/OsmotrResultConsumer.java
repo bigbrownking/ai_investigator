@@ -21,6 +21,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.UUID;
 
+import static java.util.Base64.getDecoder;
+
 @Slf4j
 @Component
 @RequiredArgsConstructor
@@ -63,8 +65,19 @@ public class OsmotrResultConsumer {
         }
 
         OsmotrReportResponse report = message.getResult();
-        result.setReportFile(report.getReportFile());
         result.setReportTxt(report.getReportTxt());
+
+        if (report.getReportFileBase64() != null && !report.getReportFileBase64().isBlank()) {
+            try {
+                byte[] reportBytes = getDecoder().decode(report.getReportFileBase64());
+                String reportUrl = minioService.uploadOsmotrGeneratedFile(
+                        reportBytes, result.getCaseNumber(), "report.docx", "report");
+                result.setReportFile(reportUrl);
+                log.info("Report docx cached in MinIO: {}", reportUrl);
+            } catch (Exception e) {
+                log.error("Failed to store report docx for result {}: {}", message.getFileId(), e.getMessage(), e);
+            }
+        }
 
         if (report.getData() != null && !report.getData().isEmpty()) {
             try {

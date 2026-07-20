@@ -16,4 +16,6 @@ public interface MinioService {
     void deleteAllFilesFromCase(String caseNumber);
     InputStream downloadFile(String objectPath);
     String uploadOsmotrFile(byte[] bytes, String caseNumber, String fileName, String subfolder);
+    String uploadOsmotrGeneratedFile(byte[] bytes, String caseNumber, String fileName, String subfolder);
+    boolean fileExists(String objectPath);
 }

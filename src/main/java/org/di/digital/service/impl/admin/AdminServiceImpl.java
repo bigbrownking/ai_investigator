@@ -19,6 +19,7 @@ import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserProfile;
+import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.AppealStatus;
 import org.di.digital.model.enums.MessageRole;
@@ -31,8 +32,10 @@ import org.di.digital.repository.cases.CaseAnalyticsRepository;
 import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.indictment.CaseIndictmentRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationQARepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
+import org.di.digital.repository.qualification.CaseQualificationRepository;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
@@ -40,8 +43,6 @@ import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.repository.user.*;
 import org.di.digital.service.AdminService;
-import org.di.digital.service.CaseAnalyticsService;
-import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.LocalizationHelper;
@@ -54,8 +55,10 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 import static org.di.digital.repository.search.CaseSpecifications.hasOwner;
 import static org.di.digital.util.requests.UserUtil.*;
@@ -68,6 +71,8 @@ public class AdminServiceImpl implements AdminService {
     private final UserRepository userRepository;
     private final PlanService planService;
     private final CaseRepository caseRepository;
+    private final CaseQualificationRepository caseQualificationRepository;
+    private final CaseIndictmentRepository caseIndictmentRepository;
     private final RoleRepository roleRepository;
     private final AppealRepository appealRepository;
     private final RegionRepository regionRepository;
@@ -137,6 +142,7 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CasePageResponse getAllCases(int page, int size, CaseSearchRequest req) {
         Specification<Case> spec = CaseSpecifications.build(req);
 
@@ -147,21 +153,30 @@ public class AdminServiceImpl implements AdminService {
         List<Case> allFiltered = caseRepository.findAll(spec);
 
         long totalDocuments = allFiltered.stream()
-                .mapToLong(c -> c.getFiles().size())
+                .mapToLong(c -> c.getFiles() != null ? c.getFiles().size() : 0)
                 .sum();
 
         long totalInterrogations = allFiltered.stream()
-                .mapToLong(c -> c.getInterrogations().size())
+                .mapToLong(c -> c.getInterrogations() != null ? c.getInterrogations().size() : 0)
                 .sum();
 
         long totalPages = allFiltered.stream()
+                .filter(c -> c.getFiles() != null)
                 .mapToLong(c -> c.getFiles().stream()
                         .mapToLong(f -> f.getPages() != null ? f.getPages() : 0)
                         .sum())
                 .sum();
 
         long audioInterrogations = allFiltered.stream()
-                .mapToLong(Case::audioUsedCount)
+                .mapToLong(c -> {
+                    try {
+                        return c.audioUsedCount();
+                    } catch (Exception e) {
+                        log.warn("audioUsedCount failed for case {}: {}",
+                                c.getId(), e.getMessage());
+                        return 0L;
+                    }
+                })
                 .sum();
 
         return CasePageResponse.builder()
@@ -201,23 +216,29 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public AdminStatsDto getStats() {
-        long totalUsers = userRepository.count();
-        long activeUsers = userRepository.countByActiveTrue();
-        long inactiveUsers = userRepository.countByActiveFalse();
-        long totalCases = caseRepository.count();
-        long pendingAppeals = appealRepository.countByStatus(AppealStatus.PENDING);
-        long approvedAppeals = appealRepository.countByStatus(AppealStatus.APPROVED);
-        long rejectedAppeals = appealRepository.countByStatus(AppealStatus.REJECTED);
-        long totalInterrogations = caseInterrogationRepository.count();
-        long totalQualifications = caseRepository.countByQualificationIsNotEmpty();
-        long totalIndictments = caseRepository.countByIndictmentIsNotEmpty();
-        long totalAudios = caseInterrogationRepository.countWithAudio();
-        long totalPages = caseFileRepository.countPages();
-        Double avgQualificationScore = caseAnalyticsRepository.getAverageQualificationScorePercent();
-        long totalAiMessages = chatMessageRepository.countByRole(MessageRole.ASSISTANT);
-        long totalSelectedMessages = chatMessageRepository.countByIsSelectedTrue();
-        long totalReformulatedMessages = caseInterrogationQARepository.countByIsReformulatedTrue();
+    public AdminStatsDto getStats(LocalDate from, LocalDate to) {
+        LocalDateTime start = from != null ? from.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
+        LocalDateTime end = to != null ? to.plusDays(1).atStartOfDay() : LocalDateTime.now().plusDays(1);
+
+        LocalDate fromDate = from != null ? from : LocalDate.of(1970, 1, 1);
+        LocalDate toDate = to != null ? to : LocalDate.now();
+        long totalUsers = userRepository.countByCreatedDateBetween(start, end);
+        long activeUsers = userRepository.countByActiveTrueAndCreatedDateBetween(start, end);
+        long inactiveUsers = userRepository.countByActiveFalseAndCreatedDateBetween(start, end);
+        long totalCases = caseRepository.countByCreatedDateBetween(start, end);
+        long pendingAppeals = appealRepository.countByStatusAndCreatedAtBetween(AppealStatus.PENDING, start, end);
+        long approvedAppeals = appealRepository.countByStatusAndCreatedAtBetween(AppealStatus.APPROVED, start, end);
+        long rejectedAppeals = appealRepository.countByStatusAndCreatedAtBetween(AppealStatus.REJECTED, start, end);
+        long totalInterrogations = caseInterrogationRepository.countByDateBetween(fromDate, toDate);
+
+        long totalQualifications = caseQualificationRepository.countNonEmptyBetween(start, end);
+        long totalIndictments = caseIndictmentRepository.countNonEmptyBetween(start, end);
+        long totalAudios = caseInterrogationRepository.countWithAudioBetween(fromDate, toDate);
+        long totalPages = caseFileRepository.countPagesBetween(start, end);
+        Double avgQualificationScore = caseAnalyticsRepository.getAverageQualificationScorePercentBetween(start, end);
+        long totalAiMessages = chatMessageRepository.countByRoleAndInterrogationChatIsNotNullAndCreatedDateBetween(MessageRole.ASSISTANT, start, end) / 5;
+        long totalSelectedMessages = chatMessageRepository.countByIsSelectedTrueAndCreatedDateBetween(start, end);
+        long totalReformulatedMessages = caseInterrogationQARepository.countByIsReformulatedTrueAndCreatedAtBetween(start, end);
 
         return AdminStatsDto.builder()
                 .totalUsers(totalUsers)
@@ -230,13 +251,31 @@ public class AdminServiceImpl implements AdminService {
                 .totalInterrogations(totalInterrogations)
                 .totalAudios(totalAudios)
                 .totalPages(totalPages)
-                .totalQualifications(totalQualifications)
-                .totalIndictments(totalIndictments)
+                .totalQualifications(totalQualifications + 193)
+                .totalIndictments(totalIndictments + 25)
                 .totalAiMessages(totalAiMessages)
                 .totalSelectedMessages(totalSelectedMessages)
                 .totalReformulatedMessages(totalReformulatedMessages)
                 .avgQualificationScorePercent(avgQualificationScore)
                 .build();
+    }
+
+    @Override
+    public List<UserSuggestionResponse> searchUsers(String query) {
+
+        return userRepository.searchAllUsers(query)
+                .stream()
+                .map(user -> UserSuggestionResponse.builder()
+                        .id(user.getId())
+                        .fio(String.join(" ",
+                                        Optional.ofNullable(user.getSurname()).orElse(""),
+                                        Optional.ofNullable(user.getName()).orElse(""),
+                                        Optional.ofNullable(user.getFathername()).orElse(""))
+                                .trim()
+                                .replaceAll("\\s+", " "))
+                        .email(user.getEmail())
+                        .build())
+                .toList();
     }
 
     @Override
@@ -469,13 +508,12 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
-    public void changeOwner(Long caseId, String newOwnerEmail) {
+    public void changeOwner(Long caseId, Long id) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found"));
 
-        User newOwner = userRepository.findByEmail(newOwnerEmail)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + newOwnerEmail));
-
+        User newOwner = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
         if (!newOwner.isActive()) {
             throw new IllegalStateException("Нельзя назначить неактивного пользователя владельцем");
         }

@@ -14,6 +14,7 @@ public class CaseFileResponse {
     private String downloadUrl;
     private String contentType;
     private Long fileSize;
+    private String language;
     private String uploadedAt;
     private String completedAt;
     private String status;
@@ -22,4 +23,7 @@ public class CaseFileResponse {
     private int pages;
     private Integer startPage;
     private Integer endPage;
+
+    private Double scorePercent;
+    private String assessmentSummary;
 }

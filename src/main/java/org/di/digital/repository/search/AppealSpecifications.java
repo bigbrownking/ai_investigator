@@ -17,31 +17,32 @@ public class AppealSpecifications {
         return Specification
                 .where(hasStatus(req.getStatus()))
                 .and(hasRegion(req.getRegion()))
-                .and(hasFrom(req.getFrom()))
-                .and(hasTo(req.getTo()))
-                .and(createdOnDate(req.getCreatedAt()));
+                .and(hasFrom(req.getCameFrom()))
+                .and(hasTo(req.getCameTo()))
+                .and(createdBetween(req.getFrom(), req.getTo()));
     }
+
     public static Specification<Appeal> buildForRegions(List<Long> regionIds, AppealSearchRequest req) {
         return Specification
                 .where(inRegions(regionIds))
                 .and(hasStatus(req.getStatus()))
-                .and(hasFrom(req.getFrom()))
-                .and(hasTo(req.getTo()))
-                .and(createdOnDate(req.getCreatedAt()));
-    }
-
-    private static Specification<Appeal> inRegions(List<Long> regionIds) {
-        return (root, query, cb) ->
-                root.get("region").get("id").in(regionIds);
+                .and(hasFrom(req.getCameFrom()))
+                .and(hasTo(req.getCameTo()))
+                .and(createdBetween(req.getFrom(), req.getTo()));
     }
 
     public static Specification<Appeal> buildForRegion(Long regionId, AppealSearchRequest req) {
         return Specification
                 .where(inRegion(regionId))
                 .and(hasStatus(req.getStatus()))
-                .and(hasFrom(req.getFrom()))
-                .and(hasTo(req.getTo()))
-                .and(createdOnDate(req.getCreatedAt()));
+                .and(hasFrom(req.getCameFrom()))
+                .and(hasTo(req.getCameTo()))
+                .and(createdBetween(req.getFrom(), req.getTo()));
+    }
+
+    private static Specification<Appeal> inRegions(List<Long> regionIds) {
+        return (root, query, cb) ->
+                root.get("region").get("id").in(regionIds);
     }
 
     private static Specification<Appeal> inRegion(Long regionId) {
@@ -105,13 +106,17 @@ public class AppealSpecifications {
             );
         };
     }
-
-    private static Specification<Appeal> createdOnDate(LocalDate date) {
+    private static Specification<Appeal> createdBetween(LocalDate from, LocalDate to) {
         return (root, query, cb) -> {
-            if (date == null) return null;
-            LocalDateTime start = date.atStartOfDay();
-            LocalDateTime end = date.atTime(23, 59, 59);
-            return cb.between(root.get("createdAt"), start, end);
+            if (from == null && to == null) return null;
+            if (from != null && to != null) {
+                return cb.between(root.get("createdAt"),
+                        from.atStartOfDay(), to.plusDays(1).atStartOfDay());
+            }
+            if (from != null) {
+                return cb.greaterThanOrEqualTo(root.get("createdAt"), from.atStartOfDay());
+            }
+            return cb.lessThan(root.get("createdAt"), to.plusDays(1).atStartOfDay());
         };
     }
 

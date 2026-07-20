@@ -18,16 +18,25 @@ import java.util.Optional;
 @Repository
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
     Optional<User> findByEmail(String email);
+
     Optional<User> findByIin(String iin);
+
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.settings WHERE u.email = :email")
     Optional<User> findByEmailWithSettings(@Param("email") String email);
+
     boolean existsByEmail(String email);
+
     Page<User> findByRegionId(Long regionId, Pageable pageable);
-    long countByActiveTrue();
-    long countByActiveFalse();
+    long countByCreatedDateBetween(LocalDateTime start, LocalDateTime end);
+    long countByActiveTrueAndCreatedDateBetween(LocalDateTime start, LocalDateTime end);
+    long countByActiveFalseAndCreatedDateBetween(LocalDateTime start, LocalDateTime end);
+
     long countByRegionId(Long regionId);
+
     long countByRegionIdAndActiveTrue(Long regionId);
+
     Optional<User> findByResetToken(String resetToken);
+
     @Modifying
     @Transactional
     @Query("UPDATE User u SET u.lastSeenAt = :time WHERE u.email = :email")
@@ -52,5 +61,46 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     );
 
     long countByRegionIdIn(List<Long> regionIds);
+
     long countByRegionIdInAndActiveTrue(List<Long> regionIds);
+
+    @Query("""
+        SELECT u
+        FROM User u
+        WHERE u.active = true
+        AND (
+            LOWER(u.surname) LIKE LOWER(CONCAT(:query, '%'))
+            OR LOWER(u.name) LIKE LOWER(CONCAT(:query, '%'))
+            OR LOWER(u.fathername) LIKE LOWER(CONCAT(:query, '%'))
+        )
+        ORDER BY
+            CASE
+                WHEN LOWER(u.surname) LIKE LOWER(CONCAT(:query, '%')) THEN 1
+                WHEN LOWER(u.name) LIKE LOWER(CONCAT(:query, '%')) THEN 2
+                ELSE 3
+            END,
+            u.surname, u.name
+        """)
+    List<User> searchAllUsers(@Param("query") String query);
+
+    @Query("""
+        SELECT u
+        FROM User u
+        WHERE u.region.id IN :regionIds
+        AND u.active = true
+        AND (
+            LOWER(u.surname) LIKE LOWER(CONCAT(:query, '%'))
+            OR LOWER(u.name) LIKE LOWER(CONCAT(:query, '%'))
+            OR LOWER(u.fathername) LIKE LOWER(CONCAT(:query, '%'))
+        )
+        ORDER BY
+            CASE
+                WHEN LOWER(u.surname) LIKE LOWER(CONCAT(:query, '%')) THEN 1
+                WHEN LOWER(u.name) LIKE LOWER(CONCAT(:query, '%')) THEN 2
+                ELSE 3
+            END,
+            u.surname, u.name
+        """)
+    List<User> searchAllUsersByRegions(@Param("regionIds") List<Long> regionIds,
+                                       @Param("query") String query);
 }

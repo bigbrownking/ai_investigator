@@ -25,8 +25,8 @@ public class CaseInterrogationCaseChat {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "interrogation_id", nullable = false)
+    @OneToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "interrogation_id", nullable = false, unique = true)
     private CaseInterrogation interrogation;
 
     @ManyToOne(fetch = FetchType.LAZY)

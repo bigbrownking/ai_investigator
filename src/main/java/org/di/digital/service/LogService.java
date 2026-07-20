@@ -9,6 +9,8 @@ import java.time.LocalDateTime;
 
 public interface LogService {
     void log(String description, LogLevel level, LogAction action, String caseNumber, String email);
+    void log(String description, LogLevel level, LogAction action,
+             String caseNumber, String email, String ipAddress);
     Page<Log> allLogs(int page, int size);
 
     Page<Log> searchLogs(LogLevel level, LogAction action,

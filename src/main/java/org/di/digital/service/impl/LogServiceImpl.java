@@ -24,9 +24,20 @@ import static org.di.digital.util.requests.UserUtil.*;
 public class LogServiceImpl implements LogService {
     private final LogRepository logRepository;
 
+    // LogServiceImpl
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
-    public void log(String description, LogLevel level, LogAction action, String caseNumber, String email) {
+    public void log(String description, LogLevel level, LogAction action,
+                    String caseNumber, String email) {
+        // старый путь — только для синхронного контекста (есть HTTP-запрос)
+        String ip = tryGetIp();
+        log(description, level, action, caseNumber, email, ip);
+    }
+
+    @Override
+    @Transactional(propagation = Propagation.REQUIRES_NEW)
+    public void log(String description, LogLevel level, LogAction action,
+                    String caseNumber, String email, String ipAddress) {
         try {
             Log logEntry = Log.builder()
                     .description(description)
@@ -34,13 +45,20 @@ public class LogServiceImpl implements LogService {
                     .action(action)
                     .caseNumber(caseNumber)
                     .email(email)
-                    .ipAddress(getClientIpAddress(getCurrentHttpRequest()))
+                    .ipAddress(ipAddress)
                     .build();
-
             logRepository.save(logEntry);
             log.debug("Created {} log: {} - {}", level, action, description);
         } catch (Exception e) {
             log.error("Failed to create log entry: {}", e.getMessage(), e);
+        }
+    }
+
+    private String tryGetIp() {
+        try {
+            return getClientIpAddress(getCurrentHttpRequest());
+        } catch (IllegalStateException e) {
+            return null;
         }
     }
 

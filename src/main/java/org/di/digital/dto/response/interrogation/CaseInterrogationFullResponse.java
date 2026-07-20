@@ -55,4 +55,9 @@ public class CaseInterrogationFullResponse {
     private List<InterrogationTimerSessionResponse> timerSessions;
     private String status;
     private Boolean isDop;
+    private Boolean categoryConfirmed;
+    private String limitProfile;
+    private String specialGround;
+    private Boolean onBreak;
+    private LocalDateTime breakStartedAt;
 }

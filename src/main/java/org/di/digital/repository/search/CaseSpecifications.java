@@ -17,8 +17,8 @@ public class CaseSpecifications {
                 .where(hasNumber(req.getNumber()))
                 .and(hasTitle(req.getTitle()))
                 .and(isActive(req.getStatus()))
-                .and(createdAfter(req.getCreatedFrom()))
-                .and(createdBefore(req.getCreatedTo()))
+                .and(createdAfter(req.getFrom()))
+                .and(createdBefore(req.getTo()))
                 .and(hasOwnerName(req.getOwnerName()))
                 .and(hasRegion(req.getRegion()));
     }
@@ -29,8 +29,8 @@ public class CaseSpecifications {
                 .and(hasNumber(req.getNumber()))
                 .and(hasTitle(req.getTitle()))
                 .and(isActive(req.getStatus()))
-                .and(createdAfter(req.getCreatedFrom()))
-                .and(createdBefore(req.getCreatedTo()))
+                .and(createdAfter(req.getFrom()))
+                .and(createdBefore(req.getTo()))
                 .and(hasOwnerName(req.getOwnerName()));
     }
     public static Specification<Case> buildForRegions(List<Long> regionIds, CaseSearchRequest req) {
@@ -39,8 +39,8 @@ public class CaseSpecifications {
                 .and(hasNumber(req.getNumber()))
                 .and(hasTitle(req.getTitle()))
                 .and(isActive(req.getStatus()))
-                .and(createdAfter(req.getCreatedFrom()))
-                .and(createdBefore(req.getCreatedTo()))
+                .and(createdAfter(req.getFrom()))
+                .and(createdBefore(req.getTo()))
                 .and(hasOwnerName(req.getOwnerName()));
     }
 
@@ -94,10 +94,11 @@ public class CaseSpecifications {
             if (!StringUtils.hasText(ownerName)) return null;
             query.distinct(true);
             Join<Object, Object> owner = root.join("owner", JoinType.LEFT);
+            String pattern = "%" + ownerName.toLowerCase().trim() + "%";
             return cb.or(
-                    cb.like(cb.lower(owner.get("name")), ownerName.toLowerCase()),
-                    cb.like(cb.lower(owner.get("surname")), ownerName.toLowerCase()),
-                    cb.like(cb.lower(owner.get("fathername")), ownerName.toLowerCase())
+                    cb.like(cb.lower(owner.get("name")), pattern),
+                    cb.like(cb.lower(owner.get("surname")), pattern),
+                    cb.like(cb.lower(owner.get("fathername")), pattern)
             );
         };
     }

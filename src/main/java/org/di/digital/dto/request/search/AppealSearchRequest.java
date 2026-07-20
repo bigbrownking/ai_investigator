@@ -10,9 +10,10 @@ import java.time.LocalDate;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AppealSearchRequest {
-    private String from;
-    private String to;
+    private String cameFrom;
+    private String cameTo;
     private String status;
     private String region;
-    private LocalDate createdAt;
+    private LocalDate from;
+    private LocalDate to;
 }

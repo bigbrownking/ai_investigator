@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.osmotr.DistributionRequest;
 import org.di.digital.dto.response.osmotr.OsmotrResultDto;
+import org.di.digital.dto.response.osmotr.OsmotrResultSegmentDto;
 import org.di.digital.model.enums.OsmotrFileType;
 import org.di.digital.service.OsmotrService;
 import org.springframework.http.HttpHeaders;
@@ -111,5 +112,14 @@ public class OsmotrController {
                         "attachment; filename*=UTF-8''" + encode(fileName, StandardCharsets.UTF_8))
                 .contentType(MediaType.APPLICATION_OCTET_STREAM)
                 .body(file);
+    }
+
+    @GetMapping("/search")
+    public ResponseEntity<List<OsmotrResultDto>> searchSegments(
+            @PathVariable String caseNumber,
+            @RequestParam String query,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                digitalOsmotrService.searchSegments(caseNumber, query, authentication.getName()));
     }
 }

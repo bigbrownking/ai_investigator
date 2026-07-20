@@ -1,14 +1,12 @@
 package org.di.digital.dto.response.osmotr;
 
-import lombok.AllArgsConstructor;
-import lombok.Builder;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
+import lombok.*;
 import org.di.digital.model.enums.OsmotrProcessingStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
 
+@Setter
 @Getter
 @Builder
 @NoArgsConstructor
@@ -21,6 +19,7 @@ public class OsmotrResultDto {
     private String userEmail;
     private OsmotrProcessingStatus status;
     private String reportTxt;
+    private String reportFileBase64;
     private String errorMessage;
     private Long processingDurationSeconds;
     private LocalDateTime createdAt;

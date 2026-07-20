@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.List;
 import java.util.Map;
 
 @Service
@@ -20,12 +21,12 @@ public class DocumentFormatterServiceImpl implements DocumentFormatterService {
     }
 
     @Override
-    public byte[] generateIndictmentDocument(String text) throws IOException {
-        return indictmentFormatter.generate(text);
+    public byte[] generateIndictmentDocument(List<Map<String, Object>> sections) throws IOException {
+        return indictmentFormatter.generate(sections);
     }
 
     @Override
-    public byte[] generatePlanDocument(Map<String, Object> plan) throws IOException {
-        return planDocumentFormatter.generate(plan);
+    public byte[] generatePlanDocument(Map<String, Object> plan, String approvedBy) throws IOException {
+        return planDocumentFormatter.generate(plan, approvedBy);
     }
 }

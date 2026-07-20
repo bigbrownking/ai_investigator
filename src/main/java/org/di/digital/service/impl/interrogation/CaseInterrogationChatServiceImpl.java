@@ -1,12 +1,12 @@
 package org.di.digital.service.impl.interrogation;
 
-import com.fasterxml.jackson.databind.JsonNode;
-import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChatRequest;
+import org.di.digital.dto.response.cases.QueryResponse;
 import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.dto.response.chat.CaseChatMessageDto;
+import org.di.digital.dto.response.interrogation.InterrogationQuestionsResponse;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChatMessage;
 import org.di.digital.model.enums.LogAction;
@@ -15,27 +15,28 @@ import org.di.digital.model.enums.MessageRole;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationCaseChat;
 import org.di.digital.model.interrogation.CaseInterrogationChat;
-import org.di.digital.model.interrogation.CaseInterrogationQA;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationCaseChatRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationChatRepository;
 import org.di.digital.repository.user.UserRepository;
-import org.di.digital.service.interrogation.CaseInterrogationChatService;
 import org.di.digital.service.LogService;
-import org.di.digital.service.StreamingService;
+import org.di.digital.service.interrogation.CaseInterrogationChatService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
+import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.context.request.RequestAttributes;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
+import java.util.concurrent.CompletableFuture;
 
-import static org.di.digital.util.requests.RequestBodyBuilder.interrogationBody;
+import static org.di.digital.util.requests.RequestBodyBuilder.generalChatBody;
 import static org.di.digital.util.requests.RequestUrlBuilder.interrogationQuestionsUrl;
 import static org.di.digital.util.requests.RequestUrlBuilder.qualificationChatUrl;
 import static org.di.digital.util.requests.UserUtil.validateUserAccess;
@@ -49,11 +50,12 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     private final UserRepository userRepository;
     private final CaseInterrogationChatRepository caseInterrogationChatRepository;
     private final CaseInterrogationCaseChatRepository caseInterrogationCaseChatRepository;
-
     private final CaseChatMessageRepository chatMessageRepository;
-    private final ObjectMapper objectMapper;
-    private final StreamingService streamingService;
+
     private final LogService logService;
+    private final InterrogationChatWriter interrogationChatWriter;
+    private final InterrogationQuestionsWriter questionsWriter;
+    private final WebClient.Builder webClientBuilder;
 
     @Value("${model.host}")
     private String pythonHost;
@@ -64,100 +66,124 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     @Value("${qualification.port}")
     private String chatPort;
 
+    // ========================================================================
+    // Генерация вопросов: prepare (tx) -> HTTP (без tx) -> saveQuestions (tx)
+    // ========================================================================
     @Override
-    @Transactional
     public void streamInterrogationChatResponse(Long caseId, Long interrogationId,
                                                 ChatRequest request, String userEmail,
                                                 SseEmitter emitter) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
-        validateUserAccess(caseEntity, user);
+        InterrogationQuestionsWriter.PreparedInterrogation prep;
+        try {
+            prep = questionsWriter.prepare(
+                    caseId, interrogationId, request.getQuestion(), request.getAnswer(), userEmail);
+        } catch (Exception e) {
+            log.error("Interrogation prepare failed for interrogation {}: ", interrogationId, e);
+            emitter.completeWithError(e);
+            return;
+        }
 
-        String caseNumber = caseEntity.getNumber();
-        CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
-                .filter(i -> i.getId().equals(interrogationId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+        try {
+            InterrogationQuestionsResponse response = webClientBuilder.build()
+                    .post()
+                    .uri(interrogationQuestionsUrl(pythonHost, interrogationChatPort, prep.caseNumber()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(prep.requestBody())
+                    .retrieve()
+                    .bodyToMono(InterrogationQuestionsResponse.class)
+                    .block();
 
-        CaseInterrogationChat chat = getOrCreateChat(interrogation);
+            if (response == null || response.getQuestions() == null) {
+                throw new IllegalStateException("Пустой ответ от сервиса");
+            }
 
-        CaseChatMessage userMessage = CaseChatMessage.builder()
-                .interrogationChat(chat)
-                .role(MessageRole.USER)
-                .isEdited(false)
-                .content("Вопрос: " + request.getQuestion() + '\n' + "Ответ: " + request.getAnswer())
-                .complete(true)
-                .build();
-        chat.addMessage(userMessage);
-        chatMessageRepository.save(userMessage);
+            List<String> questions = response.getQuestions();
 
-        CaseChatMessage placeholderMessage = CaseChatMessage.builder()
-                .interrogationChat(chat)
-                .role(MessageRole.ASSISTANT)
-                .isEdited(false)
-                .content("")
-                .complete(false)
-                .build();
-        chat.addMessage(placeholderMessage);
-        final Long placeholderId = chatMessageRepository.save(placeholderMessage).getId();
+            questionsWriter.saveQuestions(prep.chatId(), prep.placeholderId(), questions);
 
-        List<CaseInterrogationQA> qaList = interrogation.getQaList();
+            emitter.send(SseEmitter.event().name("questions").data(questions));
+            emitter.complete();
 
-        String language = interrogation.getLanguage().equals("русском") ? "russian" : "kazakh";
-        log.info("Language is {}", language);
-        streamingService.stream(
-                interrogationQuestionsUrl(pythonHost, interrogationChatPort, caseEntity.getNumber()),
-                interrogationBody(interrogation.getFio(), interrogation.getRole(),language, qaList),
-                emitter,
-                this::extractInterrogationChunk,
-                fullText -> {
-                    chatMessageRepository.deleteById(placeholderId);
+            log.info("Saved {} question messages for interrogation {}",
+                    questions.size(), interrogationId);
 
-                    List<String> questions = parseQuestions(fullText);
-                    if (questions.isEmpty()) {
-                        CaseChatMessage single = CaseChatMessage.builder()
-                                .interrogationChat(chat)
-                                .role(MessageRole.ASSISTANT)
-                                .isEdited(false)
-                                .content(fullText)
-                                .complete(true)
-                                .build();
-                        chatMessageRepository.save(single);
-                    } else {
-                        for (String question : questions) {
-                            if (question.isBlank()) continue;
-                            CaseChatMessage msg = CaseChatMessage.builder()
-                                    .interrogationChat(chat)
-                                    .role(MessageRole.ASSISTANT)
-                                    .isEdited(false)
-                                    .content(question.trim())
-                                    .complete(true)
-                                    .build();
-                            chatMessageRepository.save(msg);
-                        }
-                    }
+            logService.log(
+                    String.format("New interrogation chat message %s by %s user to case %s",
+                            prep.userMessageContent(), userEmail, prep.caseNumber()),
+                    LogLevel.INFO, LogAction.CHAT_MESSAGE, prep.caseNumber(), userEmail);
 
-                    log.info("Saved {} question messages for interrogation {}",
-                            questions.size(), interrogationId);
-                },
-                error -> {
-                    log.error("Streaming error for interrogation {}: ", interrogationId, error);
-                    updateAssistantMessage(placeholderId, "[Error: " + error.getMessage() + "]");
-                }
-        );
-
-        logService.log(
-                String.format("New interrogation chat message %s by %s user to case %s",
-                        userMessage.getContent(), userEmail, caseNumber),
-                LogLevel.INFO,
-                LogAction.CHAT_MESSAGE,
-                caseNumber,
-                userEmail
-        );
+        } catch (Exception e) {
+            log.error("Interrogation questions error for interrogation {}: ", interrogationId, e);
+            questionsWriter.markError(prep.placeholderId(), "[Error: " + e.getMessage() + "]");
+            emitter.completeWithError(e);
+        }
     }
 
+    // ========================================================================
+    // Чат по делу в контексте допроса: prepare (tx) -> HTTP (без tx) -> save (tx)
+    // ========================================================================
+    @Override
+    public void streamCaseInterrogationChatResponse(Long caseId, Long interrogationId,
+                                                    ChatRequest request, String userEmail,
+                                                    SseEmitter emitter) {
+        InterrogationChatWriter.PreparedCaseChat prep;
+        try {
+            prep = interrogationChatWriter.prepareCaseChat(
+                    caseId, interrogationId, userEmail, request.getQuestion());
+        } catch (Exception e) {
+            log.error("Case interrogation prepare failed for interrogation {}: ", interrogationId, e);
+            emitter.completeWithError(e);
+            return;
+        }
+
+        final Long messageId = prep.messageId();
+        final String caseNumber = prep.caseNumber();
+
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+
+        CompletableFuture.runAsync(() -> {
+            RequestContextHolder.setRequestAttributes(requestAttributes);
+            try {
+                QueryResponse response = webClientBuilder.build()
+                        .post()
+                        .uri(qualificationChatUrl(pythonHost, chatPort, caseNumber))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(generalChatBody(request.getQuestion()))
+                        .retrieve()
+                        .bodyToMono(QueryResponse.class)
+                        .block();
+
+                if (response == null || response.getResponse() == null) {
+                    throw new IllegalStateException("Пустой ответ от сервиса");
+                }
+
+                emitter.send(SseEmitter.event().name("message").data(response.getResponse()));
+                emitter.complete();
+
+                interrogationChatWriter.updateAssistantMessage(
+                        messageId, response.getResponse(), response.getReferences());
+
+                logService.log(
+                        String.format("New case interrogation chat message by %s in case %s",
+                                userEmail, caseNumber),
+                        LogLevel.INFO, LogAction.CHAT_MESSAGE, caseNumber, userEmail);
+
+                log.info("Case interrogation chat completed for interrogation {}", interrogationId);
+
+            } catch (Exception e) {
+                log.error("Case interrogation chat error for interrogation {}: ", interrogationId, e);
+                interrogationChatWriter.updateAssistantMessage(
+                        messageId, "[Error: " + e.getMessage() + "]", null);
+                emitter.completeWithError(e);
+            } finally {
+                RequestContextHolder.resetRequestAttributes();
+            }
+        });
+    }
+
+    // ========================================================================
+    // История и очистка — чистая работа с БД, короткие транзакции. Оставлено как есть.
+    // ========================================================================
     @Override
     @Transactional(readOnly = true)
     public CaseChatHistoryResponse getChatHistory(Long caseId, Long interrogationId,
@@ -211,41 +237,14 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
 
         logService.log(
                 String.format("Cleared interrogation chat by %s user to case %s", userEmail, caseNumber),
-                LogLevel.INFO,
-                LogAction.CHAT_CLEAR,
-                caseNumber,
-                userEmail
-        );
+                LogLevel.INFO, LogAction.CHAT_CLEAR, caseNumber, userEmail);
         log.info("Cleared chat history for interrogation {}", interrogationId);
-    }
-
-    @Transactional
-    protected CaseInterrogationChat getOrCreateChat(CaseInterrogation interrogation) {
-        return caseInterrogationChatRepository.findByInterrogationId(interrogation.getId())
-                .orElseGet(() -> {
-                    CaseInterrogationChat newChat = CaseInterrogationChat.builder()
-                            .interrogation(interrogation)
-                            .active(true)
-                            .build();
-                    log.info("Creating new chat for interrogation {}", interrogation.getId());
-                    CaseInterrogationChat saved = caseInterrogationChatRepository.save(newChat);
-                    caseInterrogationChatRepository.flush();
-                    return saved;
-                });
-    }
-
-    @Transactional
-    protected void updateAssistantMessage(Long messageId, String fullContent) {
-        CaseChatMessage message = chatMessageRepository.findById(messageId)
-                .orElseThrow(() -> new IllegalStateException("Message not found: " + messageId));
-        message.setContent(fullContent);
-        message.setComplete(true);
-        chatMessageRepository.save(message);
     }
 
     @Override
     @Transactional
-    public void toggleMessageSelected(Long caseId, Long interrogationId, Long messageId, boolean selected, String userEmail) {
+    public void toggleMessageSelected(Long caseId, Long interrogationId, Long messageId,
+                                      boolean selected, String userEmail) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
@@ -272,14 +271,13 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         chatMessageRepository.save(message);
 
         logService.log(
-                String.format("Message %s %s in case %s", messageId, selected ? "selected" : "deselected", caseEntity.getNumber()),
-                LogLevel.INFO,
-                LogAction.MESSAGE_SELECTED,
-                caseEntity.getNumber(),
-                user.getEmail()
-        );
+                String.format("Message %s %s in case %s",
+                        messageId, selected ? "selected" : "deselected", caseEntity.getNumber()),
+                LogLevel.INFO, LogAction.MESSAGE_SELECTED, caseEntity.getNumber(), user.getEmail());
     }
 
+    // NOTE: грузит ВСЕ сообщения чата в память (PageRequest Integer.MAX_VALUE).
+    // При больших чатах стоит заменить на прицельный запрос диапазона по границам USER-сообщений.
     private List<CaseChatMessage> findGroupSiblings(Long chatId, Long targetMessageId) {
         List<CaseChatMessage> all = chatMessageRepository
                 .findByInterrogationChatIdOrderByIdAsc(chatId, PageRequest.of(0, Integer.MAX_VALUE))
@@ -316,67 +314,6 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .filter(m -> MessageRole.ASSISTANT.equals(m.getRole()))
                 .filter(m -> Boolean.TRUE.equals(m.getIsSelected()))
                 .toList();
-    }
-
-
-    @Override
-    @Transactional
-    public void streamCaseInterrogationChatResponse(Long caseId, Long interrogationId,
-                                                    ChatRequest request, String userEmail,
-                                                    SseEmitter emitter) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
-        validateUserAccess(caseEntity, user);
-
-        CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
-                .filter(i -> i.getId().equals(interrogationId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
-
-        CaseInterrogationCaseChat chat = getOrCreateCaseInterrogationChat(interrogation, user);
-
-        CaseChatMessage userMessage = CaseChatMessage.builder()
-                .caseInterrogationCaseChat(chat)
-                .role(MessageRole.USER)
-                .isEdited(false)
-                .content(request.getQuestion())
-                .complete(true)
-                .build();
-        chat.addMessage(userMessage);
-        chatMessageRepository.save(userMessage);
-
-        CaseChatMessage assistantMessage = CaseChatMessage.builder()
-                .caseInterrogationCaseChat(chat)
-                .role(MessageRole.ASSISTANT)
-                .isEdited(false)
-                .content("")
-                .complete(false)
-                .build();
-        chat.addMessage(assistantMessage);
-        final Long messageId = chatMessageRepository.save(assistantMessage).getId();
-
-        streamingService.stream(
-                qualificationChatUrl(pythonHost, chatPort, caseEntity.getNumber()),
-                request,
-                emitter,
-                chunk -> chunk,
-                fullText -> {
-                    updateAssistantMessage(messageId, fullText);
-                    log.info("Case interrogation chat streaming completed for interrogation {}", interrogationId);
-                },
-                error -> {
-                    log.error("Case interrogation chat streaming error for interrogation {}: ", interrogationId, error);
-                    updateAssistantMessage(messageId, "[Error: " + error.getMessage() + "]");
-                },
-                true
-        );
-
-        logService.log(
-                String.format("New case interrogation chat message by %s in case %s", userEmail, caseEntity.getNumber()),
-                LogLevel.INFO, LogAction.CHAT_MESSAGE, caseEntity.getNumber(), userEmail
-        );
     }
 
     @Override
@@ -434,54 +371,6 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
 
         logService.log(
                 String.format("Cleared case interrogation chat by %s in case %s", userEmail, caseEntity.getNumber()),
-                LogLevel.INFO, LogAction.CHAT_CLEAR, caseEntity.getNumber(), userEmail
-        );
-    }
-
-    @Transactional
-    protected CaseInterrogationCaseChat getOrCreateCaseInterrogationChat(CaseInterrogation interrogation, User user) {
-        return caseInterrogationCaseChatRepository
-                .findByInterrogationIdAndUserId(interrogation.getId(), user.getId())
-                .orElseGet(() -> {
-                    CaseInterrogationCaseChat newChat = CaseInterrogationCaseChat.builder()
-                            .interrogation(interrogation)
-                            .user(user)
-                            .active(true)
-                            .build();
-                    log.info("Creating new case chat for interrogation {} and user {}",
-                            interrogation.getId(), user.getEmail());
-                    return caseInterrogationCaseChatRepository.save(newChat);
-                });
-    }
-
-    private List<String> parseQuestions(String fullText) {
-        try {
-            JsonNode node = objectMapper.readTree(fullText);
-            if (node.has("questions")) {
-                List<String> result = new ArrayList<>();
-                node.get("questions").forEach(q -> result.add(q.asText()));
-                return result;
-            }
-        } catch (Exception ignored) {}
-
-        if (fullText.contains("\n")) {
-            return Arrays.stream(fullText.split("\n"))
-                    .filter(s -> !s.isBlank())
-                    .toList();
-        }
-
-        return List.of(fullText);
-    }
-
-    private String extractInterrogationChunk(String chunk) {
-        try {
-            JsonNode node = objectMapper.readTree(chunk);
-            if (node.has("questions")) {
-                StringBuilder sb = new StringBuilder();
-                node.get("questions").forEach(q -> sb.append(q.asText()).append("\n"));
-                return sb.toString();
-            }
-        } catch (Exception ignored) {}
-        return chunk;
+                LogLevel.INFO, LogAction.CHAT_CLEAR, caseEntity.getNumber(), userEmail);
     }
 }

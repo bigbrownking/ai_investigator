@@ -13,6 +13,7 @@ import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
+import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.RegAdminService;
 import org.springframework.data.domain.Page;
@@ -23,6 +24,7 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
+import java.util.List;
 import java.util.Map;
 
 import static java.net.URLEncoder.encode;
@@ -140,8 +142,16 @@ public class RegAdminController {
             @RequestBody ChangeOwnerRequest request,
             Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        regAdminService.changeOwner(userDetails.getId(), caseId, request.getNewOwnerEmail());
+        regAdminService.changeOwner(userDetails.getId(), caseId, request.getUserId());
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/users/search")
+    public ResponseEntity<List<UserSuggestionResponse>> searchUsers(
+            @RequestParam String query,
+            Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        return ResponseEntity.ok(regAdminService.searchUsers(userDetails.getId(), query));
     }
 
     @GetMapping("/cases/{caseId}/indictment")

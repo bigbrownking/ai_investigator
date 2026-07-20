@@ -21,5 +21,6 @@ public class OsmotrSubmitDecisionsRequest {
     private Long userId;
 
     private List<OsmotrDataItemDto> results;
+    private List<OsmotrDataItemDto> data;
     private List<OsmotrDecisionDto> decisions;
 }

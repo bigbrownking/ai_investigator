@@ -14,6 +14,4 @@ public interface ChatService {
     CaseChatHistoryResponse getChatHistory(Long caseId, Long userId, int page, int size);
 
     void clearChatHistoryByCaseNumber(String caseNumber, String userEmail);
-
-    void clearChatHistory(Long caseId, Long userId);
 }

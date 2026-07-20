@@ -20,10 +20,13 @@ import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserProfile;
+import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.AdminService;
 import org.di.digital.service.auth.AuthService;
+import org.di.digital.service.impl.core.DevService;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -32,6 +35,7 @@ import org.springframework.web.bind.annotation.*;
 import static java.net.URLEncoder.encode;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 
 @Slf4j
@@ -42,6 +46,8 @@ public class AdminController {
 
     private final AdminService adminService;
     private final AuthService authService;
+    private final DevService devService;
+
     @PostMapping("/reg_admin")
     public ResponseEntity<String> regAdmin(@RequestBody SignUpRequest signUpRequest) {
         return ResponseEntity.ok(authService.signupRegAdmin(signUpRequest));
@@ -108,8 +114,10 @@ public class AdminController {
         return ResponseEntity.ok(adminService.getRegionMapStats());
     }
     @GetMapping("/stats")
-    public ResponseEntity<AdminStatsDto> getStats() {
-        return ResponseEntity.ok(adminService.getStats());
+    public ResponseEntity<AdminStatsDto> getStats(
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
+        return ResponseEntity.ok(adminService.getStats(from, to));
     }
 
     @PutMapping("/users/{id}/activate")
@@ -201,8 +209,13 @@ public class AdminController {
     public ResponseEntity<Void> changeOwner(
             @PathVariable Long caseId,
             @RequestBody ChangeOwnerRequest request) {
-        adminService.changeOwner(caseId, request.getNewOwnerEmail());
+        adminService.changeOwner(caseId, request.getUserId());
         return ResponseEntity.ok().build();
+    }
+    @GetMapping("/users/search")
+    public ResponseEntity<List<UserSuggestionResponse>> searchUsers(
+            @RequestParam String query) {
+        return ResponseEntity.ok(adminService.searchUsers(query));
     }
 
     @PutMapping("/users/{userId}/profile")
@@ -226,5 +239,14 @@ public class AdminController {
     @GetMapping("/cases/{caseId}/plan")
     public ResponseEntity<CasePlanResponse> getPlan(@PathVariable Long caseId) {
         return ResponseEntity.ok(adminService.getPlan(caseId));
+    }
+
+    @PatchMapping("/queue/case/{caseNumber}/priority")
+    public ResponseEntity<Void> setCasePriority(
+            @PathVariable String caseNumber,
+            @RequestParam int priority
+    ) {
+        devService.setCasePriority(caseNumber, priority);
+        return ResponseEntity.ok().build();
     }
 }

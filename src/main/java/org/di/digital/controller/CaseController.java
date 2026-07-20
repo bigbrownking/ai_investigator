@@ -3,17 +3,12 @@ package org.di.digital.controller;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.consumer.FigurantSyncService;
-import org.di.digital.dto.request.cases.AddUserToCaseRequest;
-import org.di.digital.dto.request.cases.CreateCaseRequest;
-import org.di.digital.dto.request.cases.EditCaseRequest;
-import org.di.digital.dto.request.cases.ReorderCaseFilesRequest;
+import org.di.digital.consumer.figurant.FigurantSyncService;
+import org.di.digital.dto.request.cases.*;
 import org.di.digital.dto.request.interrogation.AddFigurantToCaseRequest;
-import org.di.digital.dto.response.cases.CaseFileResponse;
-import org.di.digital.dto.response.cases.CaseResponse;
-import org.di.digital.dto.response.cases.CaseUserResponse;
-import org.di.digital.dto.response.cases.GroupedCaseFileResponse;
+import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.FigurantResponse;
+import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.FileType;
 import org.di.digital.service.CaseFileService;
@@ -41,6 +36,7 @@ public class CaseController {
     public ResponseEntity<CaseResponse> createCase(
             @RequestParam("title") String title,
             @RequestParam("number") String number,
+            @RequestParam("language") String language,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,
             Authentication authentication
     ) {
@@ -50,11 +46,11 @@ public class CaseController {
         CreateCaseRequest request = CreateCaseRequest.builder()
                 .title(title)
                 .number(number)
+                .language(language)
                 .files(files)
                 .build();
 
         CaseResponse response = caseService.createCase(request, authentication.getName());
-
         return ResponseEntity.status(HttpStatus.CREATED).body(response);
     }
     @PatchMapping("/{caseId}")
@@ -65,6 +61,17 @@ public class CaseController {
     ) {
         log.info("Editing case: {} by user: {}", caseId, authentication.getName());
         CaseResponse response = caseService.editCase(caseId, request, authentication.getName());
+        return ResponseEntity.ok(response);
+    }
+
+    @PatchMapping("/{caseId}/language")
+    public ResponseEntity<CaseResponse> editCaseLanguage(
+            @PathVariable Long caseId,
+            @RequestBody ChangeCaseLanguageRequest request,
+            Authentication authentication
+    ) {
+        log.info("Editing case: {} by user: {}", caseId, authentication.getName());
+        CaseResponse response = caseService.changeCaseLanguage(caseId, request, authentication.getName());
         return ResponseEntity.ok(response);
     }
 
@@ -124,12 +131,12 @@ public class CaseController {
     }
 
     @GetMapping
-    public ResponseEntity<List<CaseResponse>> getUserCases(
+    public ResponseEntity<List<CasePreviewResponse>> getUserCases(
             @RequestParam(required = false, defaultValue = "desc") String sort,
             Authentication authentication
     ) {
         log.info("Getting all cases for user: {} with sort: {}", authentication.getName(), sort);
-        List<CaseResponse> cases = caseService.getUserCases(authentication.getName(), sort);
+        List<CasePreviewResponse> cases = caseService.getUserCases(authentication.getName(), sort);
         return ResponseEntity.ok(cases);
     }
 
@@ -231,10 +238,24 @@ public class CaseController {
             Authentication authentication
     ) {
         log.info("Adding user {} to case: {} by user: {}",
-                request.getEmail(), caseId, authentication.getName());
+                request.getId(), caseId, authentication.getName());
 
-        CaseUserResponse response = caseService.addUserToCase(caseId, request.getEmail(), authentication.getName());
+        CaseUserResponse response = caseService.addUserToCase(caseId, request.getId(), authentication.getName());
         return ResponseEntity.ok(response);
+    }
+    @GetMapping("/{caseId}/users/history")
+    public ResponseEntity<List<CaseMemberHistoryDto>> getMemberHistory(
+            @PathVariable Long caseId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(
+                caseService.getMemberHistory(caseId, authentication.getName()));
+    }
+
+    @GetMapping("/users/search")
+    public ResponseEntity<List<UserSuggestionResponse>> searchUsers(
+            @RequestParam String query) {
+        return ResponseEntity.ok(caseService.searchUsers(query));
     }
 
     @PostMapping("/{caseId}/figurants")
@@ -369,5 +390,17 @@ public class CaseController {
         log.info("Retrying file: {} in case: {} by user: {}", fileId, caseId, authentication.getName());
         caseFileService.retryFile(caseId, fileId, authentication.getName());
         return ResponseEntity.ok().build();
+    }
+
+    @GetMapping("/{caseId}/files/by-name")
+    public ResponseEntity<CaseFileResponse> getFileByName(
+            @PathVariable Long caseId,
+            @RequestParam String fileName,
+            Authentication authentication
+    ) {
+        log.info("Getting file {} from case: {} for user: {}",
+                fileName, caseId, authentication.getName());
+        CaseFileResponse response = caseService.getFileByName(caseId, fileName, authentication.getName());
+        return ResponseEntity.ok(response);
     }
 }

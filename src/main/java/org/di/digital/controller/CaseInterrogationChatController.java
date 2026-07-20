@@ -4,13 +4,15 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
-import org.di.digital.service.impl.core.SseHeartbeatUtil;
+import org.di.digital.service.impl.core.sse.SseHeartbeatUtil;
 import org.di.digital.service.interrogation.CaseInterrogationChatService;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RestController
@@ -29,13 +31,11 @@ public class CaseInterrogationChatController {
             @RequestBody ChatRequest request,
             Authentication authentication
     ) {
-        SseEmitter emitter = new SseEmitter(0L);
-        heartbeatUtil.startHeartbeat(emitter);
+        SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(10));
+        heartbeatUtil.startHeartbeat(emitter, "interrogation-" + interrogationId);
 
-        log.info("Starting chat stream for interrogation {} in case {}", interrogationId, caseId);
         interrogationChatService.streamInterrogationChatResponse(
-                caseId, interrogationId, request, authentication.getName(), emitter
-        );
+                caseId, interrogationId, request, authentication.getName(), emitter);
         return emitter;
     }
 
@@ -84,7 +84,11 @@ public class CaseInterrogationChatController {
             @PathVariable Long interrogationId,
             @RequestBody ChatRequest request,
             Authentication authentication) {
-        SseEmitter emitter = new SseEmitter(0L);
+        log.info("Starting case chat stream for interrogation {} in case {}", interrogationId, caseId);
+
+        SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(10));
+        heartbeatUtil.startHeartbeat(emitter, "interrogation-case-chat-" + interrogationId);
+
         interrogationChatService.streamCaseInterrogationChatResponse(
                 caseId, interrogationId, request, authentication.getName(), emitter);
         return emitter;

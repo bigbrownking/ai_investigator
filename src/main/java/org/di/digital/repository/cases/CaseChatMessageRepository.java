@@ -46,6 +46,8 @@ public interface CaseChatMessageRepository extends JpaRepository<CaseChatMessage
     long countByCaseInterrogationCaseChatId(Long chatId);
     void deleteAllByCaseInterrogationCaseChatId(Long chatId);
 
-    long countByRole(MessageRole role);
-    long countByIsSelectedTrue();
+    long countByRoleAndInterrogationChatIsNotNullAndCreatedDateBetween(
+            MessageRole role, LocalDateTime start, LocalDateTime end);
+
+    long countByIsSelectedTrueAndCreatedDateBetween(LocalDateTime start, LocalDateTime end);
 }

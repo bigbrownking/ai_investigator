@@ -42,6 +42,7 @@ public class OsmotrResult {
     private LocalDateTime createdAt;
 
     @OneToMany(mappedBy = "osmotrResult", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
+    @OrderBy("startPage ASC, endPage ASC")
     @Builder.Default
     private List<OsmotrResultSegment> segments = new ArrayList<>();
 

@@ -5,9 +5,12 @@ import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.model.enums.PlanStatus;
+import org.di.digital.model.indictment.CaseIndictment;
 import org.di.digital.model.interrogation.CaseFigurant;
 import org.di.digital.model.interrogation.CaseInterrogation;
+import org.di.digital.model.plan.CasePlan;
 import org.di.digital.model.plan.PlanApprovalHistory;
+import org.di.digital.model.qualification.CaseQualification;
 import org.di.digital.model.user.User;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -37,8 +40,19 @@ public class Case {
 
     private String number;
 
+    private String language;
+
     @Builder.Default
     private boolean status = true;
+
+    @OneToOne(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private CasePlan casePlan;
+
+    @OneToOne(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private CaseQualification caseQualification;
+
+    @OneToOne(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private CaseIndictment caseIndictment;
 
     @Builder.Default
     @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
@@ -59,50 +73,6 @@ public class Case {
     @Builder.Default
     @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<PlanApprovalHistory> planApprovalHistories = new ArrayList<>();
-
-    @Column(columnDefinition = "TEXT")
-    private String qualification;
-
-    @Column(columnDefinition = "TEXT")
-    private String indictment;
-
-    @Column(name = "indictment_sections", columnDefinition = "jsonb")
-    @JdbcTypeCode(SqlTypes.JSON)
-    private List<Map<String, Object>> indictmentSections;
-
-    @Column(columnDefinition = "jsonb")
-    @JdbcTypeCode(SqlTypes.JSON)
-    private Map<String, Object> plan;
-
-    @Enumerated(EnumType.STRING)
-    private PlanStatus planStatus;
-
-    @Column(columnDefinition = "TEXT")
-    private String planReviewComment;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "plan_reviewed_by_id")
-    private User planReviewedBy;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "plan_approved_by_id")
-    private User planApprovedBy;
-
-    @ManyToOne(fetch = FetchType.LAZY)
-    @JoinColumn(name = "plan_submitted_by_id")
-    private User planSubmittedBy;
-
-    @Builder.Default
-    @Column(name = "notified_red_actions", columnDefinition = "jsonb")
-    @JdbcTypeCode(SqlTypes.JSON)
-    private Set<Integer> notifiedRedActions = new HashSet<>();
-
-    private LocalDateTime planReviewedAt;
-    private LocalDateTime planSubmittedAt;
-    private LocalDateTime planAgreedAt;
-    private LocalDateTime planApprovedAt;
-
-    private Boolean isFinalIndictmentDone;
 
     @Builder.Default
     @ManyToMany(fetch = FetchType.LAZY)
@@ -130,15 +100,6 @@ public class Case {
 
     @Column(name = "last_activity_type", length = 50)
     private String lastActivityType;
-
-    @Column(name = "qualification_generated_at")
-    private LocalDateTime qualificationGeneratedAt;
-
-    @Column(name = "indictment_generated_at")
-    private LocalDateTime indictmentGeneratedAt;
-
-    @Column(name = "plan_generated_at")
-    private LocalDateTime planGeneratedAt;
 
     public void addUser(User user) {
         this.users.add(user);
@@ -216,21 +177,124 @@ public class Case {
                 .count();
     }
 
+    public String getQualification() {
+        return caseQualification != null ? caseQualification.getContent() : null;
+    }
+
+    public LocalDateTime getQualificationGeneratedAt() {
+        return caseQualification != null ? caseQualification.getGeneratedAt() : null;
+    }
+
     public boolean hasQualification() {
-        return qualification != null;
+        return caseQualification != null && caseQualification.getContent() != null;
     }
-
     public boolean hasIndictment() {
-        return indictment != null || indictmentSections != null;
+        return getIndictment() != null || getIndictmentSections() != null;
     }
 
+    public String getIndictment() {
+        return caseIndictment != null ? caseIndictment.getContent() : null;
+    }
+
+    public List<Map<String, Object>> getIndictmentSections() {
+        return caseIndictment != null ? caseIndictment.getSections() : null;
+    }
+
+    public LocalDateTime getIndictmentGeneratedAt() {
+        return caseIndictment != null ? caseIndictment.getGeneratedAt() : null;
+    }
+
+    public Boolean getIsFinalIndictmentDone() {
+        return caseIndictment != null ? caseIndictment.getFinalDone() : null;
+    }
+
+    public Map<String, Object> getPlan() {
+        return casePlan != null ? casePlan.getContent() : null;
+    }
+    public PlanStatus getPlanStatus() {
+        return casePlan != null ? casePlan.getStatus() : null;
+    }
+    public String getPlanReviewComment() {
+        return casePlan != null ? casePlan.getReviewComment() : null;
+    }
+    public User getPlanReviewedBy() {
+        return casePlan != null ? casePlan.getReviewedBy() : null;
+    }
+    public User getPlanApprovedBy() {
+        return casePlan != null ? casePlan.getApprovedBy() : null;
+    }
+    public User getPlanSubmittedBy() {
+        return casePlan != null ? casePlan.getSubmittedBy() : null;
+    }
+    public LocalDateTime getPlanGeneratedAt() {
+        return casePlan != null ? casePlan.getGeneratedAt() : null;
+    }
+    public LocalDateTime getPlanReviewedAt() {
+        return casePlan != null ? casePlan.getReviewedAt() : null;
+    }
+    public LocalDateTime getPlanSubmittedAt() {
+        return casePlan != null ? casePlan.getSubmittedAt() : null;
+    }
+    public LocalDateTime getPlanAgreedAt() {
+        return casePlan != null ? casePlan.getAgreedAt() : null;
+    }
+    public LocalDateTime getPlanApprovedAt() {
+        return casePlan != null ? casePlan.getApprovedAt() : null;
+    }
     public boolean hasPlan() {
-        return plan != null;
+        return getPlan() != null;
     }
-
     public boolean hasBothQualifications() {
         boolean hasHumanQualificationFile = files.stream()
                 .anyMatch(CaseFile::isQualification);
         return hasQualification() && hasHumanQualificationFile;
+    }
+
+    public Set<Integer> getNotifiedRedActions() {
+        return casePlan != null ? casePlan.getNotifiedRedActions() : null;
+    }
+
+    private CasePlan ensurePlan() {
+        if (casePlan == null) {
+            casePlan = CasePlan.builder().caseEntity(this).build();
+        }
+        return casePlan;
+    }
+    public void setNotifiedRedActions(Set<Integer> notifiedRedActions) {
+        ensurePlan().setNotifiedRedActions(notifiedRedActions);
+    }
+
+    public void setPlan(Map<String, Object> plan) {
+        ensurePlan().setContent(plan);
+    }
+    public void setPlanStatus(PlanStatus status) {
+        ensurePlan().setStatus(status);
+    }
+    public void setPlanReviewComment(String comment) {
+        ensurePlan().setReviewComment(comment);
+    }
+    public void setPlanReviewedBy(User user) {
+        ensurePlan().setReviewedBy(user);
+    }
+    public void setPlanApprovedBy(User user) {
+        ensurePlan().setApprovedBy(user);
+    }
+    public void setPlanSubmittedBy(User user) {
+        ensurePlan().setSubmittedBy(user);
+    }
+    public void setPlanGeneratedAt(LocalDateTime dt) {
+        ensurePlan().setGeneratedAt(dt);
+    }
+    public void setPlanReviewedAt(LocalDateTime dt) {
+        ensurePlan().setReviewedAt(dt);
+    }
+    public void setPlanSubmittedAt(LocalDateTime dt) {
+        ensurePlan().setSubmittedAt(dt);
+    }
+    public void setPlanAgreedAt(LocalDateTime dt) {
+        ensurePlan().setAgreedAt(dt);
+    }
+    public void setPlanApprovedAt(LocalDateTime dt) {
+        ensurePlan().setApprovedAt(dt);
     }
 }

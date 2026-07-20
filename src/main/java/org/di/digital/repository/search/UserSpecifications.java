@@ -2,25 +2,25 @@ package org.di.digital.repository.search;
 
 import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
+import jakarta.persistence.criteria.Predicate;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.model.user.User;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public class UserSpecifications {
-
     public static Specification<User> build(UserSearchRequest req) {
         return Specification
                 .where(hasIin(req.getIin()))
-                .and(hasName(req.getName()))
-                .and(hasSurname(req.getSurname()))
-                .and(hasFathername(req.getFathername()))
+                .and(hasFio(req.getFio()))
                 .and(hasEmail(req.getEmail()))
                 .and(hasProfession(req.getProfession()))
                 .and(hasAdministration(req.getAdministration()))
                 .and(hasRegion(req.getRegion()))
+                .and(createdBetween(req.getFrom(), req.getTo()))
                 .and(isActive(req.getActive()));
     }
 
@@ -28,9 +28,18 @@ public class UserSpecifications {
         return Specification
                 .where(inRegions(regionIds))
                 .and(hasIin(req.getIin()))
-                .and(hasName(req.getName()))
-                .and(hasSurname(req.getSurname()))
-                .and(hasFathername(req.getFathername()))
+                .and(hasFio(req.getFio()))
+                .and(hasEmail(req.getEmail()))
+                .and(hasProfession(req.getProfession()))
+                .and(hasAdministration(req.getAdministration()))
+                .and(isActive(req.getActive()));
+    }
+
+    public static Specification<User> buildForRegion(Long regionId, UserSearchRequest req) {
+        return Specification
+                .where(inRegion(regionId))
+                .and(hasIin(req.getIin()))
+                .and(hasFio(req.getFio()))
                 .and(hasEmail(req.getEmail()))
                 .and(hasProfession(req.getProfession()))
                 .and(hasAdministration(req.getAdministration()))
@@ -40,18 +49,6 @@ public class UserSpecifications {
     private static Specification<User> inRegions(List<Long> regionIds) {
         return (root, query, cb) ->
                 root.get("region").get("id").in(regionIds);
-    }
-    public static Specification<User> buildForRegion(Long regionId, UserSearchRequest req) {
-        return Specification
-                .where(inRegion(regionId))
-                .and(hasIin(req.getIin()))
-                .and(hasName(req.getName()))
-                .and(hasSurname(req.getSurname()))
-                .and(hasFathername(req.getFathername()))
-                .and(hasEmail(req.getEmail()))
-                .and(hasProfession(req.getProfession()))
-                .and(hasAdministration(req.getAdministration()))
-                .and(isActive(req.getActive()));
     }
 
     private static Specification<User> inRegion(Long regionId) {
@@ -136,6 +133,37 @@ public class UserSpecifications {
                 active != null
                         ? cb.equal(root.get("active"), active)
                         : null;
+    }
+    private static Specification<User> createdBetween(LocalDate from, LocalDate to) {
+        return (root, query, cb) -> {
+            if (from == null && to == null) return null;
+            if (from != null && to != null) {
+                return cb.between(root.get("createdDate"),
+                        from.atStartOfDay(), to.plusDays(1).atStartOfDay());
+            }
+            if (from != null) {
+                return cb.greaterThanOrEqualTo(root.get("createdDate"), from.atStartOfDay());
+            }
+            return cb.lessThan(root.get("createdDate"), to.plusDays(1).atStartOfDay());
+        };
+    }
+    private static Specification<User> hasFio(String fio) {
+        return (root, query, cb) -> {
+            if (!StringUtils.hasText(fio)) return null;
+
+            String[] tokens = fio.trim().toLowerCase().split("\\s+");
+
+            Predicate result = cb.conjunction();
+            for (String token : tokens) {
+                String pattern = "%" + token + "%";
+                result = cb.and(result, cb.or(
+                        cb.like(cb.lower(root.get("surname")), pattern),
+                        cb.like(cb.lower(root.get("name")), pattern),
+                        cb.like(cb.lower(root.get("fathername")), pattern)
+                ));
+            }
+            return result;
+        };
     }
 
     private static String like(String value) {

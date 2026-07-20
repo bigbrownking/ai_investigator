@@ -2,13 +2,18 @@ package org.di.digital.model.cases;
 
 import jakarta.persistence.*;
 import lombok.*;
+import org.di.digital.dto.response.cases.ReferenceDto;
 import org.di.digital.model.enums.MessageRole;
 import org.di.digital.model.interrogation.CaseInterrogationCaseChat;
 import org.di.digital.model.interrogation.CaseInterrogationChat;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.List;
+import java.util.Map;
 
 @Getter
 @Setter
@@ -60,4 +65,8 @@ public class CaseChatMessage {
     @Builder.Default
     @Column(name = "is_complete")
     private boolean complete = true;
+
+    @Column(name = "chat_references", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private List<ReferenceDto> references;
 }

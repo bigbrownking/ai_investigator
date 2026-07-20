@@ -28,6 +28,7 @@ public class TaskQueue {
     private String caseNumber;
     private String fileName;
     private String fileUrl;
+    private String language;
 
     private TaskStatus status;
     private Integer priority;

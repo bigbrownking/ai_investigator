@@ -1,6 +1,7 @@
 package org.di.digital.service.impl.core;
 
 import io.minio.*;
+import io.minio.errors.ErrorResponseException;
 import io.minio.http.Method;
 import io.minio.messages.DeleteError;
 import io.minio.messages.DeleteObject;
@@ -322,6 +323,43 @@ public class MinioServiceImpl implements MinioService {
             return bucketName + "/" + objectName;
         } catch (Exception e) {
             throw new RuntimeException("Failed to upload osmotr file: " + objectName, e);
+        }
+    }
+    @Override
+    public String uploadOsmotrGeneratedFile(byte[] bytes, String caseNumber, String fileName, String subfolder) {
+        String objectName = String.format("%s/osmotr/%s/%s", caseNumber, subfolder, fileName);
+        try {
+            minioClient.putObject(PutObjectArgs.builder()
+                    .bucket(bucketName)
+                    .object(objectName)
+                    .stream(new ByteArrayInputStream(bytes), bytes.length, -1)
+                    .contentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
+                    .build());
+            return bucketName + "/" + objectName;
+        } catch (Exception e) {
+            throw new IllegalStateException("Failed to upload osmotr generated file: " + objectName, e);
+        }
+    }
+    @Override
+    public boolean fileExists(String objectPath) {
+        try {
+            String objectName = extractObjectNameFromPath(objectPath);
+            minioClient.statObject(
+                    StatObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .build()
+            );
+            return true;
+        } catch (ErrorResponseException e) {
+            if ("NoSuchKey".equals(e.errorResponse().code())) {
+                return false;
+            }
+            log.error("Error checking file existence: {}", objectPath, e);
+            return false;
+        } catch (Exception e) {
+            log.error("Error checking file existence: {}", objectPath, e);
+            return false;
         }
     }
 

@@ -136,6 +136,20 @@ public abstract class BaseDocumentFormatter {
         r.setFontSize(FONT_SIZE);
         r.setFontFamily(FONT);
     }
+    protected int handleHeaderDateLine(String[] paragraphs, int currentIndex,
+                                       XWPFDocument doc, String left) {
+        for (int j = currentIndex + 1; j < paragraphs.length; j++) {
+            String next = stripStars(paragraphs[j].trim());
+            if (next.isEmpty()) continue;
+            if (isDate(next)) {
+                formatCityDateLine(doc, left, next);
+                return j;
+            }
+            break;
+        }
+        formatRegularParagraph(doc.createParagraph(), left);
+        return currentIndex;
+    }
     protected void formatCityDateLine(XWPFDocument doc, String city, String date) {
         XWPFParagraph para = doc.createParagraph();
         para.setAlignment(ParagraphAlignment.LEFT);

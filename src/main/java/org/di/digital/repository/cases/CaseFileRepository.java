@@ -7,7 +7,9 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
+import java.util.Optional;
 
 @Repository
 public interface CaseFileRepository extends JpaRepository<CaseFile, Long> {
@@ -15,7 +17,11 @@ public interface CaseFileRepository extends JpaRepository<CaseFile, Long> {
     List<CaseFile> findByCaseEntityNumber(@Param("caseNumber") String caseNumber);
 
     boolean existsByCaseEntityIdAndStatusNotIn(Long caseId, List<CaseFileStatusEnum> statuses);
-    @Query("SELECT SUM(f.pages) FROM CaseFile f WHERE f.pages IS NOT NULL")
-    Long countPages();
+
     List<CaseFile> findByPagesIsNull();
+
+    Optional<CaseFile> findByOriginalFileNameAndCaseEntityId(String originalFileName, Long caseId);
+
+    @Query("SELECT SUM(f.pages) FROM CaseFile f WHERE f.pages IS NOT NULL AND f.uploadedAt BETWEEN :start AND :end")
+    Long countPagesBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
 }

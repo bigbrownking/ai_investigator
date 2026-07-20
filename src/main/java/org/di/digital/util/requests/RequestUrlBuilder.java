@@ -11,17 +11,23 @@ public class RequestUrlBuilder {
     public static String buildUrl(String host, String port, String endpoint) {
         return String.format(HTTP_PROTOCOL + "%s:%s%s", host, port, endpoint);
     }
+    public static String deleteDocumentUrl(String host, String port, String caseNumber, String fileName) {
+        return buildUrl(host, port, String.format("/documents/delete_document/%s/%s", caseNumber, fileName));
+    }
 
+    public static String deleteAllDocumentsUrl(String host, String port, String caseNumber) {
+        return buildUrl(host, port, String.format("/documents/delete/%s", caseNumber));
+    }
     public static String qualificationUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port,
-                String.format("/workspaces/%s/generate-qualification?mode=hybrid&stream=false", caseNumber));
+                String.format("/workspaces/%s/generate-qualification?mode=hybrid", caseNumber));
     }
     public static String caseInfoUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, String.format("/workspaces/%s/case-info", caseNumber));
     }
 
     public static String qualificationChatUrl(String host, String port, String caseNumber) {
-        return buildUrl(host, port, "/chat/" + caseNumber);
+        return buildUrl(host, port, "/query/" + caseNumber);
     }
 
     public static String indictmentUrl(String host, String port) {
@@ -36,7 +42,7 @@ public class RequestUrlBuilder {
     }
 
     public static String generalChatUrl(String host, String port) {
-        return buildUrl(host, port, "/chat/stream");
+        return buildUrl(host, port, "/chat");
     }
 
     public static String planGeneratorUrl(String host, String port) {
@@ -49,7 +55,7 @@ public class RequestUrlBuilder {
         return buildUrl(host, port, String.format("/workspaces/%s/rename", caseNumber));
     }
     public static String figurantUrl(String host, String port, String caseNumber) {
-        return buildUrl(host, port, String.format("/workspaces/%s/figurants?include_references=true", caseNumber));
+        return buildUrl(host, port, String.format("/workspaces/%s/figurants", caseNumber));
     }
     public static String osmotrDecisionUrl(String host, String port) {
         return buildUrl(host, port, "/api/submit-decisions");
@@ -59,15 +65,14 @@ public class RequestUrlBuilder {
     }
 
     public static String interrogationReformulateUrl(String host, String port) {
-        return buildUrl(host, port, "/api/interrogation/question/reformulate");
+        return buildUrl(host, port, "/interrogation/question/reformulate");
     }
     public static String interrogationCleanTranscriptUrl(String host, String port) {
-        return buildUrl(host, port, "/api/interrogation/transcript/clean");
+        return buildUrl(host, port, "/interrogation/transcript/clean");
     }
-    public static String analyticsQualification(String host, String port, String caseNumber){
-        return buildUrl(host, port, String.format("/qualification/%s/analytics", caseNumber));
+    public static String analyticsQualification(String host, String port, String caseNumber, String language){
+        return buildUrl(host, port, String.format("/qualification/%s/analytics?language=%s", caseNumber, language));
     }
-    //TODO 9622 port
 
     public static String planUpdateUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, String.format("/api/plan/%s", caseNumber));

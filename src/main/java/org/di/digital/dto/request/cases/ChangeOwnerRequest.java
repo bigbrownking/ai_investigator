@@ -4,5 +4,5 @@ import lombok.Data;
 
 @Data
 public class ChangeOwnerRequest {
-    private String newOwnerEmail;
+    private Long userId;
 }

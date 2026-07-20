@@ -13,8 +13,8 @@ public class CaseSearchRequest {
     private String number;
     private String title;
     private Boolean status;
-    private LocalDate createdFrom;
-    private LocalDate createdTo;
+    private LocalDate from;
+    private LocalDate to;
     private String ownerName;
     private String region;
 }

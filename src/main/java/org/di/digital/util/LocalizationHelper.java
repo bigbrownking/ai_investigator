@@ -61,6 +61,13 @@ public class LocalizationHelper {
             Map.entry("Ұлытау", "Ұлытау облысы")
     );
 
+    private static final Map<String, String> DOC_TYPE_TO_KZ = Map.ofEntries(
+            Map.entry("Удостоверение личности", "Жеке куәлік"),
+            Map.entry("Паспорт", "Паспорт"),
+            Map.entry("Вид на жительство", "Тұруға ықтиярхат"),
+            Map.entry("Свидетельство о рождении", "Туу туралы куәлік")
+    );
+
     public String extractRegionShortName(String fullDepartmentName, UserSettingsLanguage language) {
         if (!StringUtils.hasText(fullDepartmentName)) return fullDepartmentName;
 
@@ -182,5 +189,24 @@ public class LocalizationHelper {
         }
 
         return dateStr;
+    }
+
+    public String localizeDocumentType(String documentType, String language) {
+        if (!StringUtils.hasText(documentType)) return documentType;
+        String normalized = toTitleCase(documentType);
+        return "казахском".equals(language)
+                ? DOC_TYPE_TO_KZ.getOrDefault(normalized, normalized)
+                : normalized;
+    }
+    public String localizeIssuedWord(String language) {
+        return "казахском".equals(language) ? "берген" : "выдано";
+    }
+
+    public String localizeIinLabel(String language) {
+        return "казахском".equals(language) ? "ЖСН" : "ИИН";
+    }
+
+    public String localizeFromWord(String language) {
+        return "казахском".equals(language) ? "" : "от";
     }
 }

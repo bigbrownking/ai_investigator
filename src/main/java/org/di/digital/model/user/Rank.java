@@ -3,6 +3,7 @@ package org.di.digital.model.user;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.model.Localizable;
 
 import java.util.List;
 
@@ -14,13 +15,16 @@ import java.util.List;
 @AllArgsConstructor
 @NoArgsConstructor
 @Table(name = "ranks")
-public class Rank {
+public class Rank implements Localizable {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "name")
-    private String name;
+    @Column(name = "ru_name")
+    private String ruName;
+
+    @Column(name = "kz_name")
+    private String kzName;
 
     @OneToMany(mappedBy = "rank", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<User> users;

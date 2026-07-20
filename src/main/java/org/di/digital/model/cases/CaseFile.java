@@ -24,6 +24,7 @@ public class CaseFile {
     private String fileUrl;
     private String contentType;
     private Long fileSize;
+    private String language;
     private LocalDateTime uploadedAt;
     private LocalDateTime completedAt;
     private boolean isQualification;
@@ -47,6 +48,24 @@ public class CaseFile {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "case_id", nullable = false)
     private Case caseEntity;
+
+    @Column(name = "classification_status")
+    private String classificationStatus;
+
+    @Column(name = "document_type")
+    private String documentType;
+
+    @Column(name = "assessment_status")
+    private String assessmentStatus;
+
+    @Column(name = "score_percent")
+    private Double scorePercent;
+
+    @Column(name = "assessment_color")
+    private String assessmentColor;
+
+    @Column(name = "assessment_summary", columnDefinition = "TEXT")
+    private String assessmentSummary;
 
 
     public void addCaseEntity(Case caseEntity) {

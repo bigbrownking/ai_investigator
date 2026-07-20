@@ -1,4 +1,4 @@
-package org.di.digital.consumer;
+package org.di.digital.consumer.transcription;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;

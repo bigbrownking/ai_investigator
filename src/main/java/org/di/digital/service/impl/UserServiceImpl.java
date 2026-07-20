@@ -106,8 +106,8 @@ public class UserServiceImpl implements UserService {
             Rank rank = rankRepository.findById(request.getRankId())
                     .orElseThrow(() -> new IllegalStateException("Rank not found"));
             changes.append(String.format("rank: [%s -> %s], ",
-                    user.getRank() != null ? user.getRank().getName() : "null",
-                    rank.getName()));
+                    user.getRank() != null ? user.getRank().getRuName() : "null",
+                    rank.getRuName()));
             user.setRank(rank);
         }
 

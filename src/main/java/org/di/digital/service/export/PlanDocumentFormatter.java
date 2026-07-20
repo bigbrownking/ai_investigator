@@ -16,7 +16,7 @@ import java.util.Map;
 public class PlanDocumentFormatter extends BaseDocumentFormatter {
     private static final long LANDSCAPE_TAB = 15100L;
 
-    public byte[] generate(Map<String, Object> plan) throws IOException {
+    public byte[] generate(Map<String, Object> plan, String approvedBy) throws IOException {
 
         try (XWPFDocument doc = new XWPFDocument()) {
 
@@ -36,7 +36,7 @@ public class PlanDocumentFormatter extends BaseDocumentFormatter {
             // УТВЕРЖДАЮ
             // ─────────────────────────────────────
 
-            addApprovalBlock(doc, titleInfo);
+            addApprovalBlock(doc, titleInfo, approvedBy);
 
             addEmptyLine(doc);
 
@@ -132,7 +132,7 @@ public class PlanDocumentFormatter extends BaseDocumentFormatter {
 
     // ─────────────────────────────────────────────
 
-    private void addApprovalBlock(XWPFDocument doc, Map<String, Object> titleInfo) {
+    private void addApprovalBlock(XWPFDocument doc, Map<String, Object> titleInfo, String approvedBy) {
         XWPFParagraph p = doc.createParagraph();
         p.setAlignment(ParagraphAlignment.RIGHT);
         setLineSpacing(p);
@@ -142,7 +142,9 @@ public class PlanDocumentFormatter extends BaseDocumentFormatter {
         r.setFontFamily(FONT);
         r.setFontSize(FONT_SIZE);
 
-        String year = titleInfo.get("год") != null ? (String) titleInfo.get("год") : "«__» _____________ 20__ г";
+        String year = titleInfo.get("год") != null
+                ? (String) titleInfo.get("год")
+                : "«__» _____________ 20__ г";
 
         r.setText("«УТВЕРЖДАЮ»");
         r.addBreak();
@@ -150,7 +152,13 @@ public class PlanDocumentFormatter extends BaseDocumentFormatter {
         r.addBreak();
         r.setText("____________________________");
         r.addBreak();
-        r.setText("____________________________");
+
+        if (approvedBy != null && !approvedBy.isBlank()) {
+            r.setText(approvedBy);
+        } else {
+            r.setText("____________________________");
+        }
+
         r.addBreak();
         r.setText(year);
     }

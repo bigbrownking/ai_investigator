@@ -34,3 +34,4 @@ build/
 .env
 /src/main/resources/private.pem
 /src/main/resources/interrogations/
+/logs/

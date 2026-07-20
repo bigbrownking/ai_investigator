@@ -15,8 +15,11 @@ public class OsmotrReportResponse {
     @JsonProperty("session_id")
     private String sessionId;
 
-    @JsonProperty("report_file")
-    private String reportFile;
+    @JsonProperty("report_filename")
+    private String reportFilename;
+
+    @JsonProperty("report_file_base64")
+    private String reportFileBase64;
 
     @JsonProperty("report_txt")
     private String reportTxt;

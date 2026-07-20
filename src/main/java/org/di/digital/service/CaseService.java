@@ -1,13 +1,12 @@
 package org.di.digital.service;
 
+import org.di.digital.dto.request.cases.ChangeCaseLanguageRequest;
 import org.di.digital.dto.request.interrogation.AddFigurantToCaseRequest;
 import org.di.digital.dto.request.cases.CreateCaseRequest;
 import org.di.digital.dto.request.cases.EditCaseRequest;
 import org.di.digital.dto.request.cases.ReorderCaseFilesRequest;
-import org.di.digital.dto.response.cases.CaseFileResponse;
-import org.di.digital.dto.response.cases.CaseResponse;
-import org.di.digital.dto.response.cases.CaseUserResponse;
-import org.di.digital.dto.response.cases.GroupedCaseFileResponse;
+import org.di.digital.dto.response.cases.*;
+import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.FileType;
 import org.di.digital.dto.response.interrogation.FigurantResponse;
@@ -20,8 +19,9 @@ import java.util.Optional;
 
 public interface CaseService {
     Case getCaseEntityById(Long caseId, String email);
-    List<CaseResponse> getUserCases(String username, String sort);
+    List<CasePreviewResponse> getUserCases(String username, String sort);
     CaseResponse editCase(Long caseId, EditCaseRequest request, String email);
+    CaseResponse changeCaseLanguage(Long caseId, ChangeCaseLanguageRequest request, String email);
     CaseResponse getCaseById(Long id, String email);
     GroupedCaseFileResponse getGroupedCaseFilesById(Long id, String email);
     GroupedCaseFileResponse reorderCaseFiles(Long caseId, ReorderCaseFilesRequest request, String email);
@@ -31,7 +31,9 @@ public interface CaseService {
     InputStreamResource downloadFile(Long caseId, String fileUrl, String email);
     List<CaseFileResponse> addFilesToCase(Long caseId, List<MultipartFile> files, FileType type, String email);
     void deleteFileFromCase(Long caseId, String fileName, String email);
-    CaseUserResponse addUserToCase(Long caseId, String userEmailToAdd, String currentUserEmail);
+    CaseUserResponse addUserToCase(Long caseId, Long id, String currentUserEmail);
+    List<CaseMemberHistoryDto> getMemberHistory(Long caseId, String currentUserEmail);
+    List<UserSuggestionResponse> searchUsers(String query);
     FigurantResponse addFigurantToCase(Long caseId, AddFigurantToCaseRequest request, String currentUserEmail);
 
     void removeUserFromCase(Long caseId, Long userId, String currentUserEmail);
@@ -47,6 +49,9 @@ public interface CaseService {
     void updateCaseActivity(String caseNumber, String activityType);
     void deleteAllFiles(Long caseId, String currentEmail);
     void deleteCaseById(Long id, String currentEmail);
+
+    CaseFileResponse getFileByName(Long caseId, String fileName, String email);
+
 
     // Migration methods
     void migrateAllCaseToms();

@@ -19,6 +19,7 @@ public class CaseResponse {
     private String title;
     private String number;
     private boolean status;
+    private String language;
     private long totalPages;
     private long totalDocuments;
     private long audioUsed;

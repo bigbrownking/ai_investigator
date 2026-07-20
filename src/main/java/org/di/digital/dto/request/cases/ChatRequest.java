@@ -19,14 +19,4 @@ public class ChatRequest {
 
     @JsonProperty("answer")
     private String answer;
-
-    @JsonProperty("freeStory")
-    private Boolean freeStory;
-
-    @JsonProperty("stream")
-    @Builder.Default
-    private Boolean stream = true;
-
-    @JsonProperty("qaId")
-    private Long qaId;
 }

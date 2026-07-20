@@ -16,15 +16,18 @@ import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserProfile;
+import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.springframework.data.domain.Page;
 
+import java.time.LocalDate;
 import java.util.List;
 
 public interface AdminService {
     Page<UserProfile> getAllUsers(int page, int size, UserSearchRequest userSearchRequest);
     CasePageResponse getAllCases(int page, int size, CaseSearchRequest caseSearchRequest);
     CasePageResponse getUserCases(Long userId, int page, int size, CaseSearchRequest caseSearchRequest);
-    AdminStatsDto getStats();
+    AdminStatsDto getStats(LocalDate from, LocalDate to);
+    List<UserSuggestionResponse> searchUsers(String query);
     void activateUser(Long userId);
     void deactivateUser(Long userId);
     Page<AppealDto> getAllAppeals(int page, int size, AppealSearchRequest appealSearchRequest);
@@ -43,7 +46,7 @@ public interface AdminService {
     void assignAdvancedUserRole(String email);
     void assignRegAdminRole(String email, List<String> regions);
     void removeRegAdminRole(String email, List<String> regions);
-    void changeOwner(Long caseId, String newOwnerEmail);
+    void changeOwner(Long caseId, Long id);
     UserProfile updateUserProfile(Long id, UpdateProfileRequest request);
     //жалал не админ
     String getIndictment(Long caseId);

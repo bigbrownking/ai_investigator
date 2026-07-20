@@ -5,21 +5,26 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.io.Serializable;
 import java.time.LocalDateTime;
 
 @Data
 @Builder
 @AllArgsConstructor
 @NoArgsConstructor
-public class ProcessingResultMessage {
+public class ProcessingResultMessage implements Serializable {
     private Long caseFileId;
     private String caseNumber;
     private String fileName;
     private String userEmail;
     private ProcessingStatus status;
     private String result;
+    private String language;
     private String errorMessage;
     private LocalDateTime timestamp;
 
     private Long processingDurationSeconds;
+
+    private ClassificationResult classification;
+    private AssessmentResult assessment;
 }

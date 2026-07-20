@@ -10,8 +10,10 @@ import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
+import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.springframework.data.domain.Page;
 
+import java.util.List;
 import java.util.Map;
 
 public interface RegAdminService {
@@ -29,10 +31,6 @@ public interface RegAdminService {
 
     CaseResponse getMyRegionCaseDetail(Long adminId, Long caseId);
 
-    String getMyRegionCaseIndictment(Long adminId, Long caseId);
-
-    String getMyRegionCaseQualification(Long adminId, Long caseId);
-
     Page<LogDto> getMyRegionUserLogs(Long adminId, String email, int page, int size);
 
     CaseInterrogationFullResponse getMyRegionInterrogationDetail(Long adminId, Long interrogationId);
@@ -41,8 +39,8 @@ public interface RegAdminService {
 
     RegionStatsDto getMyRegionStats(Long adminId);
 
-    void changeOwner(Long adminId, Long caseId, String newOwnerEmail);
-
+    void changeOwner(Long adminId, Long caseId, Long id);
+    List<UserSuggestionResponse> searchUsers(Long adminId, String query);
 
     String getMyRegionIndictment(Long adminId, Long caseId);
 

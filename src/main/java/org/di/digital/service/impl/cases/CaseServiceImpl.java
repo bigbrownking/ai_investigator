@@ -1,29 +1,29 @@
-package org.di.digital.service.impl;
+package org.di.digital.service.impl.cases;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.cases.ChangeCaseLanguageRequest;
 import org.di.digital.dto.request.cases.ReorderCaseFilesRequest;
 import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.FigurantResponse;
+import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
-import org.di.digital.model.enums.MessageConstant;
+import org.di.digital.model.cases.CaseMemberHistory;
+import org.di.digital.model.enums.*;
 import org.di.digital.dto.request.interrogation.AddFigurantToCaseRequest;
 import org.di.digital.dto.request.cases.CreateCaseRequest;
 import org.di.digital.dto.request.cases.EditCaseRequest;
-import org.di.digital.model.enums.FileType;
-import org.di.digital.model.enums.CaseFileStatusEnum;
-import org.di.digital.model.enums.LogAction;
-import org.di.digital.model.enums.LogLevel;
 import org.di.digital.model.interrogation.CaseFigurant;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseFileRepository;
+import org.di.digital.repository.cases.CaseMemberHistoryRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
-import org.di.digital.service.CaseAnalyticsService;
 import org.di.digital.service.CaseService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.MinioService;
+import org.di.digital.service.impl.core.DevService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
 import org.di.digital.util.PageCounter;
@@ -44,6 +44,9 @@ import java.io.InputStream;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.di.digital.util.requests.RequestUrlBuilder.deleteAllDocumentsUrl;
+import static org.di.digital.util.requests.RequestUrlBuilder.deleteDocumentUrl;
+import static org.di.digital.util.requests.UserUtil.validateOwnerAccess;
 import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
@@ -60,8 +63,10 @@ public class CaseServiceImpl implements CaseService {
     private final Mapper mapper;
     private final PageCounter pageCounter;
     private final CaseFileRepository caseFileRepository;
-    private final CaseAnalyticsService caseAnalyticsService;
-
+    private final DevService devService;
+    private final CaseFileWriter caseFileWriter;
+    private final CaseWriter caseWriter;
+    private final CaseMemberHistoryRepository caseMemberHistoryRepository;
 
     private static final int MAX_PAGES_PER_TOM = 180;
 
@@ -109,88 +114,43 @@ public class CaseServiceImpl implements CaseService {
             currentPages += filePages;
         }
     }
-    @Transactional
     public CaseResponse createCase(CreateCaseRequest request, String email) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+        CaseFileWriter.CreatedCase created = caseFileWriter.createCaseShell(
+                new CaseFileWriter.CreateCaseData(
+                        request.getTitle(), request.getNumber(), request.getLanguage()),
+                email);
 
-        if (caseRepository.existsByNumber(request.getNumber())) {
-            logService.log(
-                    String.format("Case already exists: %s", request.getNumber()),
-                    LogLevel.ERROR,
-                    LogAction.CASE_CREATED,
-                    request.getNumber(),
-                    user.getEmail()
-            );
-            throw new IllegalStateException("Дело уже создано, пожалуйста проинформируйте создателя дела.");
-        }
-
-        String caseNumber = request.getNumber();
-        Case newCase = Case.builder()
-                .title(request.getTitle())
-                .number(request.getNumber())
-                .files(new ArrayList<>())
-                .owner(user)
-                .users(new HashSet<>())
-                .build();
-
-        newCase.addUser(user);
-        Case savedCase = caseRepository.save(newCase);
-
-        List<CaseFile> uploadedFiles = new ArrayList<>();
-
+        List<CaseFileWriter.UploadedFile> uploaded = Collections.emptyList();
         if (request.getFiles() != null && !request.getFiles().isEmpty()) {
-            for (MultipartFile file : request.getFiles()) {
-                if (!file.isEmpty()) {
-                    CaseFile caseFile = minioService.uploadFile(file, request.getNumber());
-                    caseFile.addCaseEntity(savedCase);
-                    caseFile.setStatus(CaseFileStatusEnum.QUEUED);
-                    uploadedFiles.add(caseFile);
-                }
-            }
+            uploaded = uploadAndCount(request.getFiles(), created.number(), Collections.emptySet());
         }
 
-        uploadedFiles.forEach(caseFile -> {
-            try {
-                Integer pages = pageCounter.countPagesByUrl(caseFile.getFileUrl(), caseFile.getContentType());
-                if (pages != null) {
-                    caseFile.setPages(pages);
-                }
-            } catch (Exception e) {
-                log.warn("Could not count pages for file {}: {}", caseFile.getOriginalFileName(), e.getMessage());
-            }
-        });
-        assignToms(uploadedFiles, Collections.emptyList());
+        CaseResponse response = caseFileWriter.attachFilesToNewCase(
+                created.id(), email, request.getLanguage(), uploaded);
 
-        caseRepository.flush();
-
-        for (CaseFile caseFile : savedCase.getFiles()) {
-            taskQueueService.addTaskToQueue(
-                    email,
-                    savedCase.getId(),
-                    savedCase.getNumber(),
-                    caseFile.getOriginalFileName(),
-                    caseFile.getFileUrl(),
-                    caseFile.getId()
-            );
-        }
-
-        log.info("Case created with id: {} for user: {}", savedCase.getId(), email);
-
-        logService.log(
-                String.format("Case %s created by user %s", caseNumber, email),
-                LogLevel.INFO,
-                LogAction.CASE_CREATED,
-                caseNumber,
-                email
-        );
-
-        return mapper.mapToCaseResponse(savedCase);
+        log.info("Case created with id: {} for user: {}", created.id(), email);
+        return response;
     }
 
     @Override
-    @Transactional
     public CaseResponse editCase(Long caseId, EditCaseRequest request, String email) {
+        CaseWriter.EditPrecheck pre =
+                caseWriter.prepareEdit(caseId, email, request.getNumber());
+
+        if (pre.numberChanges()) {
+            renameWorkspace(pre.oldNumber(), request.getNumber());
+        }
+
+        CaseResponse response = caseWriter.applyEdit(
+                caseId, request.getNumber(), request.getTitle(), pre.numberChanges(), email);
+
+        log.info("Case {} edited by user: {}", caseId, email);
+        return response;
+    }
+
+
+    @Override
+    public CaseResponse changeCaseLanguage(Long caseId, ChangeCaseLanguageRequest request, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
 
@@ -203,26 +163,9 @@ public class CaseServiceImpl implements CaseService {
             throw new AccessDeniedException("Только создатель дела может редактировать его");
         }
 
-        String oldNumber = caseEntity.getNumber();
-
-        if (request.getNumber() != null && !request.getNumber().equals(oldNumber)) {
-            if (caseRepository.existsByNumber(request.getNumber())) {
-                logService.log(
-                        String.format("Case already exists: %s", request.getNumber()),
-                        LogLevel.ERROR,
-                        LogAction.CASE_UPDATED,
-                        request.getNumber(),
-                        user.getEmail()
-                );
-                throw new IllegalStateException(MessageConstant.WORKSPACE_ALREADY_EXISTS.format(request.getNumber()));
-            }
-
-            renameWorkspace(oldNumber, request.getNumber());
-            caseEntity.setNumber(request.getNumber());
-        }
-
-        if (request.getTitle() != null) {
-            caseEntity.setTitle(request.getTitle());
+        String fromLanguage = caseEntity.getLanguage();
+        if(request.getLanguage() != null){
+            caseEntity.setLanguage(request.getLanguage());
         }
 
         Case savedCase = caseRepository.save(caseEntity);
@@ -230,15 +173,16 @@ public class CaseServiceImpl implements CaseService {
         log.info("Case {} edited by user: {}", caseId, email);
 
         logService.log(
-                String.format("Case %s edited by user %s", savedCase.getNumber(), email),
+                String.format("Case %s has changed its language from %s to %s by user %s", savedCase.getNumber(),fromLanguage, request.getLanguage(),email),
                 LogLevel.INFO,
-                LogAction.CASE_UPDATED,
+                LogAction.CASE_LANGUAGE_UPDATE,
                 savedCase.getNumber(),
                 email
         );
 
         return mapper.mapToCaseResponse(savedCase);
     }
+
     private void renameWorkspace(String oldNumber, String newNumber) {
         String url = RequestUrlBuilder.renameWorkspaceUrl(pythonHost, pythonPort, oldNumber);
         Map<String, String> body = Map.of("new_name", newNumber);
@@ -396,154 +340,53 @@ public class CaseServiceImpl implements CaseService {
     }
 
     @Transactional(readOnly = true)
-    public List<CaseResponse> getUserCases(String email, String sort) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+    public List<CasePreviewResponse> getUserCases(String email, String sort) {
+        List<CasePreviewResponse> previews = caseRepository.findPreviewsForUser(email);
 
-        Comparator<Case> comparator = "asc".equalsIgnoreCase(sort)
-                ? Comparator.comparing(Case::getCreatedDate, Comparator.nullsLast(Comparator.naturalOrder()))
-                : Comparator.comparing(Case::getCreatedDate, Comparator.nullsLast(Comparator.reverseOrder()));
+        Comparator<CasePreviewResponse> cmp =
+                Comparator.comparing(CasePreviewResponse::getCreatedDate,
+                        "asc".equalsIgnoreCase(sort)
+                                ? Comparator.nullsLast(Comparator.naturalOrder())
+                                : Comparator.nullsLast(Comparator.reverseOrder()));
 
-        Set<Case> allCases = new HashSet<>();
-        allCases.addAll(user.getCases());
-        allCases.addAll(user.getOwnedCases());
-
-        return allCases.stream()
-                .sorted(comparator)
-                .map(mapper::mapToCaseResponse)
-                .collect(Collectors.toList());
+        return previews.stream().sorted(cmp).collect(Collectors.toList());
     }
 
     @Override
-    @Transactional
     public void updateCaseStatus(Long caseId, boolean status, String email) {
         log.info("Updating status for case: {} to {} by user: {}", caseId, status, email);
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found"));
+        String caseNumber = caseWriter.updateStatus(caseId, status, email);
 
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found"));
-
-        String caseNumber = caseEntity.getNumber();
-        validateUserAccess(caseEntity, user);
-
-        if (!caseEntity.isOwner(user)) {
-            throw new AccessDeniedException("Только создатель дела может изменять его статус");
-        }
-
-        caseEntity.setStatus(status);
-        caseRepository.save(caseEntity);
+        devService.setCasePriority(caseNumber, status ? 0 : -1);
 
         log.info("Case {} status updated to {}", caseId, status);
-        logService.log(
-                String.format("Case %s status updated to %s by user %s", caseNumber, status, email),
-                LogLevel.INFO,
-                LogAction.CASE_STATUS_CHANGED,
-                caseNumber,
-                email
-        );
+        logService.log(String.format("Case %s status updated to %s by user %s", caseNumber, status, email),
+                LogLevel.INFO, LogAction.CASE_STATUS_CHANGED, caseNumber, email);
     }
 
-    @Transactional
     public List<CaseFileResponse> addFilesToCase(Long caseId, List<MultipartFile> files,
                                                  FileType type, String email) {
         if (files == null || files.isEmpty()) {
             return Collections.emptyList();
         }
 
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+        CaseFileWriter.AddFilesContext ctx = caseFileWriter.prepareAddFiles(caseId, email);
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("user not found: " + email));
 
-        validateUserAccess(caseEntity, user);
+        List<CaseFileWriter.UploadedFile> uploaded =
+                uploadAndCount(files, ctx.caseNumber(), ctx.existingNames());
 
-        if (Boolean.TRUE.equals(caseEntity.getIsFinalIndictmentDone())) {
-            logService.log(
-                    String.format("Cannot upload files by %s user in case %s: [%s]", email, caseEntity.getNumber(),
-                            files.stream().map(MultipartFile::getOriginalFilename).collect(Collectors.joining(", "))),
-                    LogLevel.ERROR,
-                    LogAction.FILE_UPLOAD,
-                    caseEntity.getNumber(),
-                    email
-            );
-            throw new IllegalStateException(MessageConstant.CANNOT_UPLOAD_FILE.format(caseEntity.getNumber()));
+        if (uploaded.isEmpty()) {
+            return Collections.emptyList();
         }
 
-        String caseNumber = caseEntity.getNumber();
         boolean isQualification = type == FileType.QUALIFICATION;
+        List<CaseFileResponse> result = caseFileWriter.attachFilesToExistingCase(
+                caseId, email, ctx.language(), isQualification, uploaded);
 
-        Set<String> existingFileNames = caseEntity.getFiles().stream()
-                .map(CaseFile::getOriginalFileName)
-                .collect(Collectors.toSet());
-
-        List<CaseFile> existingFiles = new ArrayList<>(caseEntity.getFiles());
-        List<CaseFile> uploadedFiles = new ArrayList<>();
-
-        for (MultipartFile file : files) {
-            if (file.isEmpty()) continue;
-
-            String originalName = file.getOriginalFilename();
-            if (existingFileNames.contains(originalName)) {
-                log.warn("File already exists: {} in case: {}", originalName, caseId);
-                continue;
-            }
-
-            try {
-                CaseFile caseFile = minioService.uploadFile(file, caseEntity.getNumber());
-                caseFile.addCaseEntity(caseEntity);
-                caseFile.setQualification(isQualification);
-                caseFile.setStatus(CaseFileStatusEnum.QUEUED);
-                uploadedFiles.add(caseFile);
-            } catch (Exception e) {
-                log.error("Failed to upload file: {} to case: {}", originalName, caseId, e);
-            }
-        }
-
-        uploadedFiles.forEach(caseFile -> {
-            try {
-                Integer pages = pageCounter.countPagesByUrl(caseFile.getFileUrl(), caseFile.getContentType());
-                if (pages != null) {
-                    caseFile.setPages(pages);
-                }
-            } catch (Exception e) {
-                log.warn("Could not count pages for file {}: {}", caseFile.getOriginalFileName(), e.getMessage());
-            }
-        });
-        assignToms(uploadedFiles, existingFiles);
-
-        List<CaseFile> savedFiles = caseFileRepository.saveAllAndFlush(uploadedFiles);
-
-        savedFiles.forEach(caseFile -> {
-            taskQueueService.addTaskToQueue(
-                    email,
-                    caseEntity.getId(),
-                    caseEntity.getNumber(),
-                    caseFile.getOriginalFileName(),
-                    caseFile.getFileUrl(),
-                    caseFile.getId()
-            );
-        });
-
-        log.info("Added {}/{} files to case: {}", uploadedFiles.size(), files.size(), caseId);
-
-        String fileNames = savedFiles.stream()
-                .map(CaseFile::getOriginalFileName)
-                .collect(Collectors.joining(", "));
-
-        logService.log(
-                String.format("Uploading files by %s user in case %s: [%s]", email, caseNumber, fileNames),
-                LogLevel.INFO,
-                LogAction.FILE_UPLOAD,
-                caseNumber,
-                email
-        );
-
-        return savedFiles.stream()
-                .map(mapper::mapToCaseFileResponse)
-                .toList();
+        log.info("Added {}/{} files to case: {}", uploaded.size(), files.size(), caseId);
+        return result;
     }
 
 
@@ -589,64 +432,31 @@ public class CaseServiceImpl implements CaseService {
     }
 
 
-    @Transactional
+    @Override
     public void deleteFileFromCase(Long caseId, String fileName, String email) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseId));
+        CaseWriter.FileToDelete f = caseWriter.resolveFileForDeletion(caseId, fileName, email);
 
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
-
-        String caseNumber = caseEntity.getNumber();
-        validateUserAccess(caseEntity, user);
-
-        CaseFile fileToDelete = caseEntity.getFiles().stream()
-                .filter(f -> f.getOriginalFileName().equals(fileName))
-                .findFirst()
-                .orElseThrow(() -> new RuntimeException("File not found: " + fileName));
-
-        if(CaseFileStatusEnum.PROCESSING.equals(fileToDelete.getStatus())){
-
-            String message = MessageConstant.CANNOT_DELETE_FILE.format(caseNumber);
-            log.warn(message);
-            logService.log(
-                    String.format("Cannot delete processing file in case %s", caseEntity.getNumber()),
-                    LogLevel.ERROR,
-                    LogAction.FILE_DELETE,
-                    caseEntity.getNumber(),
-                    user.getEmail()
-            );
-            throw new IllegalStateException(message);
-        }
         try {
-            if(CaseFileStatusEnum.COMPLETED.equals(fileToDelete.getStatus())){
-                deleteFileFromWorkspace(caseEntity.getNumber(), fileName);
+            if (f.wasCompleted()) {
+                deleteFileFromWorkspace(f.caseNumber(), fileName);
             }
+            minioService.deleteFile(f.fileUrl());
+            taskQueueService.deleteTask(f.id());
 
-            minioService.deleteFile(fileToDelete.getFileUrl());
+            caseWriter.removeFileRecord(caseId, f.id(), email);
 
-            taskQueueService.deleteTask(fileToDelete.getId());
-
-            caseEntity.getFiles().remove(fileToDelete);
-            caseRepository.save(caseEntity);
+            logService.log(String.format("Deleted %s file from case %s", f.originalFileName(), f.caseNumber()),
+                    LogLevel.INFO, LogAction.FILE_DELETE, f.caseNumber(), email);
             log.info("Deleted file: {} from case: {}", fileName, caseId);
-
-            logService.log(
-                    String.format("Deleted %s file from case %s", fileToDelete.getOriginalFileName(), caseNumber),
-                    LogLevel.INFO,
-                    LogAction.FILE_DELETE,
-                    caseNumber,
-                    email
-            );
 
         } catch (Exception e) {
             log.error("Failed to delete file: {} from case: {}", fileName, caseId, e);
             throw new RuntimeException("Failed to delete file: " + fileName, e);
         }
     }
+
     private void deleteFileFromWorkspace(String caseNumber, String fileName) {
-        String url = String.format("http://%s:%s/workspaces/delete_by_case_id/%s/%s",
-                pythonHost, pythonPort, caseNumber, fileName);
+        String url = deleteDocumentUrl(pythonHost, pythonPort, caseNumber, fileName);
 
         log.info("🗑️ Deleting file from workspace: {}", url);
 
@@ -664,9 +474,9 @@ public class CaseServiceImpl implements CaseService {
             log.warn("⚠️ Failed to delete file from workspace (continuing anyway): {}", e.getMessage());
         }
     }
+
     private void deleteAllFilesFromWorkspace(String caseNumber) {
-        String url = String.format("http://%s:%s/workspaces/%s",
-                pythonHost, pythonPort, caseNumber);
+        String url = deleteAllDocumentsUrl(pythonHost, pythonPort, caseNumber);
 
         log.info("🗑️ Deleting all files from workspace: {}", url);
 
@@ -713,22 +523,23 @@ public class CaseServiceImpl implements CaseService {
 
     @Override
     @Transactional
-    public CaseUserResponse addUserToCase(Long caseId, String userEmailToAdd, String currentUserEmail) {
+    public CaseUserResponse addUserToCase(Long caseId, Long id, String currentUserEmail) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
 
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        validateUserAccess(caseEntity, currentUser);
+        validateOwnerAccess(caseEntity, currentUser);
 
-        User userToAdd = userRepository.findByEmail(userEmailToAdd)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userEmailToAdd));
+        User userToAdd = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("User not found: " + id));
 
+        String email = userToAdd.getEmail();
         if (caseEntity.hasUser(userToAdd)) {
             logService.log(
                     String.format("User '%s' already added to case №%s by user %s",
-                            userEmailToAdd, caseEntity.getNumber(), currentUserEmail),
+                            email, caseEntity.getNumber(), currentUserEmail),
                     LogLevel.ERROR,
                     LogAction.USER_ADD,
                     caseEntity.getNumber(),
@@ -741,17 +552,67 @@ public class CaseServiceImpl implements CaseService {
         caseEntity.addUser(userToAdd);
         Case savedCase = caseRepository.save(caseEntity);
 
-        log.info("User {} added to case {} by {}", userEmailToAdd, caseId, currentUserEmail);
+        recordMemberHistory(caseNumber, userToAdd, currentUser, CaseMemberAction.ADD);
+
+        log.info("User {} added to case {} by {}", email, caseId, currentUserEmail);
 
         logService.log(
                 String.format("User '%s' added to case №%s by user %s",
-                        userEmailToAdd, caseNumber, currentUserEmail),
+                        email, caseNumber, currentUserEmail),
                 LogLevel.INFO,
                 LogAction.USER_ADD,
                 caseNumber,
                 currentUserEmail
         );
         return mapper.mapToCaseUserResponse(userToAdd, savedCase);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CaseMemberHistoryDto> getMemberHistory(Long caseId, String currentUserEmail) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+
+        validateOwnerAccess(caseEntity, currentUser);
+
+        return caseMemberHistoryRepository
+                .findByCaseNumberOrderByTimestampDesc(caseEntity.getNumber())
+                .stream()
+                .map(mapper::toCaseMemberHistoryDto)
+                .toList();
+    }
+
+    private void recordMemberHistory(String caseNumber, User target,
+                                     User performedBy, CaseMemberAction action) {
+        caseMemberHistoryRepository.save(CaseMemberHistory.builder()
+                .caseNumber(caseNumber)
+                .action(action)
+                .targetEmail(target.getEmail())
+                .targetFio(target.getFio())
+                .performedByEmail(performedBy.getEmail())
+                .performedByFio(performedBy.getFio())
+                .build());
+    }
+
+    @Override
+    public List<UserSuggestionResponse> searchUsers(String query) {
+
+        return userRepository.searchAllUsers(query)
+                .stream()
+                .map(user -> UserSuggestionResponse.builder()
+                        .id(user.getId())
+                        .fio(String.join(" ",
+                                        Optional.ofNullable(user.getSurname()).orElse(""),
+                                        Optional.ofNullable(user.getName()).orElse(""),
+                                        Optional.ofNullable(user.getFathername()).orElse(""))
+                                .trim()
+                                .replaceAll("\\s+", " "))
+                        .email(user.getEmail())
+                        .build())
+                .toList();
     }
 
     @Override
@@ -818,7 +679,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        validateUserAccess(caseEntity, currentUser);
+        validateOwnerAccess(caseEntity, currentUser);
 
         User userToRemove = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
@@ -850,6 +711,8 @@ public class CaseServiceImpl implements CaseService {
 
         caseEntity.removeUser(userToRemove);
         caseRepository.save(caseEntity);
+
+        recordMemberHistory(caseNumber, userToRemove, currentUser, CaseMemberAction.REMOVE);
 
         logService.log(
                 String.format("User '%s' removed from case №%s by user %s",
@@ -965,33 +828,16 @@ public class CaseServiceImpl implements CaseService {
 
     @Override
     public void deleteAllFiles(Long caseId, String currentUserEmail) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+        // 1) короткая tx: валидация + caseNumber
+        String caseNumber = caseWriter.authorizeForFileWipe(caseId, currentUserEmail);
 
-        User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
-
-        validateUserAccess(caseEntity, currentUser);
-
-        String caseNumber = caseEntity.getNumber();
         try {
-            deleteAllFilesFromWorkspace(caseEntity.getNumber());
-
-            minioService.deleteAllFilesFromCase(caseEntity.getNumber());
-
+            deleteAllFilesFromWorkspace(caseNumber);
+            minioService.deleteAllFilesFromCase(caseNumber);
             taskQueueService.deleteTasksByCaseId(caseId);
 
-            caseEntity.removeAllAttachedFiles();
-            caseRepository.save(caseEntity);
+            caseWriter.wipeAttachedFiles(caseId, currentUserEmail);
             log.info("Deleted all files from case: {}", caseId);
-
-            logService.log(
-                    String.format("All files deleted from case №%s by user %s", caseNumber, currentUserEmail),
-                    LogLevel.INFO,
-                    LogAction.FILE_DELETE,
-                    caseNumber,
-                    currentUserEmail
-            );
 
         } catch (Exception e) {
             log.error("Failed to delete all files from case: {}", caseId, e);
@@ -1000,27 +846,12 @@ public class CaseServiceImpl implements CaseService {
     }
 
     @Override
-    @Transactional
     public void deleteCaseById(Long caseId, String currentUserEmail) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found"));
-
-        User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("User not found"));
-
-        validateUserAccess(caseEntity, currentUser);
+        caseWriter.authorizeOwnerForDelete(caseId, currentUserEmail);
 
         deleteAllFiles(caseId, currentUserEmail);
 
-        caseRepository.delete(caseEntity);
-        logService.log(
-                String.format("Case '%s' deleted by user %s",
-                        caseEntity.getNumber(), currentUserEmail),
-                LogLevel.INFO,
-                LogAction.CASE_DELETED,
-                caseEntity.getNumber(),
-                currentUserEmail
-        );
+        caseWriter.deleteCaseRecord(caseId, currentUserEmail);
         log.info("Case {} deleted", caseId);
     }
 
@@ -1075,5 +906,58 @@ public class CaseServiceImpl implements CaseService {
 
         log.info("Page count migration done. Updated: {}, Failed: {}, Skipped: {}",
                 updated, failed, files.size() - updated - failed);
+    }
+
+    private List<CaseFileWriter.UploadedFile> uploadAndCount(
+            List<MultipartFile> files, String caseNumber, Set<String> alreadyExisting) {
+
+        List<CaseFileWriter.UploadedFile> uploaded = new ArrayList<>();
+        Set<String> seen = new HashSet<>(alreadyExisting);
+
+        for (MultipartFile file : files) {
+            if (file.isEmpty()) continue;
+            String originalName = file.getOriginalFilename();
+            if (seen.contains(originalName)) {
+                log.warn("File already exists: {} in case {}", originalName, caseNumber);
+                continue;
+            }
+            try {
+                CaseFile caseFile = minioService.uploadFile(file, caseNumber);
+
+                Integer pages = null;
+                try {
+                    pages = pageCounter.countPagesByUrl(caseFile.getFileUrl(), caseFile.getContentType());
+                } catch (Exception e) {
+                    log.warn("Could not count pages for {}: {}", caseFile.getOriginalFileName(), e.getMessage());
+                }
+
+                uploaded.add(new CaseFileWriter.UploadedFile(
+                        caseFile.getOriginalFileName(), caseFile.getStoredFileName(), caseFile.getFileUrl(),
+                        caseFile.getContentType(), caseFile.getFileSize(), caseFile.getUploadedAt(), pages));
+                seen.add(originalName);
+
+            } catch (Exception e) {
+                log.error("Failed to upload file: {} to case {}", originalName, caseNumber, e);
+            }
+        }
+        return uploaded;
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CaseFileResponse getFileByName(Long caseId, String fileName, String email) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+
+        validateUserAccess(caseEntity, user);
+
+        CaseFile caseFile = caseFileRepository
+                .findByOriginalFileNameAndCaseEntityId(fileName, caseId)
+                .orElseThrow(() -> new IllegalStateException("Файл не найден: " + fileName));
+
+        return mapper.mapToCaseFileResponse(caseFile);
     }
 }

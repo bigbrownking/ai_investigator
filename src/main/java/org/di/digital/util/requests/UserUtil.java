@@ -66,6 +66,19 @@ public class UserUtil {
             throw new AccessDeniedException("У вас нет доступа к этому делу");
         }
     }
+    public static void validateOwnerAccess(Case caseEntity, User user) {
+        if (!caseEntity.isOwner(user)) {
+            logService.log(
+                    String.format("Non-owner user %s attempted to manage members of case %s",
+                            user.getEmail(), caseEntity.getNumber()),
+                    LogLevel.ERROR,
+                    LogAction.NO_ACCESS,
+                    caseEntity.getNumber(),
+                    user.getEmail()
+            );
+            throw new AccessDeniedException("Только владелец дела может управлять участниками");
+        }
+    }
     public static void validateRegionAccess(User admin, Case caseEntity, RegionRepository regionRepository) {
         if (admin.getRegion() == null) {
             throw new AccessDeniedException("У администратора нет региона");

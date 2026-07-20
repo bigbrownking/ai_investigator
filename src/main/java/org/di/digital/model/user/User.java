@@ -119,4 +119,7 @@ public class User {
     public boolean hasRole(String roleName) {
         return roles.stream().anyMatch(r -> r.getName().equals(roleName));
     }
+    public String getFio(){
+        return surname + " " + name + " " + fathername;
+    }
 }

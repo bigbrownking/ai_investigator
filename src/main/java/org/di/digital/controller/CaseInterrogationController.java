@@ -256,4 +256,48 @@ public class CaseInterrogationController {
         caseInterrogationService.deleteApplicationFile(caseId, interrogationId, fileId, authentication.getName());
         return ResponseEntity.noContent().build();
     }
+
+
+    @GetMapping("/{caseId}/interrogations/{interrogationId}/time-status")
+    public ResponseEntity<InterrogationTimeStatusResponse> getTimeStatus(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(caseInterrogationService
+                .getTimeStatus(caseId, interrogationId, authentication.getName()));
+    }
+
+    @PostMapping("/{caseId}/interrogations/{interrogationId}/break")
+    public ResponseEntity<InterrogationTimeStatusResponse> startBreak(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            Authentication authentication
+    ) {
+        log.info("Starting break for interrogation: {}, case: {}", interrogationId, caseId);
+        return ResponseEntity.ok(caseInterrogationService
+                .startBreak(caseId, interrogationId, authentication.getName()));
+    }
+
+    @PostMapping("/{caseId}/interrogations/{interrogationId}/category")
+    public ResponseEntity<InterrogationTimeStatusResponse> confirmCategory(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            @RequestBody ConfirmCategoryRequest request,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(caseInterrogationService.confirmCategory(
+                caseId, interrogationId, request.getGround(),
+                request.getGroundNote(), authentication.getName()));
+    }
+
+    @PostMapping("/{caseId}/interrogations/{interrogationId}/continuous-override")
+    public ResponseEntity<InterrogationTimeStatusResponse> confirmContinuousOverride(
+            @PathVariable Long caseId,
+            @PathVariable Long interrogationId,
+            Authentication authentication
+    ) {
+        return ResponseEntity.ok(caseInterrogationService
+                .confirmContinuousOverride(caseId, interrogationId, authentication.getName()));
+    }
 }

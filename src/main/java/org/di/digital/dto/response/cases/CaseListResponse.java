@@ -25,6 +25,6 @@ public class CaseListResponse {
     private LocalDateTime createdDate;
     private LocalDateTime lastActivityDate;
     private String lastActivityType;
-    private String ownerEmail;
-    private List<String> participantEmails;
+    private String ownerFio;
+    private List<String> participantFios;
 }

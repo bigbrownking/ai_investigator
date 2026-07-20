@@ -60,7 +60,7 @@ public class TaskQueueService {
         }
     }
     public void retryTask(Long caseFileId, String userEmail, Long caseId,
-                          String caseNumber, String fileName, String fileUrl) {
+                          String caseNumber, String fileName, String fileUrl, String language) {
         List<TaskQueue> failedTasks = taskQueueRepository
                 .findByCaseFileIdAndStatus(caseFileId, TaskStatus.FAILED);
 
@@ -74,11 +74,11 @@ public class TaskQueueService {
             log.info("Task {} re-queued for caseFile {}", task.getId(), caseFileId);
         } else {
             log.warn("No FAILED task found for caseFileId {}, creating new task", caseFileId);
-            addTaskToQueue(userEmail, caseId, caseNumber, fileName, fileUrl, caseFileId);
+            addTaskToQueue(userEmail, caseId, caseNumber, fileName, fileUrl, caseFileId, language);
         }
     }
     public void addTaskToQueue(String userEmail, Long caseId, String caseNumber,
-                               String fileName, String fileUrl, Long caseFileId) {
+                               String fileName, String fileUrl, Long caseFileId, String language) {
 
         boolean exists = taskQueueRepository
                 .existsByCaseFileIdAndStatusIn(
@@ -94,6 +94,7 @@ public class TaskQueueService {
         TaskQueue task = TaskQueue.builder()
                 .userEmail(userEmail)
                 .caseFileId(caseFileId)
+                .language(language)
                 .caseId(caseId)
                 .caseNumber(caseNumber)
                 .fileName(fileName)
@@ -107,10 +108,10 @@ public class TaskQueueService {
         log.info("Added task {} to queue for user {}", fileName, userEmail);
     }
 
-    public TaskQueue getNextTaskByRoundRobin() {
-        int maxPriority = getMaxPendingPriority();
+    public TaskQueue getNextTaskByRoundRobin(List<Long> excludedCaseIds) {
+        int maxPriority = getMaxPendingPriority(excludedCaseIds);
 
-        List<String> users = getOrderedUsersWithPendingTasksByPriority(maxPriority);
+        List<String> users = getOrderedUsersWithPendingTasksByPriority(maxPriority, excludedCaseIds);
         log.info("DEBUG: Max priority={}, users with this priority: {}", maxPriority, users);
 
         if (users.isEmpty()) return null;
@@ -134,12 +135,19 @@ public class TaskQueueService {
         for (int i = 0; i < users.size(); i++) {
             String candidate = users.get((startIndex + i) % users.size());
 
-            List<TaskQueue> userTasks = taskQueueRepository
-                    .findByUserEmailAndStatusAndPriorityOrderByCreatedAtAsc(
-                            candidate, TaskStatus.PENDING, maxPriority);
+            Query taskQuery = new Query();
+            taskQuery.addCriteria(Criteria.where("userEmail").is(candidate)
+                    .and("status").is(TaskStatus.PENDING)
+                    .and("priority").is(maxPriority));
+            if (excludedCaseIds != null && !excludedCaseIds.isEmpty()) {
+                taskQuery.addCriteria(Criteria.where("caseId").nin(excludedCaseIds));
+            }
+            taskQuery.with(Sort.by(Sort.Direction.ASC, "createdAt"));
+            taskQuery.limit(1);
 
-            if (!userTasks.isEmpty()) {
-                TaskQueue task = userTasks.get(0);
+            TaskQueue task = mongoTemplate.findOne(taskQuery, TaskQueue.class);
+
+            if (task != null) {
                 task.setStatus(TaskStatus.PROCESSING);
                 task.setSentToQueueAt(LocalDateTime.now());
                 taskQueueRepository.save(task);
@@ -156,21 +164,28 @@ public class TaskQueueService {
         return null;
     }
 
-    private int getMaxPendingPriority() {
+    private int getMaxPendingPriority(List<Long> excludedCaseIds) {
         Query query = new Query();
-        query.addCriteria(Criteria.where("status").is(TaskStatus.PENDING));
+        Criteria criteria = Criteria.where("status").is(TaskStatus.PENDING);
+        if (excludedCaseIds != null && !excludedCaseIds.isEmpty()) {
+            criteria.and("caseId").nin(excludedCaseIds);
+        }
+        query.addCriteria(criteria);
         query.with(Sort.by(Sort.Direction.DESC, "priority"));
         query.limit(1);
         TaskQueue top = mongoTemplate.findOne(query, TaskQueue.class);
         return top != null ? top.getPriority() : 0;
     }
 
-    private List<String> getOrderedUsersWithPendingTasksByPriority(int priority) {
+    private List<String> getOrderedUsersWithPendingTasksByPriority(int priority, List<Long> excludedCaseIds) {
+        Criteria matchCriteria = Criteria.where("status").is(TaskStatus.PENDING)
+                .and("priority").is(priority);
+        if (excludedCaseIds != null && !excludedCaseIds.isEmpty()) {
+            matchCriteria.and("caseId").nin(excludedCaseIds);
+        }
+
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(
-                        Criteria.where("status").is(TaskStatus.PENDING)
-                                .and("priority").is(priority)
-                ),
+                Aggregation.match(matchCriteria),
                 Aggregation.group("userEmail")
                         .min("createdAt").as("firstTaskTime"),
                 Aggregation.sort(Sort.by(Sort.Direction.ASC, "firstTaskTime"))
@@ -239,5 +254,11 @@ public class TaskQueueService {
 
         Document result = results.getUniqueMappedResult();
         return result != null ? result.getDouble("avgDuration") : null;
+    }
+
+    public List<Long> getProcessingCaseIds() {
+        Query query = new Query();
+        query.addCriteria(Criteria.where("status").is(TaskStatus.PROCESSING));
+        return mongoTemplate.findDistinct(query, "caseId", TaskQueue.class, Long.class);
     }
 }

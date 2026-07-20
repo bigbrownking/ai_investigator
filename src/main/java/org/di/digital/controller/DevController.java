@@ -5,6 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.TaskStatus;
 import org.di.digital.service.impl.core.DevService;
+import org.di.digital.util.IndictmentMigrationService;
+import org.di.digital.util.PlanMigrationService;
+import org.di.digital.util.QualificationMigrationService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -18,6 +21,9 @@ import java.util.Map;
 public class DevController {
 
     private final DevService devService;
+    private final PlanMigrationService planMigrationService;
+    private final QualificationMigrationService qualificationMigrationService;
+    private final IndictmentMigrationService indictmentMigrationService;
 
     // ─── Stats ────────────────────────────────────────────────────
 
@@ -116,9 +122,23 @@ public class DevController {
         return ResponseEntity.ok("Done");
     }
 
-    @PostMapping("/fetch-qual")
-    public ResponseEntity<String> fetchQual(){
-        devService.fetchQualPercent();
-        return ResponseEntity.ok("Done");
+    @PostMapping("/migrate-qualification")
+    public ResponseEntity<String> migrate1() {
+        int count = qualificationMigrationService.migrateExistingQualifications();
+        return ResponseEntity.ok("Migrated " + count + " qualifications");
     }
+
+    @PostMapping("/migrate-indictment")
+    public ResponseEntity<String> migrate2() {
+        int count = indictmentMigrationService.migrateExistingIndictments();
+        return ResponseEntity.ok("Migrated " + count + " indictments");
+    }
+
+
+    @PostMapping("/migrate-plan")
+    public ResponseEntity<String> migrate3() {
+        int count = planMigrationService.migrateExistingPlans();
+        return ResponseEntity.ok("Migrated " + count + " plans");
+    }
+
 }

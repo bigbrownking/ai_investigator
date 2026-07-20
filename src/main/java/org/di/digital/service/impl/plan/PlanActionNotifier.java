@@ -4,7 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.ApprovalLevel;
-import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.model.plan.CasePlan;
+import org.di.digital.repository.plan.CasePlanRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.impl.core.NotificationService;
 import org.springframework.stereotype.Service;
@@ -23,14 +24,16 @@ import java.util.Set;
 @RequiredArgsConstructor
 public class PlanActionNotifier {
 
-    private final CaseRepository caseRepository;
+    private final CasePlanRepository casePlanRepository;
     private final UserRepository userRepository;
     private final NotificationService notificationService;
 
     @Transactional
     @SuppressWarnings("unchecked")
-    public void checkAndNotifyRedActions(Case caseEntity) {
-        Map<String, Object> plan = caseEntity.getPlan();
+    public void checkAndNotifyRedActions(CasePlan casePlan) {
+        Case caseEntity = casePlan.getCaseEntity();
+
+        Map<String, Object> plan = casePlan.getContent();
         if (plan == null) return;
 
         List<Map<String, Object>> actions = (List<Map<String, Object>>) plan.get("actions");
@@ -39,8 +42,8 @@ public class PlanActionNotifier {
         DateTimeFormatter formatter = DateTimeFormatter.ofPattern("dd.MM.yyyy");
         LocalDate today = LocalDate.now();
 
-        Set<Integer> alreadyNotified = caseEntity.getNotifiedRedActions() != null
-                ? new HashSet<>(caseEntity.getNotifiedRedActions())
+        Set<Integer> alreadyNotified = casePlan.getNotifiedRedActions() != null
+                ? new HashSet<>(casePlan.getNotifiedRedActions())
                 : new HashSet<>();
 
         boolean hasNew = false;
@@ -60,7 +63,6 @@ public class PlanActionNotifier {
                     Long regionId = caseEntity.getOwner().getRegion().getId();
                     Long administrationId = caseEntity.getOwner().getAdministration().getId();
 
-
                     List.of(ApprovalLevel.LEVEL_1_ZAM, ApprovalLevel.LEVEL_1_RUK)
                             .forEach(level ->
                                     userRepository.findActiveByProfessionIdAndRegionIdAndAdministrationId(
@@ -78,8 +80,8 @@ public class PlanActionNotifier {
         }
 
         if (hasNew) {
-            caseEntity.setNotifiedRedActions(alreadyNotified);
-            caseRepository.save(caseEntity);
+            casePlan.setNotifiedRedActions(alreadyNotified);
+            casePlanRepository.save(casePlan);
         }
     }
 }

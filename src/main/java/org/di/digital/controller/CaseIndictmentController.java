@@ -13,13 +13,17 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
+
+import static java.net.URLEncoder.encode;
 
 @Slf4j
 @RestController
 @RequestMapping("/cases/indictment")
 @RequiredArgsConstructor
 public class CaseIndictmentController {
+
     private final IndictmentService indictmentService;
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -28,13 +32,13 @@ public class CaseIndictmentController {
                                        Authentication authentication) {
 
         if (authentication == null || !authentication.isAuthenticated()) {
-            log.error("Unauthenticated access attempt to qualification stream");
+            log.error("Unauthenticated access attempt to indictment stream");
             SseEmitter emitter = new SseEmitter();
             emitter.completeWithError(new IllegalStateException("Authentication required"));
             return emitter;
         }
 
-        log.info("Streaming qualification for workspace: {} by user: {}",
+        log.info("Generating indictment for case: {} by user: {}",
                 caseNumber, authentication.getName());
         return indictmentService.generateIndictment(caseNumber, language, authentication.getName());
     }
@@ -43,15 +47,16 @@ public class CaseIndictmentController {
     public SseEmitter complete(
             @RequestParam String caseNumber,
             @RequestParam(required = false, defaultValue = "russian") String language,
-            Authentication authentication){
+            Authentication authentication) {
+
         if (authentication == null || !authentication.isAuthenticated()) {
-            log.error("Unauthenticated access attempt to qualification stream");
+            log.error("Unauthenticated access attempt to indictment complete");
             SseEmitter emitter = new SseEmitter();
             emitter.completeWithError(new IllegalStateException("Authentication required"));
             return emitter;
         }
 
-        log.info("Streaming qualification for workspace: {} by user: {}",
+        log.info("Completing indictment for case: {} by user: {}",
                 caseNumber, authentication.getName());
         return indictmentService.completeIndictment(caseNumber, language, authentication.getName());
     }
@@ -61,23 +66,25 @@ public class CaseIndictmentController {
                                     @RequestParam int sectionId,
                                     @RequestParam(required = false, defaultValue = "russian") String language,
                                     Authentication authentication) {
+
         if (authentication == null || !authentication.isAuthenticated()) {
+            log.error("Unauthenticated access attempt to indictment section");
             SseEmitter emitter = new SseEmitter();
             emitter.completeWithError(new IllegalStateException("Authentication required"));
             return emitter;
         }
-        log.info("Streaming indictment section {} for case: {} by user: {}",
+
+        log.info("Generating indictment section {} for case: {} by user: {}",
                 sectionId, caseNumber, authentication.getName());
         return indictmentService.generateIndictmentSection(
                 caseNumber, language, authentication.getName(), sectionId);
     }
 
-
     @GetMapping("/download")
     public ResponseEntity<Resource> downloadIndictment(
             @RequestParam String caseNumber,
             Authentication authentication) {
-        log.info("Downloading qualification for case: {} by user: {}",
+        log.info("Downloading indictment for case: {} by user: {}",
                 caseNumber, authentication.getName());
 
         Resource resource = indictmentService.downloadIndictmentAsWord(caseNumber, authentication.getName());
@@ -85,7 +92,8 @@ public class CaseIndictmentController {
         String filename = String.format("обвинительный акт_%s.docx", caseNumber.replace("/", "-"));
 
         return ResponseEntity.ok()
-                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"" + filename + "\"")
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + encode(filename, StandardCharsets.UTF_8))
                 .contentType(MediaType.parseMediaType(
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
                 .body(resource);
@@ -95,6 +103,7 @@ public class CaseIndictmentController {
     public ResponseEntity<List<IndictmentSectionDto>> getIndictmentSections(@RequestParam String caseNumber) {
         return ResponseEntity.ok(indictmentService.getIndictmentSections(caseNumber));
     }
+
     @PatchMapping("/sections")
     public ResponseEntity<IndictmentSectionDto> updateSection(
             @RequestParam String caseNumber,

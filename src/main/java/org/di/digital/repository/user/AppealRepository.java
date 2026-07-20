@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 
 @Repository
@@ -15,7 +16,7 @@ public interface AppealRepository extends JpaRepository<Appeal, Long>,
         JpaSpecificationExecutor<Appeal> {
     Page<Appeal> findByRegionId(Long regionId, Pageable pageable);
     List<Appeal> findByUserId(Long userId);
-    long countByStatus(AppealStatus status);
     long countByRegionIdAndStatus(Long regionId, AppealStatus status);
     long countByRegionIdInAndStatus(List<Long> regionIds, AppealStatus status);
+    long countByStatusAndCreatedAtBetween(AppealStatus status, LocalDateTime start, LocalDateTime end);
 }

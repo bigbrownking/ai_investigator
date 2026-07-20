@@ -8,12 +8,16 @@ import org.di.digital.dto.response.plan.*;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.*;
+import org.di.digital.model.plan.CasePlan;
 import org.di.digital.model.plan.PlanEditHistory;
 import org.di.digital.model.plan.PlanNotification;
+import org.di.digital.model.user.Region;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.plan.CasePlanRepository;
 import org.di.digital.repository.plan.PlanEditHistoryRepository;
 import org.di.digital.repository.plan.PlanNotificationRepository;
+import org.di.digital.repository.user.RegionRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.service.plan.PlanService;
@@ -53,6 +57,8 @@ import static org.di.digital.util.requests.UserUtil.*;
 @Service
 @RequiredArgsConstructor
 public class PlanServiceImpl implements PlanService {
+    private final CasePlanRepository casePlanRepository;
+    private final RegionRepository regionRepository;
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final WebClient.Builder webClientBuilder;
@@ -61,6 +67,8 @@ public class PlanServiceImpl implements PlanService {
     private final LogService logService;
     private final PlanEditHistoryRepository planEditHistoryRepository;
     private final PlanNotificationRepository planNotificationRepository;
+    private final PlanActionWriter planActionWriter;
+    private final PlanResponseAssembler assembler;
 
     private final Mapper mapper;
 
@@ -227,6 +235,7 @@ public class PlanServiceImpl implements PlanService {
         return result;
     }
     @Override
+    @Transactional(readOnly = true)
     public Resource downloadPlanAsWord(String caseNumber, String userEmail) {
         try {
             logService.log(
@@ -236,8 +245,10 @@ public class PlanServiceImpl implements PlanService {
                     caseNumber,
                     userEmail
             );
+            CasePlanResponse response = getPlan(caseNumber, userEmail);
+
             return new ByteArrayResource(
-                    documentFormatterService.generatePlanDocument(getPlan(caseNumber, userEmail).getPlan())
+                    documentFormatterService.generatePlanDocument(response.getPlan(), response.getApprovedBy())
             );
         } catch (IOException e) {
             throw new IllegalStateException(e);
@@ -245,6 +256,7 @@ public class PlanServiceImpl implements PlanService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CasePlanResponse getPlan(String caseNumber, String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
@@ -294,6 +306,7 @@ public class PlanServiceImpl implements PlanService {
             caseEntity.setPlanReviewedBy(user);
             caseEntity.setPlanReviewedAt(LocalDateTime.now());
             caseEntity.setPlanReviewComment(null);
+            caseEntity.setPlanSubmittedBy(user);
             caseRepository.save(caseEntity);
 
             userRepository
@@ -308,6 +321,7 @@ public class PlanServiceImpl implements PlanService {
             caseEntity.setPlanReviewComment(null);
             caseEntity.setPlanReviewedBy(null);
             caseEntity.setPlanReviewedAt(null);
+            caseEntity.setPlanSubmittedBy(user);
             caseRepository.save(caseEntity);
 
             List.of(ApprovalLevel.LEVEL_1_ZAM, ApprovalLevel.LEVEL_1_RUK)
@@ -330,24 +344,35 @@ public class PlanServiceImpl implements PlanService {
                 .build();
     }
     @Override
+    @Transactional(readOnly = true)
     public List<ManagementPendingPlanDto> getManagementPendingPlans(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
-        List<Case> cases;
-        if (user.hasRole("ADVANCED_USER")) {
-            cases = caseRepository.findByPlanStatusInAndOwnerRegionIdAndOwnerAdministrationId(
-                    List.of(PlanStatus.PENDING, PlanStatus.APPROVED_L1, PlanStatus.APPROVED_L2, PlanStatus.APPROVED_L3),
-                    user.getRegion().getId(),
-                    user.getAdministration().getId());
-        } else {
-            cases = caseRepository.findByPlanStatusInAndOwnerRegionId(
-                    List.of(PlanStatus.APPROVED_L1, PlanStatus.APPROVED_L2, PlanStatus.APPROVED_L3),
-                    user.getRegion().getId());
+
+        List<Long> regionIds = regionRepository.findByAdminsContaining(user)
+                .stream()
+                .map(Region::getId)
+                .toList();
+
+        if (regionIds.isEmpty()) {
+            return List.of();
         }
 
-        return cases.stream()
-                .sorted(Comparator.comparingInt(c -> pendingPriority(c.getPlanStatus())))
-                .map(c -> mapper.toManagementPendingPlanDto(c, enrichPlanWithStatus(c.getPlan())))
+        List<CasePlan> plans;
+        if (user.hasRole("ADVANCED_USER")) {
+            plans = casePlanRepository.findByStatusInAndOwnerRegionIdInAndOwnerAdministrationId(
+                    List.of(PlanStatus.PENDING, PlanStatus.APPROVED_L1, PlanStatus.APPROVED_L2, PlanStatus.APPROVED_L3),
+                    regionIds,
+                    user.getAdministration().getId());
+        } else {
+            plans = casePlanRepository.findByStatusInAndOwnerRegionIdIn(
+                    List.of(PlanStatus.APPROVED_L1, PlanStatus.APPROVED_L2, PlanStatus.APPROVED_L3),
+                    regionIds);
+        }
+
+        return plans.stream()
+                .sorted(Comparator.comparingInt(p -> pendingPriority(p.getStatus())))
+                .map(p -> mapper.toManagementPendingPlanDto(p, enrichPlanWithStatus(p.getContent())))
                 .toList();
     }
 
@@ -443,174 +468,38 @@ public class PlanServiceImpl implements PlanService {
         }
     }
     @Override
-    @Transactional
     public CasePlanResponse addAction(String caseNumber, String email, AddPlanActionRequest request) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+        PlanActionWriter.PlanActionResult result =
+                planActionWriter.persistAddAction(caseNumber, email, request);
 
-        Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+        syncPlanToAi(caseNumber, result.plan());
 
-        Map<String, Object> plan = caseEntity.getPlan();
-        if (plan == null) throw new IllegalStateException("План отсутствует");
-
-        List<Map<String, Object>> actions = (List<Map<String, Object>>) plan.get("actions");
-        if (actions == null) throw new IllegalStateException("Список действий отсутствует");
-
-        Map<String, Object> newAction = new LinkedHashMap<>();
-        newAction.put("номер", 0); // временно, перенумеруем ниже
-        newAction.put("действие", request.getAction());
-        newAction.put("цель", request.getGoal());
-        newAction.put("исполнитель", request.getExecutor());
-        newAction.put("направление", request.getDirection());
-
-        if (request.getDays() != null) {
-            newAction.put("дней", request.getDays());
-        }
-
-        String срок = request.getDeadline();
-        if (срок == null && request.getDays() != null) {
-            срок = LocalDate.now().plusDays(request.getDays())
-                    .format(DateTimeFormatter.ofPattern("dd.MM.yyyy"));
-        }
-        if (срок != null) {
-            newAction.put("срок", срок);
-        }
-
-        if (request.getInsertAfter() != null) {
-            int insertIndex = -1;
-
-            if (request.getInsertAfter() == 0) {
-                insertIndex = 0;
-            } else {
-                for (int i = 0; i < actions.size(); i++) {
-                    if (((Number) actions.get(i).get("номер")).intValue() == request.getInsertAfter()) {
-                        insertIndex = i + 1;
-                        break;
-                    }
-                }
-            }
-
-            if (insertIndex == -1) {
-                throw new RuntimeException("Действие №" + request.getInsertAfter() + " не найдено");
-            }
-            actions.add(insertIndex, newAction);
-        } else {
-            actions.add(newAction);
-        }
-
-        // Перенумеруем все
-        for (int i = 0; i < actions.size(); i++) {
-            actions.get(i).put("номер", i + 1);
-        }
-
-        plan.put("actions", actions);
-        caseEntity.setPlan(plan);
-        caseRepository.save(caseEntity);
-        syncPlanToAi(caseNumber, plan);
-
-        log.info("Case {} — action added by {}", caseNumber, email);
-
-        return CasePlanResponse.builder()
-                .planStatus(caseEntity.getPlanStatus())
-                .canWithdraw(canWithdraw(caseEntity.getPlanStatus()))
-                .approvedBy(getApproverName(caseEntity))
-                .reviewedBy(getReviewerName(caseEntity))
-                .plan(enrichPlanWithStatus(caseEntity.getPlan()))
-                .build();
+        return result.response();
     }
 
     @Override
-    @Transactional
     public CasePlanResponse deleteAction(String caseNumber, String email, int actionNumber) {
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+        PlanActionWriter.PlanActionResult result =
+                planActionWriter.persistDeleteAction(caseNumber, email, actionNumber);
 
-        Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+        syncPlanToAi(caseNumber, result.plan());
 
-       // validateEditAccess(user, caseEntity.getPlanStatus());
-
-        Map<String, Object> plan = caseEntity.getPlan();
-        if (plan == null) throw new IllegalStateException("План отсутствует");
-
-        List<Map<String, Object>> actions = (List<Map<String, Object>>) plan.get("actions");
-        if (actions == null) throw new IllegalStateException("Список действий отсутствует");
-
-        boolean removed = actions.removeIf(
-                a -> ((Number) a.get("номер")).intValue() == actionNumber
-        );
-
-        if (!removed) {
-            throw new RuntimeException("Действие №" + actionNumber + " не найдено");
-        }
-
-        // Перенумеруем
-        for (int i = 0; i < actions.size(); i++) {
-            actions.get(i).put("номер", i + 1);
-        }
-
-        plan.put("actions", actions);
-        caseEntity.setPlan(plan);
-        caseRepository.save(caseEntity);
-        syncPlanToAi(caseNumber, plan);
-
-        log.info("Case {} — action #{} deleted by {}", caseNumber, actionNumber, email);
-
-        return CasePlanResponse.builder()
-                .planStatus(caseEntity.getPlanStatus())
-                .canWithdraw(canWithdraw(caseEntity.getPlanStatus()))
-                .approvedBy(getApproverName(caseEntity))
-                .reviewedBy(getReviewerName(caseEntity))
-                .plan(enrichPlanWithStatus(caseEntity.getPlan()))
-                .build();
+        return result.response();
     }
 
 
 
     @Override
-    @Transactional
-    @SuppressWarnings("unchecked")
-    public ManualStatusResponse updateActionStatus(String caseNumber, String email, ManualStatusRequest request) {
-        ActionStatus newActionStatus = ActionStatus.fromValue(request.getNewStatus());
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
-
-        Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
-
-        if (caseEntity.getPlanStatus() != PlanStatus.APPROVED_L3) {
-            throw new IllegalStateException("Изменение статуса действий доступно только для утверждённого плана");
-        }
-
-        Map<String, Object> plan = caseEntity.getPlan();
-        if (plan == null) throw new IllegalStateException("План отсутствует");
-
-        List<Map<String, Object>> actions = (List<Map<String, Object>>) plan.get("actions");
-        if (actions == null) throw new IllegalStateException("Список действий отсутствует");
-
-        Map<String, Object> action = actions.stream()
-                .filter(a -> ((Number) a.get("номер")).intValue() == request.getActionNumber())
-                .findFirst()
-                .orElseThrow(() -> new NotFoundException("Действие №" + request.getActionNumber() + " не найдено"));
-
-        boolean isAdvancedUser = user.hasRole("ADVANCED_USER");
-        boolean isRegAdmin = user.hasRole("REG_ADMIN");
-
-        Boolean locked = (Boolean) action.get("статус_заблокирован");
-        if (Boolean.TRUE.equals(locked)) {
-            throw new AccessDeniedException("Статус действия заблокирован для изменения");
-        }
-
-        String role = isRegAdmin || isAdvancedUser ? "manager" : "investigator";
+    public ManualStatusResponse updateActionStatus(String caseNumber, String email,
+                                                   ManualStatusRequest request) {
+        PlanActionWriter.ActionStatusPrep prep =
+                planActionWriter.prepareActionStatus(caseNumber, email, request);
 
         Map<String, Object> requestBody = manualStatusBody(
                 request.getActionNumber(),
-                newActionStatus.getValue(),
-                role,
-                request.getComment()
-        );
+                prep.newStatusValue(),
+                prep.role(),
+                request.getComment());
 
         Map<String, Object> aiResponse;
         try {
@@ -624,54 +513,15 @@ public class PlanServiceImpl implements PlanService {
                     .block();
         } catch (Exception e) {
             log.error("Failed to call manual_status on AI for case {}: {}", caseNumber, e.getMessage(), e);
-            throw new IllegalStateException("Не удалось обновить статус через AI-сервис для дела " + caseNumber, e);
+            throw new IllegalStateException(
+                    "Не удалось обновить статус через AI-сервис для дела " + caseNumber, e);
         }
 
         if (aiResponse == null || !Boolean.TRUE.equals(aiResponse.get("success"))) {
             throw new IllegalStateException("AI не подтвердил изменение статуса для дела: " + caseNumber);
         }
 
-        String oldStatus = String.valueOf(aiResponse.get("old_status"));
-        String newStatus = String.valueOf(aiResponse.get("new_status"));
-        boolean newLocked = Boolean.TRUE.equals(aiResponse.get("locked"));
-
-        action.put("статус", newStatus);
-        action.put("статус_заблокирован", newLocked);
-
-        List<Map<String, Object>> history = (List<Map<String, Object>>) action.get("история_статусов");
-        if (history == null) {
-            history = new java.util.ArrayList<>();
-        }
-
-        Map<String, Object> historyEntry = new java.util.LinkedHashMap<>();
-        historyEntry.put("статус", newStatus);
-        historyEntry.put("заблокирован", newLocked);
-        historyEntry.put("роль", role);
-        historyEntry.put("дата", LocalDateTime.now().toString());
-        if (request.getComment() != null && !request.getComment().isBlank()) {
-            historyEntry.put("комментарий", request.getComment());
-        }
-        history.add(historyEntry);
-        action.put("история_статусов", history);
-
-        plan.put("actions", actions);
-        caseEntity.setPlan(plan);
-        caseRepository.save(caseEntity);
-
-        log.info("Case {} — action #{} status changed from '{}' to '{}' by {}",
-                caseNumber, request.getActionNumber(), oldStatus, newStatus, email);
-
-        return ManualStatusResponse.builder()
-                .success(true)
-                .caseNumber(caseNumber)
-                .actionNumber(request.getActionNumber())
-                .oldStatus(oldStatus)
-                .newStatus(newStatus)
-                .locked(newLocked)
-                .message(String.format("Статус пункта №%d изменён на '%s'",
-                        request.getActionNumber(), newStatus))
-                .historyStatuses(history)
-                .build();
+        return planActionWriter.applyActionStatus(caseNumber, email, request, prep.role(), aiResponse);
     }
     @Override
     public List<PlanEditHistoryDto> getEditHistory(String caseNumber, String email) {

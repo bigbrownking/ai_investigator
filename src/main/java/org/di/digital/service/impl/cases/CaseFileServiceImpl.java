@@ -1,7 +1,9 @@
-package org.di.digital.service.impl;
+package org.di.digital.service.impl.cases;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.message.AssessmentResult;
+import org.di.digital.dto.message.ClassificationResult;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
@@ -30,15 +32,27 @@ public class CaseFileServiceImpl implements CaseFileService {
     private final NotificationService notificationService;
 
     @Override
-    public CaseFile markAsCompleted(Long caseFileId, String result, Long processingDurationSeconds) {
+    @Transactional
+    public CaseFile markAsCompleted(Long caseFileId, String result, Long processingDurationSeconds,
+                                    ClassificationResult classification, AssessmentResult assessment) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
                 .orElseThrow(() -> new IllegalStateException("Файл не найден: " + caseFileId));
 
         caseFile.setStatus(CaseFileStatusEnum.COMPLETED);
         caseFile.setCompletedAt(LocalDateTime.now());
 
-        caseFileRepository.save(caseFile);
+        if (classification != null) {
+            caseFile.setClassificationStatus(classification.getStatus());
+            caseFile.setDocumentType(classification.getDocumentType());
+        }
+        if (assessment != null) {
+            caseFile.setAssessmentStatus(assessment.getStatus());
+            caseFile.setScorePercent(assessment.getScorePercent());
+            caseFile.setAssessmentColor(assessment.getColor());
+            caseFile.setAssessmentSummary(assessment.getSummary());
+        }
 
+        caseFileRepository.save(caseFile);
         taskQueueService.completeTask(caseFileId, processingDurationSeconds);
 
         log.info("File {} marked as COMPLETED", caseFileId);
@@ -89,13 +103,15 @@ public class CaseFileServiceImpl implements CaseFileService {
 
         notificationService.notifyFileQueued(caseFile.getCaseEntity().getNumber(), caseFile);
 
+        String language = caseFile.getCaseEntity().getLanguage();
         taskQueueService.retryTask(
                 caseFileId,
                 email,
                 caseId,
                 caseFile.getCaseEntity().getNumber(),
                 caseFile.getOriginalFileName(),
-                caseFile.getFileUrl()
+                caseFile.getFileUrl(),
+                language
         );
 
         log.info("File {} re-queued for processing by user: {}", caseFileId, email);

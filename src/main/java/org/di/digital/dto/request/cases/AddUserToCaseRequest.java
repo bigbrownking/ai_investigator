@@ -11,8 +11,5 @@ import lombok.NoArgsConstructor;
 @NoArgsConstructor
 @AllArgsConstructor
 public class AddUserToCaseRequest {
-
-    @NotBlank
-    private String email;
-
+    private Long id;
 }

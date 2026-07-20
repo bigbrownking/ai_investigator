@@ -4,8 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.OsmotrResultMessage;
 import org.di.digital.dto.notification.*;
+import org.di.digital.dto.response.interrogation.InterrogationTimeStatusResponse;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
+import org.di.digital.model.enums.InterrogationTimeEvent;
 import org.di.digital.model.enums.PlanNotificationType;
 import org.di.digital.model.enums.PlanStatus;
 import org.di.digital.model.interrogation.CaseInterrogation;
@@ -428,6 +430,50 @@ public class NotificationService {
                 notification
         );
         log.debug("Global plan notification [{}] sent to user: {}", notification.getPlanStatus(), userEmail);
+    }
+    @Transactional(readOnly = true)
+    public void sendInterrogationTimeNotification(String caseNumber,
+                                                  CaseInterrogation interrogation,
+                                                  InterrogationTimeEvent event,
+                                                  String message,
+                                                  InterrogationTimeStatusResponse status) {
+        Set<String> userEmails = caseRepository.findAllAccessibleUserEmailsByCaseNumber(caseNumber);
+        if (userEmails.isEmpty()) {
+            log.warn("No users found with access to case: {}", caseNumber);
+            return;
+        }
+
+        InterrogationTimeNotification notification = InterrogationTimeNotification.builder()
+                .caseNumber(caseNumber)
+                .interrogationId(interrogation.getId())
+                .fio(interrogation.getFio())
+                .event(event)
+                .message(message)
+                .continuousSeconds(status.getContinuousSeconds())
+                .dailySeconds(status.getDailySeconds())
+                .profile(status.getProfile())
+                .continuousWarn(status.isContinuousWarn())
+                .continuousLimitReached(status.isContinuousLimitReached())
+                .dailyWarn(status.isDailyWarn())
+                .dailyLimitReached(status.isDailyLimitReached())
+                .onBreak(status.isOnBreak())
+                .breakOver(status.isBreakOver())
+                .breakRemainingSeconds(status.getBreakRemainingSeconds())
+                .timestamp(LocalDateTime.now())
+                .build();
+
+        String destination = buildInterrogationTimeDestination(caseNumber, interrogation.getId());
+
+        for (String userEmail : userEmails) {
+            messagingTemplate.convertAndSendToUser(userEmail, destination, notification);
+        }
+
+        log.info("Time notification [{}] sent to {} users for interrogation {} in case {}",
+                event, userEmails.size(), interrogation.getId(), caseNumber);
+    }
+
+    private String buildInterrogationTimeDestination(String caseNumber, Long interrogationId) {
+        return String.format("/queue/case/%s/interrogation/%d/time", caseNumber, interrogationId);
     }
 
     private String buildInterrogationDestination(String caseNumber, Long interrogationId) {

@@ -13,6 +13,7 @@ import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
+import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.user.Appeal;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.user.Region;
@@ -43,6 +44,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
+import java.util.Optional;
 
 import static org.di.digital.util.requests.UserUtil.*;
 
@@ -200,32 +202,6 @@ public class RegAdminServiceImpl implements RegAdminService {
     }
 
     @Override
-    public String getMyRegionCaseIndictment(Long adminId, Long caseId) {
-        User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
-
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found"));
-
-        validateRegionAccess(admin, caseEntity, regionRepository);
-
-        return caseEntity.getIndictment();
-    }
-
-    @Override
-    public String getMyRegionCaseQualification(Long adminId, Long caseId) {
-        User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
-
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found"));
-
-        validateRegionAccess(admin, caseEntity, regionRepository);
-
-        return caseEntity.getQualification();
-    }
-
-    @Override
     @Transactional(readOnly = true)
     public Page<LogDto> getMyRegionUserLogs(Long adminId, String email, int page, int size) {
         User admin = userRepository.findById(adminId)
@@ -289,7 +265,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
     @Override
     @Transactional
-    public void changeOwner(Long adminId, Long caseId, String newOwnerEmail) {
+    public void changeOwner(Long adminId, Long caseId, Long id) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new IllegalStateException("Admin not found"));
 
@@ -298,8 +274,8 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         validateRegionAccess(admin, caseEntity, regionRepository);
 
-        User newOwner = userRepository.findByEmail(newOwnerEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + newOwnerEmail));
+        User newOwner = userRepository.findById(id)
+                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
 
         if (!newOwner.isActive()) {
             throw new IllegalStateException("Нельзя назначить неактивного пользователя владельцем");
@@ -324,6 +300,32 @@ public class RegAdminServiceImpl implements RegAdminService {
                 caseId, oldOwner != null ? oldOwner.getEmail() : "null", newOwner.getEmail(), adminId);
     }
 
+    @Override
+    public List<UserSuggestionResponse> searchUsers(Long adminId, String query) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+
+        List<Region> adminRegions = getAdminRegions(admin, regionRepository);
+        List<Long> regionIds = adminRegions.stream().map(Region::getId).toList();
+
+        if (regionIds.isEmpty()) {
+            return List.of();
+        }
+
+        return userRepository.searchAllUsersByRegions(regionIds, query)
+                .stream()
+                .map(user -> UserSuggestionResponse.builder()
+                        .id(user.getId())
+                        .fio(String.join(" ",
+                                        Optional.ofNullable(user.getSurname()).orElse(""),
+                                        Optional.ofNullable(user.getName()).orElse(""),
+                                        Optional.ofNullable(user.getFathername()).orElse(""))
+                                .trim()
+                                .replaceAll("\\s+", " "))
+                        .email(user.getEmail())
+                        .build())
+                .toList();
+    }
     @Override
     public String getMyRegionIndictment(Long adminId, Long caseId) {
         User admin = userRepository.findById(adminId)

@@ -1,5 +1,6 @@
 package org.di.digital.repository.cases;
 
+import org.di.digital.dto.response.cases.CasePreviewResponse;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.PlanStatus;
 import org.di.digital.model.user.User;
@@ -11,6 +12,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 import java.util.Set;
@@ -57,41 +59,19 @@ public interface CaseRepository extends JpaRepository<Case, Long>, JpaSpecificat
     @Query("SELECT COUNT(*) FROM Case c WHERE c.owner.region.id = :regionId")
     long countByRegionId(Long regionId);
 
-    @Query("SELECT COUNT(c) FROM Case c WHERE c.qualification IS NOT NULL AND c.qualification <> ''")
-    long countByQualificationIsNotEmpty();
-
-    @Query("SELECT COUNT(c) FROM Case c WHERE c.indictment IS NOT NULL AND c.qualification <> ''")
-    long countByIndictmentIsNotEmpty();
-
-    @Query("SELECT c FROM Case c WHERE c.planStatus IN :statuses " +
-            "AND c.owner.region.id = :regionId")
-    List<Case> findByPlanStatusInAndOwnerRegionId(
-            @Param("statuses") List<PlanStatus> statuses,
-            @Param("regionId") Long regionId
-    );
-
-    @Query("SELECT c FROM Case c WHERE c.planStatus IN :statuses " +
-            "AND c.owner.region.id = :regionId " +
-            "AND c.owner.administration.id = :administrationId")
-    List<Case> findByPlanStatusInAndOwnerRegionIdAndOwnerAdministrationId(
-            @Param("statuses") List<PlanStatus> statuses,
-            @Param("regionId") Long regionId,
-            @Param("administrationId") Long administrationId
-    );
-
-    List<Case> findByPlanStatusIn(List<PlanStatus> statuses);
-
     @Query("SELECT COUNT(c) FROM Case c WHERE c.owner.region.id IN :regionIds")
     long countByRegionIdIn(@Param("regionIds") List<Long> regionIds);
 
+    long countByCreatedDateBetween(LocalDateTime start, LocalDateTime end);
+
     @Query("""
-                SELECT c FROM Case c
-                WHERE c.qualification IS NOT NULL
-                AND EXISTS (
-                    SELECT f FROM CaseFile f
-                    WHERE f.caseEntity = c
-                    AND f.isQualification = true
-                )
-            """)
-    List<Case> findAllWithBothQualifications();
+            select new org.di.digital.dto.response.cases.CasePreviewResponse(
+                                                  c.id, c.title, c.number, c.status, c.language,
+                                                  c.createdDate, c.updatedDate, o.email)
+    from Case c
+    left join c.owner o
+    where o.email = :email
+       or exists (select 1 from c.users u where u.email = :email)
+    """)
+    List<CasePreviewResponse> findPreviewsForUser(@Param("email") String email);
 }

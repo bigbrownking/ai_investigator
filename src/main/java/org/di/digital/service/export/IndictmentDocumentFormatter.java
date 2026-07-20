@@ -5,8 +5,11 @@ import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+
 @Slf4j
 @Service
 public class IndictmentDocumentFormatter extends BaseDocumentFormatter {
@@ -31,60 +34,82 @@ public class IndictmentDocumentFormatter extends BaseDocumentFormatter {
             "СПРАВКА"
     };
 
-    public byte[] generate(String text) throws IOException {
+    public byte[] generate(List<Map<String, Object>> sections) throws IOException {
+        if (sections == null || sections.isEmpty()) {
+            throw new IllegalStateException("Обвинительный акт пуст");
+        }
+
         try (XWPFDocument doc = new XWPFDocument()) {
             setPageMargins(doc);
 
-            String normalized = text.replace("\r\n", "\n").replace("\r", "\n");
-            normalized = splitGluedHeaders(normalized);
-            String[] paragraphs = normalized.split("\\n");
-
-            for (int i = 0; i < paragraphs.length; i++) {
-                String clean = stripStars(paragraphs[i].trim());
-                if (clean.isEmpty()) continue;
-
-                if (clean.equals("Обвинительный акт")) {
-                    formatTitle(doc.createParagraph(), clean);
-                } else if (isCity(clean)) {
-                    i = handleCityDateLine(paragraphs, i, doc, clean);
-                    addEmptyLine(doc);
-                } else if (isSubjectParagraph(clean)) {
-                    formatSubjectParagraph(doc.createParagraph(), clean);
-                    addEmptyLine(doc);
-                } else if (clean.equals("СПРАВКА")) {
-                    addEmptyLine(doc);
-                    formatSectionHeader(doc.createParagraph(), clean);
-                } else if (clean.startsWith("о движении уголовного дела")) {
-                    formatSubtitleBold(doc.createParagraph(), clean);
-                    addEmptyLine(doc);
-                } else if (clean.startsWith("Список лиц, подлежащих вызову")) {
-                    addEmptyLine(doc);
-                    formatSectionHeader(doc.createParagraph(), clean);
-                    addEmptyLine(doc);
-                } else if (LIST_HEADERS.contains(clean)) {
-                    addEmptyLine(doc);
-                    formatListHeader(doc.createParagraph(), clean);
-                    addEmptyLine(doc);
-                } else if (SECTION_HEADERS.contains(clean)) {
-                    addEmptyLine(doc);
-                    formatSectionHeader(doc.createParagraph(), clean);
-                    addEmptyLine(doc);
-                } else if (containsInlineHeader(clean)) {
-                    handleTrailingHeader(doc, clean, INLINE_HEADER);
-                } else if (isInvestigatorSignatureBlock(clean, paragraphs, i)) {
-                    addEmptyLine(doc);
-                    addEmptyLine(doc);
-                    i = handleInvestigatorSignatureBlock(paragraphs, i, doc);
-                } else {
-                    formatRegularParagraph(doc.createParagraph(), clean);
-                }
+            for (Map<String, Object> section : sections) {
+                String text = (String) section.get("text");
+                if (text == null || text.isBlank()) continue;
+                renderSection(doc, text);
             }
+
             return writeDocument(doc);
+        }
+    }
+
+    private void renderSection(XWPFDocument doc, String text) {
+        String normalized = text.replace("\r\n", "\n").replace("\r", "\n");
+        normalized = splitGluedHeaders(normalized);
+        String[] paragraphs = normalized.split("\\n");
+
+        for (int i = 0; i < paragraphs.length; i++) {
+            String clean = stripStars(paragraphs[i].trim());
+            if (clean.isEmpty()) continue;
+
+            if (clean.equals("Обвинительный акт")) {
+                formatTitle(doc.createParagraph(), clean);
+            } else if (isDepartmentLine(clean)) {
+                i = handleHeaderDateLine(paragraphs, i, doc, clean);
+                addEmptyLine(doc);
+            } else if (isCity(clean)) {
+                i = handleCityDateLine(paragraphs, i, doc, clean);
+                addEmptyLine(doc);
+            } else if (isSubjectParagraph(clean)) {
+                formatSubjectParagraph(doc.createParagraph(), clean);
+                addEmptyLine(doc);
+            } else if (clean.equals("СПРАВКА")) {
+                addEmptyLine(doc);
+                formatSectionHeader(doc.createParagraph(), clean);
+            } else if (clean.startsWith("о движении уголовного дела")) {
+                formatSubtitleBold(doc.createParagraph(), clean);
+                addEmptyLine(doc);
+            } else if (clean.startsWith("Список лиц, подлежащих вызову")) {
+                addEmptyLine(doc);
+                formatSectionHeader(doc.createParagraph(), clean);
+                addEmptyLine(doc);
+            } else if (LIST_HEADERS.contains(clean)) {
+                addEmptyLine(doc);
+                formatListHeader(doc.createParagraph(), clean);
+                addEmptyLine(doc);
+            } else if (SECTION_HEADERS.contains(clean)) {
+                addEmptyLine(doc);
+                formatSectionHeader(doc.createParagraph(), clean);
+                addEmptyLine(doc);
+            } else if (containsInlineHeader(clean)) {
+                handleTrailingHeader(doc, clean, INLINE_HEADER);
+            } else if (isInvestigatorSignatureBlock(clean, paragraphs, i)) {
+                addEmptyLine(doc);
+                addEmptyLine(doc);
+                i = handleInvestigatorSignatureBlock(paragraphs, i, doc);
+            } else {
+                formatRegularParagraph(doc.createParagraph(), clean);
+            }
         }
     }
 
     private boolean isSubjectParagraph(String text) {
         return text.startsWith("Гражданин") || text.startsWith("Гражданка");
+    }
+    protected boolean isDepartmentLine(String text) {
+        return text.startsWith("Департамент")
+                || text.startsWith("Агентство")
+                || text.startsWith("Қаржылық Мониторинг Агенттігінің")
+                || text.startsWith("Қаржы мониторингі агенттігі");
     }
 
     private String splitGluedHeaders(String text) {

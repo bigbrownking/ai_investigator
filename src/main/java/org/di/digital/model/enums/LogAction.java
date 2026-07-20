@@ -43,6 +43,7 @@ public enum LogAction {
     MESSAGE_SELECTED("Выбор сообщения в чате"),
     REFORMULATE("Переформулировать вопрос в допросе"),
     CASE_UPDATED("Обновление дела"),
+    CASE_LANGUAGE_UPDATE("Смена языка в деле"),
     AUDIO_UPLOADED("Загрузка айдио"),
     INTERROGATION_COMPLETED("Завершение допроса"),
     USER_UPDATED("Обновление данных пользователя"),
@@ -50,6 +51,9 @@ public enum LogAction {
     NO_INTERROGATION_CLOSED("Не все допросы завершены"),
     NO_QUALIFICATION("Нет квалификации"),
     NO_SUCH_FILE("Нет необходимых файлов"),
+    INTERROGATION_CATEGORY_CONFIRMED("Подтверждение категории допрашиваемого"),
+    INTERROGATION_BREAK_STARTED("Начало перерыва допроса"),
+    INTERROGATION_LIMIT_OVERRIDE("Превышение лимита проведения допроса"),
     NO_ACCESS("Нет доступа");
 
     private final String description;

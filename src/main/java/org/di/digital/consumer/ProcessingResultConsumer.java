@@ -2,6 +2,8 @@ package org.di.digital.consumer;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.consumer.figurant.FigurantSyncService;
+import org.di.digital.consumer.plan.PlanSyncService;
 import org.di.digital.dto.message.ProcessingResultMessage;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
@@ -26,7 +28,6 @@ public class ProcessingResultConsumer {
     public void handleProcessingResult(ProcessingResultMessage message) {
         log.info("Received {} notification for file {} in case {}",
                 message.getStatus(), message.getCaseFileId(), message.getCaseNumber());
-
         try {
             CaseFile caseFile = caseFileRepository.findById(message.getCaseFileId())
                     .orElseThrow(() -> new IllegalStateException("Файл не найден: " + message.getCaseFileId()));
@@ -63,17 +64,15 @@ public class ProcessingResultConsumer {
         CaseFile caseFile = caseFileService.markAsCompleted(
                 message.getCaseFileId(),
                 message.getResult(),
-                message.getProcessingDurationSeconds());
+                message.getProcessingDurationSeconds(),
+                message.getClassification(),
+                message.getAssessment());
 
-        // Send case-level notification
         notificationService.notifyFileProcessingCompleted(
-                message.getCaseNumber(),
-                caseFile,
-                message.getResult()
-        );
+                message.getCaseNumber(), caseFile, message.getResult());
+
         figurantSyncService.sync(message.getCaseNumber());
         planSyncService.sync(message.getCaseNumber());
-
 
         log.info("File {} marked as COMPLETED in case {} ({}s)",
                 message.getCaseFileId(), message.getCaseNumber(), message.getProcessingDurationSeconds());

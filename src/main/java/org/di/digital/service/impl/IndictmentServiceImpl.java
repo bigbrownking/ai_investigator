@@ -7,18 +7,20 @@ import org.di.digital.dto.request.indictment.IndictmentSectionUpdateRequest;
 import org.di.digital.dto.response.indictment.IndictmentSectionDto;
 import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.indictment.CaseIndictment;
 import org.di.digital.model.user.User;
 import org.di.digital.model.enums.CaseActivityType;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.cases.CaseFileRepository;
+import org.di.digital.repository.indictment.CaseIndictmentRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.*;
 import org.di.digital.service.export.DocumentFormatterService;
-import org.di.digital.service.impl.core.SseHeartbeatUtil;
+import org.di.digital.service.impl.core.sse.SseHeartbeatUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -30,7 +32,6 @@ import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
-import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 import java.util.Comparator;
@@ -38,6 +39,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.TimeUnit;
 
 import static org.di.digital.util.requests.RequestBodyBuilder.indictmentBody;
 import static org.di.digital.util.requests.RequestBodyBuilder.indictmentSectionBody;
@@ -49,6 +51,7 @@ import static org.di.digital.util.requests.RequestUrlBuilder.indictmentUrl;
 @RequiredArgsConstructor
 public class IndictmentServiceImpl implements IndictmentService {
 
+    private final CaseIndictmentRepository caseIndictmentRepository;
     private final CaseRepository caseRepository;
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final CaseFileRepository caseFileRepository;
@@ -71,8 +74,8 @@ public class IndictmentServiceImpl implements IndictmentService {
 
     @Override
     public SseEmitter generateIndictment(String caseNumber, String language, String email) {
-        SseEmitter emitter = new SseEmitter(0L);
-        heartbeatUtil.startHeartbeat(emitter);
+        SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(10));
+        heartbeatUtil.startHeartbeat(emitter, "indictment-" + caseNumber);
 
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
 
@@ -105,8 +108,9 @@ public class IndictmentServiceImpl implements IndictmentService {
 
     @Override
     public SseEmitter generateIndictmentSection(String caseNumber, String language, String email, int sectionId) {
-        SseEmitter emitter = new SseEmitter(0L);
-        heartbeatUtil.startHeartbeat(emitter);
+        SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(10));
+        heartbeatUtil.startHeartbeat(emitter, "indictment-section-" + caseNumber + "-" + sectionId);
+
 
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
         executor.execute(() -> {
@@ -311,6 +315,8 @@ public class IndictmentServiceImpl implements IndictmentService {
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
 
+        CaseIndictment indictment = getOrCreateIndictment(entity);
+
         try {
             var node = mapper.readTree(rawJson);
             if (node.has("result") && node.get("result").isArray()) {
@@ -318,19 +324,20 @@ public class IndictmentServiceImpl implements IndictmentService {
                         node.get("result"),
                         mapper.getTypeFactory().constructCollectionType(List.class, Map.class)
                 );
-                entity.setIndictmentSections(sections);
-                entity.setIndictment(null);
+                indictment.setSections(sections);
+                indictment.setContent(null);
             } else {
-                entity.setIndictment(rawJson);
+                indictment.setContent(rawJson);
+                indictment.setSections(null);
             }
         } catch (Exception e) {
             log.warn("Could not parse indictment as JSON, saving as plain text for case {}", caseNumber);
-            entity.setIndictment(rawJson);
+            indictment.setContent(rawJson);
         }
 
-        entity.setIndictmentGeneratedAt(LocalDateTime.now());
-        entity.setIsFinalIndictmentDone(isDone);
-        caseRepository.save(entity);
+        indictment.setGeneratedAt(LocalDateTime.now());
+        indictment.setFinalDone(isDone);
+        caseIndictmentRepository.save(indictment);
     }
 
     private void saveSingleSection(String caseNumber, String rawJson) {
@@ -344,16 +351,18 @@ public class IndictmentServiceImpl implements IndictmentService {
             Map<String, Object> newSection = mapper.convertValue(node.get("result"), Map.class);
             Integer sectionId = (Integer) newSection.get("id");
 
-            List<Map<String, Object>> sections = entity.getIndictmentSections() != null
-                    ? new ArrayList<>(entity.getIndictmentSections())
+            CaseIndictment indictment = getOrCreateIndictment(entity);
+
+            List<Map<String, Object>> sections = indictment.getSections() != null
+                    ? new ArrayList<>(indictment.getSections())
                     : new ArrayList<>();
 
             sections.removeIf(s -> sectionId.equals(s.get("id")));
             sections.add(newSection);
             sections.sort(Comparator.comparingInt(s -> (Integer) s.get("id")));
 
-            entity.setIndictmentSections(sections);
-            caseRepository.save(entity);
+            indictment.setSections(sections);
+            caseIndictmentRepository.save(indictment);
         } catch (Exception e) {
             log.error("Failed to parse indictment section response for case {}", caseNumber, e);
         }
@@ -368,8 +377,21 @@ public class IndictmentServiceImpl implements IndictmentService {
                     caseNumber,
                     userEmail
             );
+
+            Case entity = caseRepository.findByNumber(caseNumber)
+                    .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+
+            List<Map<String, Object>> sections = entity.getIndictmentSections();
+
+            if (sections == null) {
+                if (entity.getIndictment() == null) {
+                    throw new IllegalStateException("Обвинительный акт не найден для дела: " + caseNumber);
+                }
+                sections = List.of(Map.of("id", 0, "category", "legacy", "text", entity.getIndictment()));
+            }
+
             return new ByteArrayResource(
-                    documentFormatterService.generateIndictmentDocument(getIndictment(caseNumber))
+                    documentFormatterService.generateIndictmentDocument(sections)
             );
         } catch (IOException e) {
             throw new IllegalStateException(e);
@@ -417,12 +439,12 @@ public class IndictmentServiceImpl implements IndictmentService {
         if (entity.getIndictmentSections() == null && entity.getIndictment() != null) {
             throw new IllegalStateException("Ваш обвинительный акт старого образца, сгенерируйте заново");
         }
-
         if (entity.getIndictmentSections() == null) {
             throw new IllegalStateException("Обвинительный акт не найден для дела: " + caseNumber);
         }
 
-        List<Map<String, Object>> sections = new ArrayList<>(entity.getIndictmentSections());
+        CaseIndictment indictment = getOrCreateIndictment(entity);
+        List<Map<String, Object>> sections = new ArrayList<>(indictment.getSections());
 
         Map<String, Object> target = sections.stream()
                 .filter(s -> request.getId().equals(s.get("id")))
@@ -432,8 +454,8 @@ public class IndictmentServiceImpl implements IndictmentService {
 
         target.put("text", request.getText());
 
-        entity.setIndictmentSections(sections);
-        caseRepository.save(entity);
+        indictment.setSections(sections);
+        caseIndictmentRepository.save(indictment);
 
         log.info("Indictment section {} updated for case {}", request.getId(), caseNumber);
 
@@ -442,5 +464,11 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .category((String) target.get("category"))
                 .text((String) target.get("text"))
                 .build();
+    }
+    private CaseIndictment getOrCreateIndictment(Case entity) {
+        return caseIndictmentRepository.findByCaseEntityNumber(entity.getNumber())
+                .orElseGet(() -> CaseIndictment.builder()
+                        .caseEntity(entity)
+                        .build());
     }
 }

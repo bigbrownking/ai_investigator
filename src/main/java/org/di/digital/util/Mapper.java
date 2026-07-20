@@ -3,10 +3,7 @@ package org.di.digital.util;
 import lombok.RequiredArgsConstructor;
 import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.AppealDto;
-import org.di.digital.dto.response.cases.CaseFileResponse;
-import org.di.digital.dto.response.cases.CaseListResponse;
-import org.di.digital.dto.response.cases.CaseResponse;
-import org.di.digital.dto.response.cases.CaseUserResponse;
+import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.*;
 import org.di.digital.dto.response.osmotr.OsmotrResultDto;
 import org.di.digital.dto.response.osmotr.OsmotrResultSegmentDto;
@@ -17,8 +14,10 @@ import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.support.SupportTicketPhotoDto;
 import org.di.digital.dto.response.user.*;
+import org.di.digital.model.cases.CaseMemberHistory;
 import org.di.digital.model.enums.TaskStatus;
 import org.di.digital.model.osmotr.OsmotrResult;
+import org.di.digital.model.plan.CasePlan;
 import org.di.digital.model.plan.PlanApprovalHistory;
 import org.di.digital.model.plan.PlanEditHistory;
 import org.di.digital.model.queue.TaskQueue;
@@ -211,6 +210,7 @@ public class Mapper {
                 .title(caseEntity.getTitle())
                 .number(caseEntity.getNumber())
                 .status(caseEntity.isStatus())
+                .language(caseEntity.getLanguage())
                 .totalDocuments(caseEntity.getFiles().size())
                 .audioUsed(caseEntity.audioUsedCount())
                 .hasPlan(caseEntity.hasPlan())
@@ -242,6 +242,19 @@ public class Mapper {
                 .build();
     }
 
+    public CasePreviewResponse mapToCasePreview(Case caseEntity){
+        return CasePreviewResponse.builder()
+                .id(caseEntity.getId())
+                .title(caseEntity.getTitle())
+                .number(caseEntity.getNumber())
+                .status(caseEntity.isStatus())
+                .language(caseEntity.getLanguage())
+                .createdDate(caseEntity.getCreatedDate())
+                .updatedDate(caseEntity.getUpdatedDate())
+                .ownerEmail(caseEntity.getOwner().getEmail())
+                .build();
+
+    }
     private Long extractLeadingNumber(String fileName) {
         if (fileName == null) return null;
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("^(\\d+)").matcher(fileName);
@@ -288,7 +301,7 @@ public class Mapper {
                 .role(roles)
                 .administration(localizationHelper.getLocalizedName(user.getAdministration(), language))
                 .profession(localizationHelper.getLocalizedName(user.getProfession(), language))
-                .rank(user.getRank() != null ? user.getRank().getName() : null)
+                .rank(localizationHelper.getLocalizedName(user.getRank(), language))
                 .region(localizationHelper.getLocalizedName(user.getRegion(), language))
                 .responsibleRegions(responsibleRegions)
                 .email(user.getEmail())
@@ -460,6 +473,13 @@ public class Mapper {
                 .qaList(qaList)
                 .applications(applicationFiles)
                 .isDop(interrogation.getIsDop())
+                .categoryConfirmed(interrogation.getCategoryConfirmed())
+                .limitProfile(interrogation.getLimitProfile() != null
+                        ? interrogation.getLimitProfile().name() : null)
+                .specialGround(interrogation.getSpecialGround() != null
+                        ? interrogation.getSpecialGround().name() : null)
+                .onBreak(interrogation.getOnBreak())
+                .breakStartedAt(interrogation.getBreakStartedAt())
                 .build();
     }
 
@@ -470,6 +490,7 @@ public class Mapper {
                 .contentType(f.getContentType())
                 .fileSize(f.getFileSize())
                 .status(f.getStatus().getLabel())
+                .language(f.getLanguage())
                 .previewUrl(minioService.generatePresignedUrlForPreview(f.getFileUrl()))
                 .downloadUrl(minioService.generatePresignedUrlForDownload(f.getFileUrl(), f.getOriginalFileName()))
                 .uploadedAt(String.valueOf(f.getUploadedAt()))
@@ -479,6 +500,8 @@ public class Mapper {
                 .pages(f.getPages() != null ? f.getPages() : 0)
                 .startPage(f.getStartPage())
                 .endPage(f.getEndPage())
+                .assessmentSummary(f.getAssessmentSummary())
+                .scorePercent(f.getScorePercent())
                 .build();
     }
 
@@ -536,7 +559,7 @@ public class Mapper {
                 .userFathername(appeal.getUser().getFathername())
                 .userEmail(appeal.getUser().getEmail())
                 .profession(appeal.getUser().getProfession() != null ? appeal.getUser().getProfession().getRuName() : null)
-                .rank(appeal.getUser().getRank() != null ? appeal.getUser().getRank().getName() : null)
+                .rank(appeal.getUser().getRank() != null ? appeal.getUser().getRank().getRuName() : null)
                 .administration(appeal.getUser().getAdministration() != null ? appeal.getUser().getAdministration().getRuName() : null)
                 .regionId(appeal.getRegion() != null ? appeal.getRegion().getId() : null)
                 .regionName(localizationHelper.getLocalizedName(appeal.getRegion(), getCurrentUser().getSettings().getLanguage()))
@@ -556,7 +579,7 @@ public class Mapper {
     public RankDto toRankDto(Rank rank) {
         return RankDto.builder()
                 .id(rank.getId())
-                .name(rank.getName())
+                .name(rank.getRuName())
                 .build();
     }
 
@@ -588,6 +611,7 @@ public class Mapper {
     }
 
     public CaseListResponse mapToCaseListResponse(Case c) {
+        String ownerFio = c.getOwner() != null ? c.getOwner().getFio() : null;
         return CaseListResponse.builder()
                 .id(c.getId())
                 .title(c.getTitle())
@@ -606,9 +630,9 @@ public class Mapper {
                 .createdDate(c.getCreatedDate())
                 .lastActivityDate(c.getLastActivityDate())
                 .lastActivityType(c.getLastActivityType())
-                .ownerEmail(c.getOwner() != null ? c.getOwner().getEmail() : null)
-                .participantEmails(c.getUsers().stream()
-                        .map(User::getEmail)
+                .ownerFio(ownerFio)
+                .participantFios(c.getUsers().stream()
+                        .map(User::getFio)
                         .toList())
                 .build();
     }
@@ -679,18 +703,18 @@ public class Mapper {
                 .build();
     }
 
-    public ManagementPendingPlanDto toManagementPendingPlanDto(Case c, Map<String, Object> enrichedPlan) {
+    public ManagementPendingPlanDto toManagementPendingPlanDto(CasePlan p, Map<String, Object> enrichedPlan) {
+        Case c = p.getCaseEntity();
         User author = c.getOwner();
         return ManagementPendingPlanDto.builder()
                 .author(author.getSurname() + " " + author.getName().charAt(0))
                 .caseNumber(c.getNumber())
                 .caseTitle(c.getTitle())
-                .planStatus(c.getPlanStatus())
-                .planSubmittedAt(c.getPlanSubmittedAt())
+                .planStatus(p.getStatus())
+                .planSubmittedAt(p.getSubmittedAt())
                 .plan(enrichedPlan)
                 .build();
     }
-
     public PlanEditHistoryDto toPlanEditHistoryDto(PlanEditHistory h) {
         User editor = h.getEditor();
         return PlanEditHistoryDto.builder()
@@ -727,6 +751,17 @@ public class Mapper {
                                 .fileUrl(s.getFileUrl())
                                 .build())
                         .toList())
+                .build();
+    }
+
+    public CaseMemberHistoryDto toCaseMemberHistoryDto(CaseMemberHistory h) {
+        return CaseMemberHistoryDto.builder()
+                .action(h.getAction() != null ? h.getAction().getDescription() : null)
+                .targetFio(h.getTargetFio())
+                .targetEmail(h.getTargetEmail())
+                .performedByFio(h.getPerformedByFio())
+                .performedByEmail(h.getPerformedByEmail())
+                .timestamp(h.getTimestamp())
                 .build();
     }
 }

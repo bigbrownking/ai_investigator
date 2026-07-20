@@ -1,4 +1,4 @@
-package org.di.digital.consumer;
+package org.di.digital.consumer.transcription;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -27,6 +27,9 @@ public class TranscriptionUpdateService {
     private final CaseInterrogationRepository interrogationRepository;
 
     public void updateStatus(Long qaId, Long recordId, QAStatusEnum status, String transcribedText) {
+        log.info("updateStatus: qaId={}, recordId={}, status={}, hasText={}",
+                qaId, recordId, status, transcribedText != null);
+
         if (qaId == null) {
             log.warn("qaId is null, skipping QA status update");
             return;
@@ -40,10 +43,13 @@ public class TranscriptionUpdateService {
                 qa.getAudioRecords().stream()
                         .filter(r -> r.getId().equals(recordId))
                         .findFirst()
-                        .ifPresent(r -> {
-                            r.setTranscribedText(transcribedText);
-                            r.setStatus(status);
-                        });
+                        .ifPresentOrElse(
+                                r -> { r.setTranscribedText(transcribedText); r.setStatus(status); },
+                                () -> log.warn("recordId {} НЕ найден в QA {} среди {}",
+                                        recordId, qaId,
+                                        qa.getAudioRecords().stream()
+                                                .map(CaseInterrogationAudioRecord::getId).toList())
+                        );
 
                 if (Boolean.TRUE.equals(qa.getManuallyEdited())) {
                     String existing = qa.getAnswer();
