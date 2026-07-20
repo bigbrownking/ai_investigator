@@ -13,11 +13,13 @@ import org.di.digital.dto.response.admin.RegionStatsDto;
 import org.di.digital.dto.response.admin.RegionSummaryDto;
 import org.di.digital.dto.response.cases.CaseListResponse;
 import org.di.digital.dto.response.cases.CasePageResponse;
+import org.di.digital.dto.response.cases.CasePreviewResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
+import org.di.digital.dto.response.user.UserDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.cases.Case;
@@ -326,11 +328,11 @@ public class AdminServiceImpl implements AdminService {
                 .pendingAppeals(appealRepository.countByRegionIdAndStatus(regionId, AppealStatus.PENDING))
                 .build();
 
-        Page<UserProfile> users = userRepository.findByRegionId(regionId, pageable)
-                .map(mapper::mapToUserProfileResponse);
+        Page<UserDto> users = userRepository.findByRegionId(regionId, pageable)
+                .map(mapper::mapToUserDto);
 
-        Page<CaseResponse> cases = caseRepository.findByOwnerRegionId(regionId, pageable)
-                .map(mapper::mapToCaseResponse);
+        Page<CasePreviewResponse> cases = caseRepository.findByOwnerRegionId(regionId, pageable)
+                .map(mapper::mapToCasePreview);
 
         Page<AppealDto> appeals = appealRepository.findByRegionId(regionId, pageable)
                 .map(mapper::toAppealDto);

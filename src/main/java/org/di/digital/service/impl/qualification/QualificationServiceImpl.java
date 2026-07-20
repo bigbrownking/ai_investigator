@@ -61,7 +61,7 @@ public class QualificationServiceImpl implements QualificationService {
 
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
-
+        String language = entity.getLanguage();
         if (!entity.isAtLeastOneFileProcessed()) {
             String message = MessageConstant.NO_FILE_PROCESSED.format(caseNumber);
             log.warn(message);

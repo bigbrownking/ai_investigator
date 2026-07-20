@@ -1,6 +1,7 @@
 package org.di.digital.controller;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Pattern;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.consumer.figurant.FigurantSyncService;
@@ -17,6 +18,7 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.http.*;
 import org.springframework.security.core.Authentication;
+import org.springframework.validation.annotation.Validated;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
 
@@ -24,6 +26,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 
 @Slf4j
+@Validated
 @RestController
 @RequestMapping("/cases")
 @RequiredArgsConstructor
@@ -35,6 +38,7 @@ public class CaseController {
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CaseResponse> createCase(
             @RequestParam("title") String title,
+            @Pattern(regexp = "\\d+", message = "number должен содержать только цифры")
             @RequestParam("number") String number,
             @RequestParam("language") String language,
             @RequestParam(value = "files", required = false) List<MultipartFile> files,

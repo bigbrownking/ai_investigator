@@ -73,7 +73,7 @@ public class IndictmentServiceImpl implements IndictmentService {
     private String pythonPort;
 
     @Override
-    public SseEmitter generateIndictment(String caseNumber, String language, String email) {
+    public SseEmitter generateIndictment(String caseNumber, String email) {
         SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(10));
         heartbeatUtil.startHeartbeat(emitter, "indictment-" + caseNumber);
 
@@ -82,7 +82,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         executor.execute(() -> {
             RequestContextHolder.setRequestAttributes(requestAttributes);
             try {
-                streamIndictment(caseNumber, emitter, language, email, requestAttributes);
+                streamIndictment(caseNumber, emitter, email, requestAttributes);
             } finally {
                 RequestContextHolder.resetRequestAttributes();
             }
@@ -91,14 +91,14 @@ public class IndictmentServiceImpl implements IndictmentService {
     }
 
     @Override
-    public SseEmitter completeIndictment(String caseNumber, String language, String email) {
+    public SseEmitter completeIndictment(String caseNumber, String email) {
         SseEmitter emitter = new SseEmitter(0L);
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
 
         executor.execute(() -> {
             RequestContextHolder.setRequestAttributes(requestAttributes);
             try {
-                completeIndictment(caseNumber, emitter, language, email, requestAttributes);
+                completeIndictment(caseNumber, emitter, email, requestAttributes);
             } finally {
                 RequestContextHolder.resetRequestAttributes();
             }
@@ -107,7 +107,7 @@ public class IndictmentServiceImpl implements IndictmentService {
     }
 
     @Override
-    public SseEmitter generateIndictmentSection(String caseNumber, String language, String email, int sectionId) {
+    public SseEmitter generateIndictmentSection(String caseNumber, String email, int sectionId) {
         SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(10));
         heartbeatUtil.startHeartbeat(emitter, "indictment-section-" + caseNumber + "-" + sectionId);
 
@@ -116,7 +116,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         executor.execute(() -> {
             RequestContextHolder.setRequestAttributes(requestAttributes);
             try {
-                streamIndictmentSection(caseNumber, emitter, language, email, sectionId, requestAttributes);
+                streamIndictmentSection(caseNumber, emitter, email, sectionId, requestAttributes);
             } finally {
                 RequestContextHolder.resetRequestAttributes();
             }
@@ -124,7 +124,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         return emitter;
     }
 
-    private void streamIndictment(String caseNumber, SseEmitter emitter, String language,
+    private void streamIndictment(String caseNumber, SseEmitter emitter,
                                   String email, RequestAttributes requestAttributes) {
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
@@ -132,6 +132,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("User not found: " + email));
 
+        String language = entity.getLanguage();
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(caseNumber);
             log.warn(message);
@@ -179,13 +180,15 @@ public class IndictmentServiceImpl implements IndictmentService {
         }
     }
 
-    private void completeIndictment(String caseNumber, SseEmitter emitter, String language, String email, RequestAttributes requestAttributes) {
+    private void completeIndictment(String caseNumber, SseEmitter emitter,
+                                    String email, RequestAttributes requestAttributes) {
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
 
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("User not found: " + email));
 
+        String language = entity.getLanguage();
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(caseNumber);
             log.warn(message);
@@ -256,11 +259,12 @@ public class IndictmentServiceImpl implements IndictmentService {
                 error -> log.error("Indictment streaming error for case {}", caseNumber, error)
         );
     }
-    private void streamIndictmentSection(String caseNumber, SseEmitter emitter, String language,
+    private void streamIndictmentSection(String caseNumber, SseEmitter emitter,
                                          String email, int sectionId, RequestAttributes requestAttributes) {
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
 
+        String language = entity.getLanguage();
         if (entity.getIndictmentSections() == null && entity.getIndictment() != null) {
             emitter.completeWithError(new IllegalStateException(
                     "Ваш обвинительный акт старого образца, сгенерируйте заново"));

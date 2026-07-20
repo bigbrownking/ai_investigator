@@ -143,7 +143,7 @@ public class InterrogationCreateWriter {
                 .specialGround(ground != null ? ground : InterrogationSpecialGround.NONE)
                 .limitProfile(ground != null && ground.isSpecial()
                         ? InterrogationLimitProfile.SPECIAL : InterrogationLimitProfile.STANDARD)
-                .categoryConfirmed(false) //ground != null
+                .categoryConfirmed(ground != null)
                 .build();
 
         if (article != null) {

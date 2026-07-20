@@ -46,6 +46,7 @@ import java.util.*;
 import java.util.stream.Collectors;
 
 
+import static org.di.digital.util.requests.RequestUrlBuilder.caseInfoUrl;
 import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
@@ -124,7 +125,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
     private String fetchArticleFromCaseInfo(String caseNumber) {
         try {
-            String url = RequestUrlBuilder.caseInfoUrl(pythonHost, treePort, caseNumber);
+            String url = caseInfoUrl(pythonHost, treePort, caseNumber);
             return webClientBuilder.build()
                     .post()
                     .uri(url)

@@ -40,7 +40,7 @@ public class CaseIndictmentController {
 
         log.info("Generating indictment for case: {} by user: {}",
                 caseNumber, authentication.getName());
-        return indictmentService.generateIndictment(caseNumber, language, authentication.getName());
+        return indictmentService.generateIndictment(caseNumber, authentication.getName());
     }
 
     @GetMapping(value = "/stream/complete", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -58,7 +58,7 @@ public class CaseIndictmentController {
 
         log.info("Completing indictment for case: {} by user: {}",
                 caseNumber, authentication.getName());
-        return indictmentService.completeIndictment(caseNumber, language, authentication.getName());
+        return indictmentService.completeIndictment(caseNumber, authentication.getName());
     }
 
     @GetMapping(value = "/stream/section", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
@@ -77,7 +77,7 @@ public class CaseIndictmentController {
         log.info("Generating indictment section {} for case: {} by user: {}",
                 sectionId, caseNumber, authentication.getName());
         return indictmentService.generateIndictmentSection(
-                caseNumber, language, authentication.getName(), sectionId);
+                caseNumber, authentication.getName(), sectionId);
     }
 
     @GetMapping("/download")

@@ -171,11 +171,11 @@ public class CaseInterrogation {
     @Column(name = "current_series_started_at")
     private LocalDateTime currentSeriesStartedAt;
 
-    public static final Duration MANDATORY_BREAK = Duration.ofMinutes(2);
+    public static final Duration MANDATORY_BREAK = Duration.ofHours(2);
 
     public boolean isAudioUsed() {
         return qaList.stream()
-                .anyMatch(qa -> !qa.getAudioRecords().isEmpty() || !qa.getAudioFileUrl().isEmpty());
+                .anyMatch(qa -> !qa.getAudioRecords().isEmpty() || qa.getAudioFileUrl() != null);
     }
     public String getAdequateLanguage(){
        return language.equals("русском") ? "russian" : language.equals("казахском") ? "kazakh" : null;

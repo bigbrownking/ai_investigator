@@ -8,9 +8,9 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 import java.util.List;
 
 public interface IndictmentService {
-    SseEmitter generateIndictment(String caseNumber, String language, String email);
-    SseEmitter completeIndictment(String caseNumber, String language, String email);
-    SseEmitter generateIndictmentSection(String caseNumber, String language, String email, int sectionId);
+    SseEmitter generateIndictment(String caseNumber, String email);
+    SseEmitter completeIndictment(String caseNumber, String email);
+    SseEmitter generateIndictmentSection(String caseNumber, String email, int sectionId);
     Resource downloadIndictmentAsWord(String caseNumber, String email);
     String getIndictment(String caseNumber);
     List<IndictmentSectionDto> getIndictmentSections(String caseNumber);

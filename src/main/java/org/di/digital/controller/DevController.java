@@ -141,4 +141,9 @@ public class DevController {
         return ResponseEntity.ok("Migrated " + count + " plans");
     }
 
+    @GetMapping("/avg-page")
+    public DevService.AvgTimePerPageResponse avgPage(){
+        return devService.getAvgTimePerPage();
+    }
+
 }

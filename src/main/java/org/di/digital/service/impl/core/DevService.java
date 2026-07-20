@@ -23,10 +23,7 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.util.Comparator;
-import java.util.LinkedHashMap;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 import java.util.stream.Collectors;
 
 @Slf4j
@@ -192,6 +189,11 @@ public class DevService {
             Map<String, Integer> tasksPerCase,
             double avgProcessingSeconds
     ) {}
+    public record AvgTimePerPageResponse(
+            long totalProcessingSeconds,
+            long totalPages,
+            double avgSecondsPerPage
+    ) {}
 
 
     @Transactional
@@ -256,5 +258,46 @@ public class DevService {
         for(Case c : allCases){
             figurantSyncService.sync(c.getNumber());
         }
+    }
+
+    public AvgTimePerPageResponse getAvgTimePerPage() {
+        // 1. Завершённые задачи с известной длительностью
+        Query query = new Query(
+                Criteria.where("status").is(TaskStatus.COMPLETED)
+                        .and("processingDurationSeconds").exists(true)
+        );
+        List<TaskQueue> completed = mongoTemplate.find(query, TaskQueue.class);
+
+        if (completed.isEmpty()) {
+            return new AvgTimePerPageResponse(0, 0, 0.0);
+        }
+
+        // 2. Собираем pages пачкой по caseFileId (чтобы не дёргать БД в цикле)
+        List<Long> caseFileIds = completed.stream()
+                .map(TaskQueue::getCaseFileId)
+                .filter(Objects::nonNull)
+                .distinct()
+                .collect(Collectors.toList());
+
+        Map<Long, Integer> pagesByFileId = caseFileRepository.findAllById(caseFileIds).stream()
+                .filter(cf -> cf.getPages() != null && cf.getPages() > 0)
+                .collect(Collectors.toMap(CaseFile::getId, CaseFile::getPages));
+
+        // 3. Суммируем только те задачи, у которых есть и duration, и pages
+        long totalSeconds = 0;
+        long totalPages = 0;
+        for (TaskQueue task : completed) {
+            Long duration = task.getProcessingDurationSeconds();
+            Integer pages = pagesByFileId.get(task.getCaseFileId());
+            if (duration != null && pages != null) {
+                totalSeconds += duration;
+                totalPages += pages;
+            }
+        }
+
+        double avgPerPage = totalPages > 0 ? (double) totalSeconds / totalPages : 0.0;
+        log.info("Avg time per page: {} sec ({} sec / {} pages)", avgPerPage, totalSeconds, totalPages);
+
+        return new AvgTimePerPageResponse(totalSeconds, totalPages, avgPerPage);
     }
 }

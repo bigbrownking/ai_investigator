@@ -272,6 +272,21 @@ public class Mapper {
                 .build();
     }
 
+    public UserDto mapToUserDto(User user){
+        UserSettingsLanguage language = user.getSettings().getLanguage();
+        return UserDto.builder()
+                .id(user.getId())
+                .iin(user.getIin())
+                .name(user.getName())
+                .surname(user.getSurname())
+                .fathername(user.getFathername())
+                .email(user.getEmail())
+                .administration(localizationHelper.getLocalizedName(user.getAdministration(), language))
+                .profession(localizationHelper.getLocalizedName(user.getProfession(), language))
+                .rank(localizationHelper.getLocalizedName(user.getRank(), language))
+                .region(localizationHelper.getLocalizedName(user.getRegion(), language))
+                .build();
+    }
     public UserProfile mapToUserProfileResponse(User user) {
         Set<String> roles = user.getRoles().stream().map(Role::getName).collect(Collectors.toSet());
 
