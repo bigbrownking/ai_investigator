@@ -193,12 +193,23 @@ public class AdminServiceImpl implements AdminService {
                 })
                 .sum();
 
+        long activeCases = allFiltered.stream()
+                .filter(Case::isStatus)
+                .count();
+
+        long inactiveCases = allFiltered.stream()
+                .filter(c -> !c.isStatus())
+                .count();
+
+
         return CasePageResponse.builder()
                 .cases(casePage)
                 .totalDocuments(totalDocuments)
                 .totalPages(totalPages)
                 .totalInterrogations(totalInterrogations)
                 .audioInterrogations(audioInterrogations)
+                .activeCases(activeCases)
+                .inactiveCases(inactiveCases)
                 .build();
     }
 
