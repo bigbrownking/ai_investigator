@@ -9,10 +9,7 @@ import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
-import org.di.digital.dto.response.admin.AdminStatsDto;
-import org.di.digital.dto.response.admin.AppealDto;
-import org.di.digital.dto.response.admin.RegionStatsDto;
-import org.di.digital.dto.response.admin.RegionSummaryDto;
+import org.di.digital.dto.response.admin.*;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
@@ -53,7 +50,7 @@ public class AdminController {
         return ResponseEntity.ok(authService.signupRegAdmin(signUpRequest));
     }
     @GetMapping("/users")
-    public ResponseEntity<Page<UserProfile>> getAllUsers(
+    public ResponseEntity<PagedUserResponse> getAllUsers(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @ModelAttribute UserSearchRequest userSearchRequest) {
@@ -102,7 +99,7 @@ public class AdminController {
     }
 
     @GetMapping("/appeals")
-    public ResponseEntity<Page<AppealDto>> getAllAppeals(
+    public ResponseEntity<PagedAppealResponse> getAllAppeals(
             @RequestParam(defaultValue = "0") int page,
             @RequestParam(defaultValue = "20") int size,
             @ModelAttribute AppealSearchRequest appealSearchRequest) {

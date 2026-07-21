@@ -5,10 +5,7 @@ import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
-import org.di.digital.dto.response.admin.AdminStatsDto;
-import org.di.digital.dto.response.admin.AppealDto;
-import org.di.digital.dto.response.admin.RegionStatsDto;
-import org.di.digital.dto.response.admin.RegionSummaryDto;
+import org.di.digital.dto.response.admin.*;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
@@ -23,14 +20,13 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface AdminService {
-    Page<UserProfile> getAllUsers(int page, int size, UserSearchRequest userSearchRequest);
-    CasePageResponse getAllCases(int page, int size, CaseSearchRequest caseSearchRequest);
+    PagedUserResponse getAllUsers(int page, int size, UserSearchRequest userSearchRequest);    CasePageResponse getAllCases(int page, int size, CaseSearchRequest caseSearchRequest);
     CasePageResponse getUserCases(Long userId, int page, int size, CaseSearchRequest caseSearchRequest);
     AdminStatsDto getStats(LocalDate from, LocalDate to);
     List<UserSuggestionResponse> searchUsers(String query);
     void activateUser(Long userId);
     void deactivateUser(Long userId);
-    Page<AppealDto> getAllAppeals(int page, int size, AppealSearchRequest appealSearchRequest);
+    PagedAppealResponse getAllAppeals(int page, int size, AppealSearchRequest appealSearchRequest);
     List<RegionStatsDto> getRegionMapStats();
     RegionSummaryDto getRegionSummary(Long regionId, int page, int size);
     CaseResponse getCaseDetail(Long caseId);
@@ -48,7 +44,7 @@ public interface AdminService {
     void removeRegAdminRole(String email, List<String> regions);
     void changeOwner(Long caseId, Long id);
     UserProfile updateUserProfile(Long id, UpdateProfileRequest request);
-    //жалал не админ
+    //жалал что админ пидр
     String getIndictment(Long caseId);
     String getQualification(Long caseId);
     CasePlanResponse getPlan(Long caseId);

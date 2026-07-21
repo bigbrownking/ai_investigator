@@ -10,6 +10,8 @@ import org.springframework.data.domain.Page;
 @AllArgsConstructor
 public class CasePageResponse {
     private Page<CaseListResponse> cases;
+    private long activeCases;
+    private long inactiveCases;
     private long totalDocuments;
     private long totalPages;
     private long totalInterrogations;
