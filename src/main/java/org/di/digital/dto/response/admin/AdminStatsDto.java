@@ -9,12 +9,7 @@ import lombok.*;
 @NoArgsConstructor
 public class AdminStatsDto {
     private long totalUsers;
-    private long activeUsers;
-    private long inactiveUsers;
     private long totalCases;
-    private long pendingAppeals;
-    private long approvedAppeals;
-    private long rejectedAppeals;
     private long totalInterrogations;
     private long totalPages;
     private long totalAudios;

@@ -7,10 +7,7 @@ import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
-import org.di.digital.dto.response.admin.AdminStatsDto;
-import org.di.digital.dto.response.admin.AppealDto;
-import org.di.digital.dto.response.admin.RegionStatsDto;
-import org.di.digital.dto.response.admin.RegionSummaryDto;
+import org.di.digital.dto.response.admin.*;
 import org.di.digital.dto.response.cases.CaseListResponse;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
@@ -57,6 +54,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.time.LocalTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -92,11 +90,27 @@ public class AdminServiceImpl implements AdminService {
     private final InterrogationExportService interrogationExportService;
 
     @Override
-    public Page<UserProfile> getAllUsers(int page, int size, UserSearchRequest req) {
+    public PagedUserResponse getAllUsers(int page, int size, UserSearchRequest req) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate"));
         Specification<User> spec = UserSpecifications.build(req);
-        return userRepository.findAll(spec, pageable)
+        Page<UserProfile> result = userRepository.findAll(spec, pageable)
                 .map(mapper::mapToUserProfileResponse);
+
+        LocalDateTime start = req.getFrom().atStartOfDay();
+        LocalDateTime end = req.getTo().atTime(LocalTime.MAX);
+
+        return PagedUserResponse.builder()
+                .content(result.getContent())
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .number(result.getNumber())
+                .size(result.getSize())
+                .first(result.isFirst())
+                .last(result.isLast())
+                .empty(result.isEmpty())
+                .activeUsers(userRepository.countByActiveTrueAndCreatedDateBetween(start, end))
+                .inactiveUsers(userRepository.countByActiveFalseAndCreatedDateBetween(start, end))
+                .build();
     }
 
     @Override
@@ -208,11 +222,28 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public Page<AppealDto> getAllAppeals(int page, int size, AppealSearchRequest req) {
+    public PagedAppealResponse getAllAppeals(int page, int size, AppealSearchRequest req) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<Appeal> spec = AppealSpecifications.build(req);
-        return appealRepository.findAll(spec, pageable)
+        Page<AppealDto> result = appealRepository.findAll(spec, pageable)
                 .map(mapper::toAppealDto);
+
+        LocalDateTime start = req.getFrom().atStartOfDay();
+        LocalDateTime end = req.getTo().atTime(LocalTime.MAX);
+
+        return PagedAppealResponse.builder()
+                .content(result.getContent())
+                .totalElements(result.getTotalElements())
+                .totalPages(result.getTotalPages())
+                .number(result.getNumber())
+                .size(result.getSize())
+                .first(result.isFirst())
+                .last(result.isLast())
+                .empty(result.isEmpty())
+                .pendingAppeals(appealRepository.countByStatusAndCreatedAtBetween(AppealStatus.PENDING, start, end))
+                .approvedAppeals(appealRepository.countByStatusAndCreatedAtBetween(AppealStatus.APPROVED, start, end))
+                .rejectedAppeals(appealRepository.countByStatusAndCreatedAtBetween(AppealStatus.REJECTED, start, end))
+                .build();
     }
 
     @Override
@@ -223,12 +254,7 @@ public class AdminServiceImpl implements AdminService {
         LocalDate fromDate = from != null ? from : LocalDate.of(1970, 1, 1);
         LocalDate toDate = to != null ? to : LocalDate.now();
         long totalUsers = userRepository.countByCreatedDateBetween(start, end);
-        long activeUsers = userRepository.countByActiveTrueAndCreatedDateBetween(start, end);
-        long inactiveUsers = userRepository.countByActiveFalseAndCreatedDateBetween(start, end);
         long totalCases = caseRepository.countByCreatedDateBetween(start, end);
-        long pendingAppeals = appealRepository.countByStatusAndCreatedAtBetween(AppealStatus.PENDING, start, end);
-        long approvedAppeals = appealRepository.countByStatusAndCreatedAtBetween(AppealStatus.APPROVED, start, end);
-        long rejectedAppeals = appealRepository.countByStatusAndCreatedAtBetween(AppealStatus.REJECTED, start, end);
         long totalInterrogations = caseInterrogationRepository.countByDateBetween(fromDate, toDate);
 
         long totalQualifications = caseQualificationRepository.countNonEmptyBetween(start, end);
@@ -242,12 +268,12 @@ public class AdminServiceImpl implements AdminService {
 
         return AdminStatsDto.builder()
                 .totalUsers(totalUsers)
-                .activeUsers(activeUsers)
-                .inactiveUsers(inactiveUsers)
+                //.activeUsers(activeUsers)
+                //.inactiveUsers(inactiveUsers)
                 .totalCases(totalCases)
-                .pendingAppeals(pendingAppeals)
-                .approvedAppeals(approvedAppeals)
-                .rejectedAppeals(rejectedAppeals)
+                //.pendingAppeals(pendingAppeals)
+                //.approvedAppeals(approvedAppeals)
+                //.rejectedAppeals(rejectedAppeals)
                 .totalInterrogations(totalInterrogations)
                 .totalAudios(totalAudios)
                 .totalPages(totalPages)
