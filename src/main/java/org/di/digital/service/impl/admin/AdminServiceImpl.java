@@ -98,8 +98,12 @@ public class AdminServiceImpl implements AdminService {
         Page<UserProfile> result = userRepository.findAll(spec, pageable)
                 .map(mapper::mapToUserProfileResponse);
 
-        LocalDateTime start = req.getFrom().atStartOfDay();
-        LocalDateTime end = req.getTo().atTime(LocalTime.MAX);
+        LocalDateTime start = req.getFrom() != null
+                ? req.getFrom().atStartOfDay()
+                : LocalDate.of(1970, 1, 1).atStartOfDay();
+        LocalDateTime end = req.getTo() != null
+                ? req.getTo().atTime(LocalTime.MAX)
+                : LocalDate.now().atTime(LocalTime.MAX);
 
         return PagedUserResponse.builder()
                 .content(result.getContent())
@@ -241,8 +245,12 @@ public class AdminServiceImpl implements AdminService {
         Page<AppealDto> result = appealRepository.findAll(spec, pageable)
                 .map(mapper::toAppealDto);
 
-        LocalDateTime start = req.getFrom().atStartOfDay();
-        LocalDateTime end = req.getTo().atTime(LocalTime.MAX);
+        LocalDateTime start = req.getFrom() != null
+                ? req.getFrom().atStartOfDay()
+                : LocalDate.of(1970, 1, 1).atStartOfDay();
+        LocalDateTime end = req.getTo() != null
+                ? req.getTo().atTime(LocalTime.MAX)
+                : LocalDate.now().atTime(LocalTime.MAX);
 
         return PagedAppealResponse.builder()
                 .content(result.getContent())
