@@ -1,4 +1,4 @@
-package org.di.digital.service;
+package org.di.digital.service.cases;
 
 import org.di.digital.dto.message.AssessmentResult;
 import org.di.digital.dto.message.ClassificationResult;

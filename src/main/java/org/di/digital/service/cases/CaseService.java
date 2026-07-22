@@ -1,4 +1,4 @@
-package org.di.digital.service;
+package org.di.digital.service.cases;
 
 import org.di.digital.dto.request.cases.ChangeCaseLanguageRequest;
 import org.di.digital.dto.request.interrogation.AddFigurantToCaseRequest;

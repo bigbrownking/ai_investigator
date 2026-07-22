@@ -2,9 +2,11 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.indictment.IndictmentRephraseApplyRequest;
+import org.di.digital.dto.request.indictment.IndictmentRephraseRequest;
 import org.di.digital.dto.request.indictment.IndictmentSectionUpdateRequest;
 import org.di.digital.dto.response.indictment.IndictmentSectionDto;
-import org.di.digital.service.IndictmentService;
+import org.di.digital.service.indictment.IndictmentService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -28,7 +30,6 @@ public class CaseIndictmentController {
 
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamIndictment(@RequestParam String caseNumber,
-                                       @RequestParam(required = false, defaultValue = "russian") String language,
                                        Authentication authentication) {
 
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -46,7 +47,6 @@ public class CaseIndictmentController {
     @GetMapping(value = "/stream/complete", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter complete(
             @RequestParam String caseNumber,
-            @RequestParam(required = false, defaultValue = "russian") String language,
             Authentication authentication) {
 
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -64,7 +64,6 @@ public class CaseIndictmentController {
     @GetMapping(value = "/stream/section", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamSection(@RequestParam String caseNumber,
                                     @RequestParam int sectionId,
-                                    @RequestParam(required = false, defaultValue = "russian") String language,
                                     Authentication authentication) {
 
         if (authentication == null || !authentication.isAuthenticated()) {
@@ -78,6 +77,33 @@ public class CaseIndictmentController {
                 sectionId, caseNumber, authentication.getName());
         return indictmentService.generateIndictmentSection(
                 caseNumber, authentication.getName(), sectionId);
+    }
+
+    @PostMapping(value = "/stream/rephrase", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamRephrase(@RequestParam String caseNumber,
+                                     @RequestBody IndictmentRephraseRequest request,
+                                     Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            SseEmitter emitter = new SseEmitter();
+            emitter.completeWithError(new IllegalStateException("Authentication required"));
+            return emitter;
+        }
+        return indictmentService.generateIndictmentPrompt(
+                caseNumber, authentication.getName(),
+                request.getStartSectionId(), request.getStartOffset(),
+                request.getEndSectionId(), request.getEndOffset(), request.getPrompt());
+    }
+
+    @PostMapping("/rephrase/apply")
+    public ResponseEntity<List<IndictmentSectionDto>> applyRephrase(
+            @RequestParam String caseNumber,
+            @RequestBody IndictmentRephraseApplyRequest request,
+            Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+        log.info("Applying rephrase for case: {} by user: {}", caseNumber, authentication.getName());
+        return ResponseEntity.ok(indictmentService.applyRephrase(caseNumber, request));
     }
 
     @GetMapping("/download")

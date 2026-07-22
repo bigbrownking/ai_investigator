@@ -4,15 +4,11 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.interrogation.*;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.cases.CaseFile;
-import org.di.digital.model.enums.MessageConstant;
-import org.di.digital.dto.message.AudioProcessingMessage;
 import org.di.digital.dto.request.interrogation.AddInterrogationRequest;
 import org.di.digital.dto.request.interrogation.EditAudioTranscribedTextRequest;
 import org.di.digital.dto.request.interrogation.UpdateProtocolFieldRequest;
 import org.di.digital.model.enums.*;
 import org.di.digital.model.fl.FLAddress;
-import org.di.digital.model.fl.FLDocument;
 import org.di.digital.model.fl.FLRecord;
 import org.di.digital.model.interrogation.*;
 import org.di.digital.model.user.User;
@@ -23,13 +19,9 @@ import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.interrogation.CaseInterrogationService;
 import org.di.digital.service.FLService;
 import org.di.digital.service.LogService;
-import org.di.digital.service.MinioService;
-import org.di.digital.service.impl.queue.AudioQueueService;
-import org.di.digital.service.impl.queue.TaskQueueService;
-import org.di.digital.util.LocalizationHelper;
+import org.di.digital.service.core.MinioService;
 import org.di.digital.util.Mapper;
 import org.di.digital.util.PageCounter;
-import org.di.digital.util.requests.RequestUrlBuilder;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -141,7 +133,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
     @Override
     @Transactional
-    public QAResponse createQA(Long caseId, Long interrogationId, String email) {
+    public QAResponse createQA(Long caseId, Long interrogationId, String question, String email) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
 
@@ -158,7 +150,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         int orderIndex = interrogation.getQaList().size();
 
         CaseInterrogationQA qa = CaseInterrogationQA.builder()
-                .question(null)
+                .question(question)
                 .answer(null)
                 .status(QAStatusEnum.PENDING)
                 .orderIndex(orderIndex)

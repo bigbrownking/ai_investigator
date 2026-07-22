@@ -8,7 +8,7 @@ import org.di.digital.dto.message.ProcessingResultMessage;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.repository.cases.CaseFileRepository;
-import org.di.digital.service.CaseFileService;
+import org.di.digital.service.cases.CaseFileService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;

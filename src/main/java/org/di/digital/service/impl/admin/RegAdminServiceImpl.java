@@ -29,15 +29,13 @@ import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
-import org.di.digital.service.RegAdminService;
+import org.di.digital.service.admin.RegAdminService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
-import org.di.digital.util.LocalizationHelper;
 import org.di.digital.util.Mapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 

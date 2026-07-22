@@ -5,7 +5,7 @@ import java.util.List;
 import java.util.Map;
 
 public interface DocumentFormatterService {
-    byte[] generateQualificationDocument(String text) throws IOException;
+    byte[] generateQualificationDocument(List<Map<String, Object>> sections) throws IOException;
     byte[] generateIndictmentDocument(List<Map<String, Object>> sections) throws IOException;
     byte[] generatePlanDocument(Map<String, Object> plan, String approvedBy) throws IOException;
 }

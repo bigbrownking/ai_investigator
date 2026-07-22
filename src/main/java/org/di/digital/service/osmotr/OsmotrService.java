@@ -1,4 +1,4 @@
-package org.di.digital.service;
+package org.di.digital.service.osmotr;
 
 import org.di.digital.dto.request.osmotr.DistributionRequest;
 import org.di.digital.dto.response.osmotr.OsmotrResultDto;

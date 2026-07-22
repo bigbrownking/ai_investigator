@@ -16,8 +16,8 @@ public class DocumentFormatterServiceImpl implements DocumentFormatterService {
     private final PlanDocumentFormatter planDocumentFormatter;
 
     @Override
-    public byte[] generateQualificationDocument(String text) throws IOException {
-        return qualificationFormatter.generate(text);
+    public byte[] generateQualificationDocument(List<Map<String, Object>> sections) throws IOException {
+        return qualificationFormatter.generate(sections);
     }
 
     @Override

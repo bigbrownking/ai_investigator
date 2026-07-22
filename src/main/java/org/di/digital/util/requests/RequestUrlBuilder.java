@@ -18,9 +18,10 @@ public class RequestUrlBuilder {
     public static String deleteAllDocumentsUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, String.format("/documents/delete/%s", caseNumber));
     }
-    public static String qualificationUrl(String host, String port, String caseNumber) {
+    public static String qualificationUrl(String host, String port, long userId, String caseNumber, String language) {
         return buildUrl(host, port,
-                String.format("/workspaces/%s/generate-qualification?mode=hybrid", caseNumber));
+                String.format("/workspaces/%s/generate-qualification?user_id=%d&mode=hybrid&language=%s",
+                        caseNumber, userId, language));
     }
     public static String caseInfoUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, String.format("/workspaces/%s/case-info", caseNumber));
@@ -35,6 +36,9 @@ public class RequestUrlBuilder {
     }
     public static String indictmentSectionUrl(String host, String port) {
         return buildUrl(host, port, "/generate_akt_section");
+    }
+    public static String indictmentPromptUrl(String host, String port) {
+        return buildUrl(host, port, "/change_context");
     }
 
     public static String interrogationQuestionsUrl(String host, String port, String caseNumber) {

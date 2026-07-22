@@ -1,4 +1,4 @@
-package org.di.digital.service;
+package org.di.digital.service.admin;
 
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;

@@ -48,6 +48,15 @@ public class RequestBodyBuilder {
         return body;
     }
 
+    public static Map<String, Object> indictmentPromptBody(String caseNumber, String context, String prompt, String language) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("user_wants", prompt);
+        body.put("context", context);
+        body.put("language", language);
+        body.put("working_dir", caseNumber);
+        return body;
+    }
+
 
     public static Map<String, Object> interrogationBody(String fio, String role,
                                                         String language, List<CaseInterrogationQA> qaList) {

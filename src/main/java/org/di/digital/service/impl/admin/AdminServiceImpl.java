@@ -41,7 +41,7 @@ import org.di.digital.repository.search.UserSpecifications;
 import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.repository.user.*;
-import org.di.digital.service.AdminService;
+import org.di.digital.service.admin.AdminService;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.LocalizationHelper;

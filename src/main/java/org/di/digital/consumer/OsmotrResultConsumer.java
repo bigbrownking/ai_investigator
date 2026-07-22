@@ -9,11 +9,8 @@ import org.di.digital.model.enums.OsmotrProcessingStatus;
 import org.di.digital.model.osmotr.OsmotrResult;
 import org.di.digital.model.osmotr.OsmotrResultSegment;
 import org.di.digital.repository.osmotr.OsmotrResultRepository;
-import org.di.digital.service.MinioService;
-import org.di.digital.service.OsmotrService;
+import org.di.digital.service.core.MinioService;
 import org.di.digital.service.impl.core.NotificationService;
-import org.di.digital.service.impl.OsmotrServiceImpl;
-import org.di.digital.util.Mapper;
 import org.di.digital.util.PdfSplitter;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
@@ -65,6 +62,13 @@ public class OsmotrResultConsumer {
         }
 
         OsmotrReportResponse report = message.getResult();
+        log.info("Report for {}: status={}, hasBase64={}, base64Len={}, reportTxtLen={}, dataItems={}",
+                message.getFileId(),
+                message.getStatus(),
+                report != null && report.getReportFileBase64() != null && !report.getReportFileBase64().isBlank(),
+                report != null && report.getReportFileBase64() != null ? report.getReportFileBase64().length() : 0,
+                report != null && report.getReportTxt() != null ? report.getReportTxt().length() : 0,
+                report != null && report.getData() != null ? report.getData().size() : 0);
         result.setReportTxt(report.getReportTxt());
 
         if (report.getReportFileBase64() != null && !report.getReportFileBase64().isBlank()) {

@@ -11,7 +11,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.interrogation.CaseInterrogationApplicationFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
-import org.di.digital.service.MinioService;
+import org.di.digital.service.core.MinioService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;

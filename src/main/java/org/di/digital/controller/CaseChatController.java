@@ -5,7 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
-import org.di.digital.service.ChatService;
+import org.di.digital.service.cases.ChatService;
 import org.di.digital.service.impl.core.sse.SseHeartbeatUtil;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;

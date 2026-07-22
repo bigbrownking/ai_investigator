@@ -1,4 +1,4 @@
-package org.di.digital.service;
+package org.di.digital.service.core;
 
 import org.springframework.web.reactive.function.client.WebClient;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;

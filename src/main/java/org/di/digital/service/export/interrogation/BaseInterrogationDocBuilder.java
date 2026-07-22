@@ -271,40 +271,36 @@ public abstract class BaseInterrogationDocBuilder {
                               String questionLabel, String answerLabel, String noAnswerLabel) {
         if (qaList == null || qaList.isEmpty()) return;
 
-        for (int idx = 0; idx < qaList.size(); idx++) {
-            CaseInterrogationQAResponse qa = qaList.get(idx);
-
-            if (idx == 0) {
-                String answer = (qa.getAnswer() != null && !qa.getAnswer().isBlank())
-                        ? qa.getAnswer() : noAnswerLabel;
-                addJustifiedParagraph(doc, answer);
-                addEmptyLine(doc);
-                addInlineSignatureLine(doc, roleLabel, fio);
-                addEmptyLine(doc);
-            } else {
+        for (CaseInterrogationQAResponse qa : qaList) {
+            // Вопрос печатаем, только если он есть (первый элемент может быть «свободным рассказом»)
+            if (qa.getQuestion() != null && !qa.getQuestion().isBlank()) {
                 XWPFParagraph qPara = doc.createParagraph();
                 qPara.setAlignment(ParagraphAlignment.BOTH);
                 qPara.setIndentationFirstLine(720);
+                setLineSpacing(qPara);
                 XWPFRun qRun = qPara.createRun();
                 qRun.setBold(true);
                 qRun.setText(questionLabel + ": " + safe(qa.getQuestion()));
                 qRun.setFontFamily(FONT);
                 qRun.setFontSize(FONT_SIZE);
-
-                XWPFParagraph aPara = doc.createParagraph();
-                aPara.setAlignment(ParagraphAlignment.BOTH);
-                aPara.setIndentationFirstLine(720);
-                XWPFRun aRun = aPara.createRun();
-                String answer = (qa.getAnswer() != null && !qa.getAnswer().isBlank())
-                        ? qa.getAnswer() : noAnswerLabel;
-                aRun.setText(answerLabel + ": " + answer);
-                aRun.setFontFamily(FONT);
-                aRun.setFontSize(FONT_SIZE);
-
-                addEmptyLine(doc);
-                addInlineSignatureLine(doc, roleLabel, fio);
-                addEmptyLine(doc);
             }
+
+            XWPFParagraph aPara = doc.createParagraph();
+            aPara.setAlignment(ParagraphAlignment.BOTH);
+            aPara.setIndentationFirstLine(720);
+            setLineSpacing(aPara);
+            XWPFRun aRun = aPara.createRun();
+            String answer = (qa.getAnswer() != null && !qa.getAnswer().isBlank())
+                    ? qa.getAnswer() : noAnswerLabel;
+            // Для «свободного рассказа» без вопроса можно печатать ответ без метки answerLabel
+            boolean hasQuestion = qa.getQuestion() != null && !qa.getQuestion().isBlank();
+            aRun.setText(hasQuestion ? (answerLabel + ": " + answer) : answer);
+            aRun.setFontFamily(FONT);
+            aRun.setFontSize(FONT_SIZE);
+
+            addEmptyLine(doc);
+            addInlineSignatureLine(doc, roleLabel, fio);
+            addEmptyLine(doc);
         }
     }
 

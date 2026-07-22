@@ -11,7 +11,7 @@ import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
-import org.di.digital.service.CaseFileService;
+import org.di.digital.service.cases.CaseFileService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.springframework.stereotype.Service;

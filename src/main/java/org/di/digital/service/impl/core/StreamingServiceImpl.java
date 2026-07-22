@@ -2,7 +2,7 @@ package org.di.digital.service.impl.core;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.service.StreamingService;
+import org.di.digital.service.core.StreamingService;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
 import org.springframework.web.reactive.function.client.WebClient;

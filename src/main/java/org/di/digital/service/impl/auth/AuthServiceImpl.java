@@ -299,7 +299,7 @@ public class AuthServiceImpl implements AuthService {
                 .refreshToken(refreshToken)
                 .type("Bearer")
                 .username(user.getEmail())
-                .faceEnabled(faceEnabled)
+                .faceEnabled(false)
                 .build();
     }
 

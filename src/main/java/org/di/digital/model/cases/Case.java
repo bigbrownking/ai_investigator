@@ -199,6 +199,9 @@ public class Case {
     public List<Map<String, Object>> getIndictmentSections() {
         return caseIndictment != null ? caseIndictment.getSections() : null;
     }
+    public List<Map<String, Object>> getQualificationSections() {
+        return caseQualification != null ? caseQualification.getSections() : null;
+    }
 
     public LocalDateTime getIndictmentGeneratedAt() {
         return caseIndictment != null ? caseIndictment.getGeneratedAt() : null;

@@ -15,7 +15,7 @@ import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.security.UserDetailsImpl;
-import org.di.digital.service.RegAdminService;
+import org.di.digital.service.admin.RegAdminService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;

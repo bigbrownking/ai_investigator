@@ -19,7 +19,7 @@ import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.security.UserDetailsImpl;
-import org.di.digital.service.AdminService;
+import org.di.digital.service.admin.AdminService;
 import org.di.digital.service.auth.AuthService;
 import org.di.digital.service.impl.core.DevService;
 import org.springframework.data.domain.Page;

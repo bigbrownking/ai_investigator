@@ -12,6 +12,7 @@ import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.user.RegionRepository;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.LogService;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,6 +29,10 @@ import java.util.StringTokenizer;
 public class UserUtil {
     private static final String ROLE_REG_ADMIN = "REG_ADMIN";
     private static LogService logService;
+    @Autowired
+    public void setLogService(LogService logService) {
+        UserUtil.logService = logService;
+    }
     public static String getClientIpAddress(HttpServletRequest request) {
         String forwardHeader= request.getHeader("X-Forwarded-For");
         if (forwardHeader == null) {

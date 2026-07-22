@@ -15,7 +15,7 @@ import org.di.digital.repository.user.UserRepository;
 import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.service.FeedbackService;
-import org.di.digital.service.MinioService;
+import org.di.digital.service.core.MinioService;
 import org.di.digital.util.Mapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;

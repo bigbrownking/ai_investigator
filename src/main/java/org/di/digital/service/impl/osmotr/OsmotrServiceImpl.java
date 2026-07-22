@@ -1,4 +1,4 @@
-package org.di.digital.service.impl;
+package org.di.digital.service.impl.osmotr;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
@@ -18,8 +18,8 @@ import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.osmotr.OsmotrResultRepository;
 import org.di.digital.repository.user.UserRepository;
-import org.di.digital.service.MinioService;
-import org.di.digital.service.OsmotrService;
+import org.di.digital.service.core.MinioService;
+import org.di.digital.service.osmotr.OsmotrService;
 import org.di.digital.service.impl.queue.OsmotrQueueService;
 import org.di.digital.util.Mapper;
 import org.di.digital.util.PdfSplitter;
@@ -37,7 +37,6 @@ import java.util.*;
 import static java.util.Base64.getDecoder;
 import static java.util.Base64.getEncoder;
 import static org.di.digital.util.requests.RequestUrlBuilder.osmotrDecisionUrl;
-import static org.di.digital.util.requests.RequestUrlBuilder.osmotrDownloadUrl;
 import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
@@ -318,31 +317,13 @@ public class OsmotrServiceImpl implements OsmotrService {
                 log.info("Generated file found in MinIO: {}", objectPath);
                 return is.readAllBytes();
             } catch (Exception e) {
-                log.warn("Failed to read cached file {}, regenerating: {}", objectPath, e.getMessage());
+                log.error("Failed to read generated file {}: {}", objectPath, e.getMessage(), e);
+                throw new IllegalStateException("Ошибка чтения файла: " + fileName, e);
             }
         }
 
-        log.info("Generated file not found, requesting from service: {}", objectPath);
-
-        byte[] file = webClientBuilder.build()
-                .get()
-                .uri(osmotrDownloadUrl(osmotrHost, osmotrPort, result.getSessionId(), fileType))
-                .retrieve()
-                .bodyToMono(byte[].class)
-                .block();
-
-        if (file == null || file.length == 0) {
-            throw new IllegalStateException("Пустой ответ от сервиса для fileType=" + fileType);
-        }
-
-        try {
-            minioService.uploadOsmotrGeneratedFile(file, caseNumber, fileName, fileType);
-            log.info("Generated file cached in MinIO: {}", objectPath);
-        } catch (Exception e) {
-            log.error("Failed to cache generated file {}: {}", objectPath, e.getMessage(), e);
-        }
-
-        return file;
+        throw new IllegalStateException(
+                "Файл '" + fileType + "' не был сгенерирован для этого осмотра: " + objectPath);
     }
 
     @Transactional(readOnly = true)

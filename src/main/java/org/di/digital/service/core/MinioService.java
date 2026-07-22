@@ -1,4 +1,4 @@
-package org.di.digital.service;
+package org.di.digital.service.core;
 
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.interrogation.CaseInterrogationApplicationFile;

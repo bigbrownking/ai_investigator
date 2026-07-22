@@ -15,7 +15,7 @@ import java.util.Map;
 public interface CaseInterrogationService {
     CaseInterrogationFullResponse addInterrogation(Long caseId, AddInterrogationRequest request, String email);
 
-    QAResponse createQA(Long caseId, Long interrogationId, String email);
+    QAResponse createQA(Long caseId, Long interrogationId,String question, String email);
 
     void deleteInterrogation(Long caseId, Long interrogationId, String email);
 

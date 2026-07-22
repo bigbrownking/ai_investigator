@@ -1,8 +1,9 @@
-package org.di.digital.service.impl;
+package org.di.digital.service.impl.indictment;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.indictment.IndictmentRephraseApplyRequest;
 import org.di.digital.dto.request.indictment.IndictmentSectionUpdateRequest;
 import org.di.digital.dto.response.indictment.IndictmentSectionDto;
 import org.di.digital.model.enums.MessageConstant;
@@ -19,13 +20,17 @@ import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.*;
+import org.di.digital.service.cases.CaseService;
+import org.di.digital.service.core.StreamingService;
 import org.di.digital.service.export.DocumentFormatterService;
 import org.di.digital.service.impl.core.sse.SseHeartbeatUtil;
+import org.di.digital.service.indictment.IndictmentService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.reactive.function.client.WebClient;
@@ -41,10 +46,8 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
-import static org.di.digital.util.requests.RequestBodyBuilder.indictmentBody;
-import static org.di.digital.util.requests.RequestBodyBuilder.indictmentSectionBody;
-import static org.di.digital.util.requests.RequestUrlBuilder.indictmentSectionUrl;
-import static org.di.digital.util.requests.RequestUrlBuilder.indictmentUrl;
+import static org.di.digital.util.requests.RequestBodyBuilder.*;
+import static org.di.digital.util.requests.RequestUrlBuilder.*;
 
 @Slf4j
 @Service
@@ -117,6 +120,25 @@ public class IndictmentServiceImpl implements IndictmentService {
             RequestContextHolder.setRequestAttributes(requestAttributes);
             try {
                 streamIndictmentSection(caseNumber, emitter, email, sectionId, requestAttributes);
+            } finally {
+                RequestContextHolder.resetRequestAttributes();
+            }
+        });
+        return emitter;
+    }
+
+    @Override
+    public SseEmitter generateIndictmentPrompt(String caseNumber, String email,
+                                               int startSectionId, int startOffset,
+                                               int endSectionId, int endOffset, String prompt) {
+        SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(10));
+        heartbeatUtil.startHeartbeat(emitter, "indictment-prompt-" + caseNumber);
+        RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
+        executor.execute(() -> {
+            RequestContextHolder.setRequestAttributes(requestAttributes);
+            try {
+                streamIndictmentPrompt(caseNumber, emitter, email,
+                        startSectionId, startOffset, endSectionId, endOffset, prompt, requestAttributes);
             } finally {
                 RequestContextHolder.resetRequestAttributes();
             }
@@ -252,13 +274,14 @@ public class IndictmentServiceImpl implements IndictmentService {
                                 caseNumber,
                                 email
                         );
-                    }finally {
+                    } finally {
                         RequestContextHolder.resetRequestAttributes();
                     }
                 },
                 error -> log.error("Indictment streaming error for case {}", caseNumber, error)
         );
     }
+
     private void streamIndictmentSection(String caseNumber, SseEmitter emitter,
                                          String email, int sectionId, RequestAttributes requestAttributes) {
         Case entity = caseRepository.findByNumber(caseNumber)
@@ -304,12 +327,110 @@ public class IndictmentServiceImpl implements IndictmentService {
         }
     }
 
+    private void streamIndictmentPrompt(String caseNumber, SseEmitter emitter, String email,
+                                        int startSectionId, int startOffset,
+                                        int endSectionId, int endOffset, String prompt,
+                                        RequestAttributes requestAttributes) {
+        Case entity = caseRepository.findByNumber(caseNumber)
+                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+
+        String language = entity.getLanguage();
+        if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
+            String message = MessageConstant.NO_QUALIFICATION.format(caseNumber);
+            log.warn(message);
+            logService.log(String.format("No qualification file in case %s", caseNumber),
+                    LogLevel.ERROR, LogAction.NO_QUALIFICATION, caseNumber, user.getEmail());
+            emitter.completeWithError(new IllegalStateException(message));
+            return;
+        }
+
+        List<Map<String, Object>> sections = entity.getIndictmentSections();
+        if (sections == null || sections.isEmpty()) {
+            emitter.completeWithError(new IllegalStateException("Секции акта не найдены: " + caseNumber));
+            return;
+        }
+
+        int startIdx = indexOfSection(sections, startSectionId);
+        int endIdx = indexOfSection(sections, endSectionId);
+        if (startIdx < 0) {
+            emitter.completeWithError(new IllegalStateException("Секция id=" + startSectionId + " не найдена"));
+            return;
+        }
+        if (endIdx < 0) {
+            emitter.completeWithError(new IllegalStateException("Секция id=" + endSectionId + " не найдена"));
+            return;
+        }
+        if (startIdx > endIdx) {
+            emitter.completeWithError(new IllegalStateException(
+                    "Начальная секция идёт позже конечной: start=" + startSectionId + ", end=" + endSectionId));
+            return;
+        }
+        String context;
+        if (startIdx == endIdx) {
+            String text = (String) sections.get(startIdx).get("text");
+            if (text == null || startOffset < 0 || endOffset > text.length() || startOffset > endOffset) {
+                emitter.completeWithError(new IllegalStateException(
+                        "Некорректные позиции: start=" + startOffset + ", end=" + endOffset
+                                + ", length=" + (text == null ? "null" : text.length())));
+                return;
+            }
+            context = text.substring(startOffset, endOffset);
+        } else {
+            String startText = (String) sections.get(startIdx).get("text");
+            String endText = (String) sections.get(endIdx).get("text");
+            if (startText == null || startOffset < 0 || startOffset > startText.length()) {
+                emitter.completeWithError(new IllegalStateException(
+                        "Некорректный startOffset=" + startOffset
+                                + ", length=" + (startText == null ? "null" : startText.length())));
+                return;
+            }
+            if (endText == null || endOffset < 0 || endOffset > endText.length()) {
+                emitter.completeWithError(new IllegalStateException(
+                        "Некорректный endOffset=" + endOffset
+                                + ", length=" + (endText == null ? "null" : endText.length())));
+                return;
+            }
+
+            StringBuilder sb = new StringBuilder();
+            sb.append(startText.substring(startOffset));
+            for (int i = startIdx + 1; i < endIdx; i++) {
+                String midText = (String) sections.get(i).get("text");
+                if (midText != null) {
+                    sb.append('\n').append(midText);
+                }
+            }
+            sb.append('\n').append(endText, 0, endOffset);
+            context = sb.toString();
+        }
+        try {
+            String responseJson = webClientBuilder.build()
+                    .post()
+                    .uri(indictmentPromptUrl(pythonHost, pythonPort))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(indictmentPromptBody(caseNumber, context, prompt, language))
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            var node = mapper.readTree(responseJson);
+            emitter.send(SseEmitter.event().data(node.get("result").toString()));
+            emitter.complete();
+
+        } catch (Exception e) {
+            log.error("Indictment rephrase error for case {}", caseNumber, e);
+            emitter.completeWithError(e);
+        }
+    }
+
     private String extractChunk(String chunk) {
         try {
             var node = mapper.readTree(chunk);
-            if (node.has("delta"))  return node.get("delta").asText();
+            if (node.has("delta")) return node.get("delta").asText();
             if (node.has("result")) return node.get("result").asText();
-        } catch (Exception ignored) {}
+        } catch (Exception ignored) {
+        }
         return chunk;
     }
 
@@ -342,6 +463,85 @@ public class IndictmentServiceImpl implements IndictmentService {
         indictment.setGeneratedAt(LocalDateTime.now());
         indictment.setFinalDone(isDone);
         caseIndictmentRepository.save(indictment);
+    }
+    @Override
+    @Transactional
+    public List<IndictmentSectionDto> applyRephrase(String caseNumber, IndictmentRephraseApplyRequest request) {
+        Case entity = caseRepository.findByNumber(caseNumber)
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+
+        if (entity.getIndictmentSections() == null && entity.getIndictment() != null) {
+            throw new IllegalStateException("Ваш обвинительный акт старого образца, сгенерируйте заново");
+        }
+        if (entity.getIndictmentSections() == null) {
+            throw new IllegalStateException("Обвинительный акт не найден для дела: " + caseNumber);
+        }
+
+        CaseIndictment indictment = getOrCreateIndictment(entity);
+        List<Map<String, Object>> sections = new ArrayList<>(indictment.getSections());
+
+        int startSectionId = request.getStartSectionId();
+        int endSectionId = request.getEndSectionId();
+        int startOffset = request.getStartOffset();
+        int endOffset = request.getEndOffset();
+        String replacement = request.getReplacementText() == null ? "" : request.getReplacementText();
+
+        int startIdx = indexOfSection(sections, startSectionId);
+        int endIdx = indexOfSection(sections, endSectionId);
+        if (startIdx < 0) {
+            throw new IllegalStateException("Секция id=" + startSectionId + " не найдена");
+        }
+        if (endIdx < 0) {
+            throw new IllegalStateException("Секция id=" + endSectionId + " не найдена");
+        }
+        if (startIdx > endIdx) {
+            throw new IllegalStateException(
+                    "Начальная секция идёт позже конечной: start=" + startSectionId + ", end=" + endSectionId);
+        }
+
+        if (startIdx == endIdx) {
+            Map<String, Object> s = sections.get(startIdx);
+            String text = (String) s.get("text");
+            if (text == null || startOffset < 0 || endOffset > text.length() || startOffset > endOffset) {
+                throw new IllegalStateException(
+                        "Некорректные позиции: start=" + startOffset + ", end=" + endOffset
+                                + ", length=" + (text == null ? "null" : text.length()));
+            }
+            s.put("text", text.substring(0, startOffset) + replacement + text.substring(endOffset));
+        } else {
+            Map<String, Object> startSection = sections.get(startIdx);
+            Map<String, Object> endSection = sections.get(endIdx);
+            String startText = (String) startSection.get("text");
+            String endText = (String) endSection.get("text");
+            if (startText == null || startOffset < 0 || startOffset > startText.length()) {
+                throw new IllegalStateException(
+                        "Некорректный startOffset=" + startOffset
+                                + ", length=" + (startText == null ? "null" : startText.length()));
+            }
+            if (endText == null || endOffset < 0 || endOffset > endText.length()) {
+                throw new IllegalStateException(
+                        "Некорректный endOffset=" + endOffset
+                                + ", length=" + (endText == null ? "null" : endText.length()));
+            }
+            startSection.put("text", startText.substring(0, startOffset) + replacement);
+            endSection.put("text", endText.substring(endOffset));
+            for (int i = startIdx + 1; i < endIdx; i++) {
+                sections.get(i).put("text", "");
+            }
+        }
+
+        indictment.setSections(sections);
+        caseIndictmentRepository.save(indictment);
+
+        log.info("Rephrase applied for case {} sections {}..{}", caseNumber, startSectionId, endSectionId);
+
+        return sections.stream()
+                .map(s -> IndictmentSectionDto.builder()
+                        .id((Integer) s.get("id"))
+                        .category((String) s.get("category"))
+                        .text((String) s.get("text"))
+                        .build())
+                .toList();
     }
 
     private void saveSingleSection(String caseNumber, String rawJson) {
@@ -400,13 +600,6 @@ public class IndictmentServiceImpl implements IndictmentService {
         } catch (IOException e) {
             throw new IllegalStateException(e);
         }
-    }
-
-    @Override
-    public String getIndictment(String caseNumber) {
-        return caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber))
-                .getIndictment();
     }
 
     @Override
@@ -469,10 +662,20 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .text((String) target.get("text"))
                 .build();
     }
+
     private CaseIndictment getOrCreateIndictment(Case entity) {
         return caseIndictmentRepository.findByCaseEntityNumber(entity.getNumber())
                 .orElseGet(() -> CaseIndictment.builder()
                         .caseEntity(entity)
                         .build());
+    }
+
+    private int indexOfSection(List<Map<String, Object>> sections, int sectionId) {
+        for (int i = 0; i < sections.size(); i++) {
+            if (Integer.valueOf(sectionId).equals(sections.get(i).get("id"))) {
+                return i;
+            }
+        }
+        return -1;
     }
 }
