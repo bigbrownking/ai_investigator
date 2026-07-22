@@ -20,7 +20,8 @@ import java.time.LocalDate;
 import java.util.List;
 
 public interface AdminService {
-    PagedUserResponse getAllUsers(int page, int size, UserSearchRequest userSearchRequest);    CasePageResponse getAllCases(int page, int size, CaseSearchRequest caseSearchRequest);
+    PagedUserResponse getAllUsers(int page, int size, UserSearchRequest userSearchRequest);
+    CasePageResponse getAllCases(int page, int size, CaseSearchRequest caseSearchRequest);
     CasePageResponse getUserCases(Long userId, int page, int size, CaseSearchRequest caseSearchRequest);
     AdminStatsDto getStats(LocalDate from, LocalDate to);
     List<UserSuggestionResponse> searchUsers(String query);
