@@ -23,6 +23,12 @@ public class RequestUrlBuilder {
                 String.format("/workspaces/%s/generate-qualification?user_id=%d&mode=hybrid&language=%s",
                         caseNumber, userId, language));
     }
+    public static String qualificationSectionUrl(String host, String port, String caseNumber) {
+        return buildUrl(host, port, String.format("/qualification/%s/regenerate-qualification?mode=hybrid", caseNumber));
+    }
+    public static String qualificationPromptUrl(String host, String port, String caseNumber) {
+        return buildUrl(host, port, String.format("/qualification/%s/rephrase", caseNumber));
+    }
     public static String caseInfoUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, String.format("/workspaces/%s/case-info", caseNumber));
     }
@@ -43,6 +49,10 @@ public class RequestUrlBuilder {
 
     public static String interrogationQuestionsUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, String.format("/interrogation/questions/%s", caseNumber));
+    }
+
+    public static String interrogationContradictionUrl(String host, String port, String caseNumber) {
+        return buildUrl(host, port, String.format("/interrogation/%s/contradiction", caseNumber));
     }
 
     public static String generalChatUrl(String host, String port) {

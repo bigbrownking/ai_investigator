@@ -33,9 +33,16 @@ public class RequestBodyBuilder {
         body.put("language", language);
         return body;
     }
+    public static Map<String, Object> qualificationSectionBody(int id, String mode, String language) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("id", id);
+        body.put("mode", mode);
+        body.put("language", language);
+        return body;
+    }
 
     public static Map<String, Object> indictmentSectionBody(String caseNumber, List<String> qualoNames,
-                                                     long userId, boolean isDone, String language, int id) {
+                                                            long userId, boolean isDone, String language, int id) {
         Map<String, Object> body = new HashMap<>();
         body.put("working_dir", caseNumber);
         body.put("mode", "hybrid");
@@ -72,6 +79,13 @@ public class RequestBodyBuilder {
         return body;
     }
 
+    public static Map<String, Object> interrogationContradictionBody(String indication, String language) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("indication", indication);
+        body.put("language", language);
+        return body;
+    }
+
     //mode: initial/append/update
     public static MultiValueMap<String, Object> planBody(String caseNumber, String mode) {
         MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
@@ -95,7 +109,7 @@ public class RequestBodyBuilder {
     }
 
     public static Map<String, Object> interrogationReformulateQuestionBody(ReformulateQuestionRequest request) {
-        String language =  request.getLanguage().equals("русском") ? "russian" : "kazakh";
+        String language = request.getLanguage().equals("русском") ? "russian" : "kazakh";
         Map<String, Object> body = new HashMap<>();
 
         body.put("case_id", request.getCaseNumber());

@@ -6,13 +6,14 @@ import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.response.cases.QueryResponse;
 import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.dto.response.chat.CaseChatMessageDto;
+import org.di.digital.dto.response.interrogation.ContradictionDto;
+import org.di.digital.dto.response.interrogation.ContradictionResponse;
 import org.di.digital.dto.response.interrogation.InterrogationQuestionsResponse;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChatMessage;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
 import org.di.digital.model.enums.MessageRole;
-import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationCaseChat;
 import org.di.digital.model.interrogation.CaseInterrogationChat;
 import org.di.digital.model.user.User;
@@ -20,6 +21,7 @@ import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationCaseChatRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationChatRepository;
+import org.di.digital.repository.interrogation.CaseInterrogationContradictionRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.service.interrogation.CaseInterrogationChatService;
@@ -37,8 +39,8 @@ import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
 import static org.di.digital.util.requests.RequestBodyBuilder.generalChatBody;
-import static org.di.digital.util.requests.RequestUrlBuilder.interrogationQuestionsUrl;
-import static org.di.digital.util.requests.RequestUrlBuilder.qualificationChatUrl;
+import static org.di.digital.util.requests.RequestBodyBuilder.interrogationContradictionBody;
+import static org.di.digital.util.requests.RequestUrlBuilder.*;
 import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
@@ -55,6 +57,8 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     private final LogService logService;
     private final InterrogationChatWriter interrogationChatWriter;
     private final InterrogationQuestionsWriter questionsWriter;
+    private final CaseInterrogationContradictionWriter contradictionWriter;
+    private final CaseInterrogationContradictionRepository contradictionRepository;
     private final WebClient.Builder webClientBuilder;
 
     @Value("${model.host}")
@@ -102,7 +106,6 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
             questionsWriter.saveQuestions(prep.chatId(), prep.placeholderId(), questions);
 
             emitter.send(SseEmitter.event().name("questions").data(questions));
-            emitter.complete();
 
             log.info("Saved {} question messages for interrogation {}",
                     questions.size(), interrogationId);
@@ -111,6 +114,10 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                     String.format("New interrogation chat message %s by %s user to case %s",
                             prep.userMessageContent(), userEmail, prep.caseNumber()),
                     LogLevel.INFO, LogAction.CHAT_MESSAGE, prep.caseNumber(), userEmail);
+
+            checkContradictions(prep, interrogationId, emitter);
+
+            emitter.complete();
 
         } catch (Exception e) {
             log.error("Interrogation questions error for interrogation {}: ", interrogationId, e);
@@ -199,6 +206,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         if (chat == null) {
             return CaseChatHistoryResponse.builder()
                     .messages(List.of())
+                    .contradictions(List.of())
                     .totalMessages(0)
                     .build();
         }
@@ -208,9 +216,16 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .getContent();
         long total = chatMessageRepository.countByInterrogationChatId(chat.getId());
 
+        List<ContradictionDto> contradictions = contradictionRepository
+                .findByInterrogationChatIdOrderByIdAsc(chat.getId())
+                .stream()
+                .map(ContradictionDto::from)
+                .toList();
+
         return CaseChatHistoryResponse.builder()
                 .chatId(chat.getId())
                 .messages(messages.stream().map(CaseChatMessageDto::from).toList())
+                .contradictions(contradictions)
                 .totalMessages((int) total)
                 .currentPage(page)
                 .pageSize(size)
@@ -231,6 +246,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         CaseInterrogationChat chat = caseInterrogationChatRepository.findByInterrogationId(interrogationId)
                 .orElseThrow(() -> new IllegalStateException("Чат для допроса не найден: " + interrogationId));
 
+        contradictionRepository.deleteAllByInterrogationChatId(chat.getId());
         chatMessageRepository.deleteAllByInterrogationChatId(chat.getId());
         chat.getMessages().clear();
         caseInterrogationChatRepository.save(chat);
@@ -274,6 +290,41 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 String.format("Message %s %s in case %s",
                         messageId, selected ? "selected" : "deselected", caseEntity.getNumber()),
                 LogLevel.INFO, LogAction.MESSAGE_SELECTED, caseEntity.getNumber(), user.getEmail());
+    }
+    private void checkContradictions(InterrogationQuestionsWriter.PreparedInterrogation prep,
+                                     Long interrogationId, SseEmitter emitter) {
+        try {
+            ContradictionResponse response = webClientBuilder.build()
+                    .post()
+                    .uri(interrogationContradictionUrl(pythonHost, interrogationChatPort, prep.caseNumber()))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(interrogationContradictionBody(prep.answer(), prep.language()))
+                    .retrieve()
+                    .bodyToMono(ContradictionResponse.class)
+                    .block();
+
+            List<ContradictionResponse.ContradictionItem> items =
+                    response == null ? null : response.getContradictions();
+
+            if (items == null || items.isEmpty()) {
+                log.debug("No contradictions for interrogation {}", interrogationId);
+                return;
+            }
+
+            List<ContradictionDto> saved = contradictionWriter
+                    .save(prep.chatId(), prep.userMessageId(), prep.answer(), items)
+                    .stream()
+                    .map(ContradictionDto::from)
+                    .toList();
+
+            emitter.send(SseEmitter.event().name("contradictions").data(saved));
+
+            log.info("Found {} contradictions for interrogation {}", saved.size(), interrogationId);
+
+        } catch (Exception e) {
+            log.warn("Contradiction check failed for interrogation {}: {}",
+                    interrogationId, e.getMessage());
+        }
     }
 
     // NOTE: грузит ВСЕ сообщения чата в память (PageRequest Integer.MAX_VALUE).
@@ -333,6 +384,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         if (chat == null) {
             return CaseChatHistoryResponse.builder()
                     .messages(List.of())
+                    .contradictions(List.of())
                     .totalMessages(0)
                     .build();
         }

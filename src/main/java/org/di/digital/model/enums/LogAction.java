@@ -33,6 +33,7 @@ public enum LogAction {
     PLAN_GENERATION("Генерация плана"),
     QUALIFICATION_DOWNLOAD("Скачивание квалификации"),
     PLAN_DOWNLOAD("Скачивание плана"),
+    REPORT_DOWNLOAD("Скачивание справки"),
     INDICTMENT_DOWNLOAD("Скачивание обвинительного акта"),
     INTERROGATION_DOWNLOAD("Скачивание допроса"),
     INTERROGATION_ADDED("Создание допроса"),

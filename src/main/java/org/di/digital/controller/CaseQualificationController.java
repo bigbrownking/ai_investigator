@@ -2,6 +2,9 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.qualification.QualificationRephraseApplyRequest;
+import org.di.digital.dto.request.qualification.QualificationRephraseRequest;
+import org.di.digital.dto.request.qualification.QualificationSectionUpdateRequest;
 import org.di.digital.dto.response.qualification.QualificationSectionDto;
 import org.di.digital.service.qualification.QualificationService;
 import org.springframework.core.io.Resource;
@@ -62,5 +65,59 @@ public class CaseQualificationController {
     public ResponseEntity<List<QualificationSectionDto>> getQualificationSections(
             @RequestParam String caseNumber) {
         return ResponseEntity.ok(qualificationService.getQualificationSections(caseNumber));
+    }
+
+    @GetMapping(value = "/stream/section", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamSection(@RequestParam String caseNumber,
+                                    @RequestParam int sectionId,
+                                    Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            SseEmitter emitter = new SseEmitter();
+            emitter.completeWithError(new IllegalStateException("Authentication required"));
+            return emitter;
+        }
+        return qualificationService.generateQualificationSection(
+                caseNumber, authentication.getName(), sectionId);
+    }
+
+    @PostMapping(value = "/stream/rephrase", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamRephrase(@RequestParam String caseNumber,
+                                     @RequestBody QualificationRephraseRequest request,
+                                     Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            SseEmitter emitter = new SseEmitter();
+            emitter.completeWithError(new IllegalStateException("Authentication required"));
+            return emitter;
+        }
+        return qualificationService.generateQualificationPrompt(
+                caseNumber, authentication.getName(),
+                request.getStartSectionId(), request.getStartOffset(),
+                request.getEndSectionId(), request.getEndOffset(), request.getPrompt());
+    }
+
+    @PostMapping("/rephrase/apply")
+    public ResponseEntity<List<QualificationSectionDto>> applyRephrase(
+            @RequestParam String caseNumber,
+            @RequestBody QualificationRephraseApplyRequest request,
+            Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+        log.info("Applying qualification rephrase for case: {} by user: {}",
+                caseNumber, authentication.getName());
+        return ResponseEntity.ok(qualificationService.applyRephrase(caseNumber, request));
+    }
+
+    @PatchMapping("/sections")
+    public ResponseEntity<QualificationSectionDto> updateSection(
+            @RequestParam String caseNumber,
+            @RequestBody QualificationSectionUpdateRequest request,
+            Authentication authentication) {
+        if (authentication == null || !authentication.isAuthenticated()) {
+            return ResponseEntity.status(401).build();
+        }
+        log.info("Updating qualification section {} for case: {} by user: {}",
+                request.getId(), caseNumber, authentication.getName());
+        return ResponseEntity.ok(qualificationService.updateSection(caseNumber, request));
     }
 }

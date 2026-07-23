@@ -52,7 +52,7 @@ public class InterrogationQuestionsWriter {
                 .complete(true)
                 .build();
         chat.addMessage(userMessage);
-        chatMessageRepository.save(userMessage);
+        Long userMessageId = chatMessageRepository.save(userMessage).getId();
 
         CaseChatMessage placeholder = CaseChatMessage.builder()
                 .interrogationChat(chat)
@@ -64,7 +64,7 @@ public class InterrogationQuestionsWriter {
         chat.addMessage(placeholder);
         Long placeholderId = chatMessageRepository.save(placeholder).getId();
 
-        String language = "русском".equals(interrogation.getLanguage()) ? "russian" : "kazakh";
+        String language = interrogation.getAdequateLanguage();
         Object requestBody = interrogationBody(
                 interrogation.getFio(),
                 interrogation.getRole(),
@@ -74,9 +74,12 @@ public class InterrogationQuestionsWriter {
         return new PreparedInterrogation(
                 chat.getId(),
                 placeholderId,
+                userMessageId,
                 caseEntity.getNumber(),
                 requestBody,
-                userMessage.getContent()
+                userMessage.getContent(),
+                answer,
+                language
         );
     }
 
@@ -138,8 +141,11 @@ public class InterrogationQuestionsWriter {
     public record PreparedInterrogation(
             Long chatId,
             Long placeholderId,
+            Long userMessageId,
             String caseNumber,
             Object requestBody,
-            String userMessageContent
+            String userMessageContent,
+            String answer,
+            String language
     ) {}
 }

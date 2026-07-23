@@ -3,6 +3,7 @@ package org.di.digital.service.impl.core;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.OsmotrResultMessage;
+import org.di.digital.dto.message.ReportResultMessage;
 import org.di.digital.dto.notification.*;
 import org.di.digital.dto.response.interrogation.InterrogationTimeStatusResponse;
 import org.di.digital.model.cases.Case;
@@ -497,6 +498,9 @@ public class NotificationService {
     private String buildOsmotrDestination() {
         return "/queue/osmotr/status";
     }
+    private String buildReportDestination() {
+        return "/queue/review/status";
+    }
     private String getCaseTitle(String caseNumber) {
         return caseRepository.findByNumber(caseNumber)
                 .map(Case::getTitle)
@@ -538,6 +542,19 @@ public class NotificationService {
                     message.getUserEmail(), message.getFileId(), message.getStatus());
         } catch (Exception e) {
             log.error("Osmotr WS notification failed for {}: {}", message.getUserEmail(), e.getMessage());
+        }
+    }
+    public void notifyReportStatus(ReportResultMessage message) {
+        try {
+            messagingTemplate.convertAndSendToUser(
+                    message.getUserEmail(),
+                    buildReportDestination(),
+                    message
+            );
+            log.info("Report WS notification sent to {}, status={}",
+                    message.getUserEmail(), message.getStatus());
+        } catch (Exception e) {
+            log.error("Report WS notification failed for {}: {}", message.getUserEmail(), e.getMessage());
         }
     }
 }
