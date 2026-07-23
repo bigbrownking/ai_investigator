@@ -56,11 +56,11 @@ public class CaseWriter {
                 .orElseThrow(() -> new IllegalStateException("User not found"));
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new IllegalStateException("Case not found"));
-        validateUserAccess(caseEntity, user);
-        if (!caseEntity.isOwner(user)) {
-            throw new org.springframework.security.access.AccessDeniedException(
-                    "Только создатель дела может изменять его статус");
-        }
+        //validateUserAccess(caseEntity, user);
+//        if (!caseEntity.isOwner(user)) {
+//            throw new org.springframework.security.access.AccessDeniedException(
+//                    "Только создатель дела может изменять его статус");
+//        }
         caseEntity.setStatus(status);
         caseRepository.save(caseEntity);
         return caseEntity.getNumber();

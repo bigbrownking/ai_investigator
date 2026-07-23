@@ -42,6 +42,7 @@ import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.repository.user.*;
 import org.di.digital.service.admin.AdminService;
+import org.di.digital.service.admin.RegAdminService;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.LocalizationHelper;
@@ -342,6 +343,61 @@ public class AdminServiceImpl implements AdminService {
         userRepository.save(user);
         log.info("User {} deactivated by admin", userId);
     }
+
+
+    @Override
+    @Transactional
+    public void deleteUser(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userId));
+
+        if (user.isActive()) {
+            throw new IllegalStateException("Пользователь активен, сперва деактивируйте его");
+        }
+
+        if (userRepository.isRegionAdmin(userId)) {
+            throw new IllegalStateException(
+                    "Пользователь является администратором региона, сначала назначьте другого админа");
+        }
+
+        // 1. Переносим владение кейсами на админа региона и архивируем их
+        if (user.getRegion() != null) {
+            Long regionId = user.getRegion().getId();
+            Long adminUserId = userRepository.findAdminUserIdByRegionId(regionId)
+                    .orElseThrow(() -> new IllegalStateException(
+                            "Админ региона не найден для региона " + regionId));
+
+            User regionAdmin = userRepository.getReferenceById(adminUserId);
+            caseRepository.reassignOwnerAndDeactivate(userId, regionAdmin);
+        }
+
+        // 2. Убираем юзера из участников кейсов
+        caseRepository.removeUserFromAllCases(userId);
+
+        // 3. Обращения — удаляем полностью
+        appealRepository.deleteAllByUserId(userId);
+
+        // 4. Исторические ссылки — обнуляем
+        caseRepository.clearChatAuthor(userId);
+        caseRepository.clearInterrogationChatAuthor(userId);
+        caseRepository.clearPlanApprovedBy(userId);
+        caseRepository.clearPlanSubmittedBy(userId);
+        caseRepository.clearPlanReviewedBy(userId);
+        caseRepository.clearApprovalHistoryReviewer(userId);
+        caseRepository.clearEditHistoryEditor(userId);
+        reviewRepository.clearReviewAuthor(userId);
+        supportTicketRepository.clearTicketAuthor(userId);
+
+        // 5. Личные данные юзера
+//        userRepository.deleteUserRoles(userId);
+//        userRepository.deleteUserSettings(userId);
+//        userRepository.deleteUserFaceTemplates(userId);
+
+        // 6. Сам юзер
+        userRepository.delete(user);
+        log.info("User {} deleted by admin", userId);
+    }
+
     @Override
     public List<RegionStatsDto> getRegionMapStats() {
         return regionRepository.findAll().stream()

@@ -8,13 +8,13 @@ import org.di.digital.model.enums.CaseFileStatusEnum;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "case_reviews")
+@Table(name = "case_reports")
 @Getter
 @Setter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CaseReview {
+public class CaseReport {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)

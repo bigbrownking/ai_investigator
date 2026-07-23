@@ -16,6 +16,7 @@ import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.admin.RegAdminService;
+import org.di.digital.service.cases.CaseService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -37,6 +38,8 @@ import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 public class RegAdminController {
 
     private final RegAdminService regAdminService;
+    private final CaseService caseService;
+
     @GetMapping("/appeals")
     public ResponseEntity<Page<AppealDto>> getAppeals(
             Authentication authentication,
@@ -88,6 +91,19 @@ public class RegAdminController {
     public ResponseEntity<Void> approve(@PathVariable Long id, Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         regAdminService.approveAppeal(id, userDetails.getId());
+        return ResponseEntity.ok().build();
+    }
+
+    @PatchMapping("/cases/{caseId}/status")
+    public ResponseEntity<CaseResponse> updateCaseStatus(
+            @PathVariable Long caseId,
+            @RequestParam boolean status,
+            Authentication authentication
+    ) {
+        log.info("Updating case {} status to {} by user: {}",
+                caseId, status, authentication.getName());
+
+        caseService.updateCaseStatus(caseId, status, authentication.getName());
         return ResponseEntity.ok().build();
     }
 

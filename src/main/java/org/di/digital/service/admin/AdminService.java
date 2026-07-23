@@ -27,6 +27,7 @@ public interface AdminService {
     List<UserSuggestionResponse> searchUsers(String query);
     void activateUser(Long userId);
     void deactivateUser(Long userId);
+    void deleteUser(Long userId);
     PagedAppealResponse getAllAppeals(int page, int size, AppealSearchRequest appealSearchRequest);
     List<RegionStatsDto> getRegionMapStats();
     RegionSummaryDto getRegionSummary(Long regionId, int page, int size);

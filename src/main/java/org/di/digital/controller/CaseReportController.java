@@ -2,7 +2,7 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.report.CaseReview;
+import org.di.digital.model.report.CaseReport;
 import org.di.digital.service.report.ReportService;
 import org.springframework.core.io.Resource;
 import org.springframework.http.HttpHeaders;
@@ -12,7 +12,6 @@ import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 
 import java.nio.charset.StandardCharsets;
-import java.util.Map;
 
 import static java.net.URLEncoder.encode;
 
@@ -43,7 +42,7 @@ public class CaseReportController {
     }
 
     @GetMapping
-    public ResponseEntity<CaseReview> getReport(@PathVariable String caseNumber) {
+    public ResponseEntity<CaseReport> getReport(@PathVariable String caseNumber) {
         return ResponseEntity.ok(reportService.getByCaseNumber(caseNumber));
     }
 
