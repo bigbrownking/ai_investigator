@@ -88,8 +88,7 @@ public class QualificationServiceImpl implements QualificationService {
     }
 
     @Override
-    public SseEmitter generateQualificationSection(String caseNumber, String email,
-                                                   int sectionId) {
+    public SseEmitter generateQualificationSection(String caseNumber, String email, int sectionId) {
         SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(10));
         heartbeatUtil.startHeartbeat(emitter, "qualification-section-" + caseNumber + "-" + sectionId);
 
@@ -175,6 +174,10 @@ public class QualificationServiceImpl implements QualificationService {
         }
     }
 
+    /**
+     * Регенерация одной секции.
+     * Сервис отвечает объектом секции: {"id":0,"text":"...","category":"header"}
+     */
     private void streamQualificationSection(String caseNumber, SseEmitter emitter, String email,
                                             int sectionId, String mode) {
         Case entity = caseRepository.findByNumber(caseNumber)
@@ -211,10 +214,18 @@ public class QualificationServiceImpl implements QualificationService {
             }
 
             qualificationWriter.saveSingleSection(caseNumber, responseJson);
-            log.info("Qualification section {} completed for case {}", sectionId, caseNumber);
 
             var node = mapper.readTree(responseJson);
-            emitter.send(SseEmitter.event().name("message").data(node.get("result").toString()));
+            var sectionNode = node.has("result") ? node.get("result") : node;
+
+            if (sectionNode == null || !sectionNode.isObject() || !sectionNode.has("id")) {
+                log.error("Unexpected section response for case {}, section {}: {}",
+                        caseNumber, sectionId, responseJson);
+                throw new IllegalStateException("Некорректный ответ от сервиса");
+            }
+
+            log.info("Qualification section {} completed for case {}", sectionId, caseNumber);
+            emitter.send(SseEmitter.event().name("message").data(sectionNode.toString()));
             emitter.complete();
 
         } catch (Exception e) {
@@ -223,6 +234,11 @@ public class QualificationServiceImpl implements QualificationService {
         }
     }
 
+    /**
+     * Перефразирование выделенного фрагмента.
+     * Запрос: {"selected_text": "...", "instruction": "..."}
+     * Ответ:  {"rephrased_text": "...", "status": "completed", "message": "..."}
+     */
     private void streamQualificationPrompt(String caseNumber, SseEmitter emitter, String email,
                                            int startSectionId, int startOffset,
                                            int endSectionId, int endOffset, String prompt) {
@@ -250,9 +266,8 @@ public class QualificationServiceImpl implements QualificationService {
                     .uri(qualificationPromptUrl(pythonHost, pythonPort, caseNumber))
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(Map.of(
-                            "context", context,
-                            "prompt", prompt == null ? "" : prompt,
-                            "language", entity.getLanguage()))
+                            "selected_text", context,
+                            "instruction", prompt == null ? "" : prompt))
                     .retrieve()
                     .bodyToMono(String.class)
                     .block();
@@ -262,7 +277,21 @@ public class QualificationServiceImpl implements QualificationService {
             }
 
             var node = mapper.readTree(responseJson);
-            emitter.send(SseEmitter.event().name("message").data(node.get("result").asText()));
+
+            var statusNode = node.get("status");
+            if (statusNode != null && !"completed".equals(statusNode.asText())) {
+                String msg = node.hasNonNull("message") ? node.get("message").asText() : "unknown";
+                throw new IllegalStateException(
+                        "Сервис вернул статус " + statusNode.asText() + ": " + msg);
+            }
+
+            var textNode = node.get("rephrased_text");
+            if (textNode == null || textNode.isNull()) {
+                log.error("No 'rephrased_text' in response for case {}: {}", caseNumber, responseJson);
+                throw new IllegalStateException("Некорректный ответ от сервиса");
+            }
+
+            emitter.send(SseEmitter.event().name("message").data(textNode.asText()));
             emitter.complete();
 
         } catch (Exception e) {
@@ -282,9 +311,6 @@ public class QualificationServiceImpl implements QualificationService {
 
         if (entity.getQualificationSections() == null && entity.getQualification() != null) {
             throw new IllegalStateException("Ваша квалификация старого образца, сгенерируйте заново");
-        }
-        if (entity.getQualificationSections() == null) {
-            throw new IllegalStateException("Квалификация не найдена для дела: " + caseNumber);
         }
 
         CaseQualification qualification = getOrCreateQualification(entity);
@@ -341,9 +367,6 @@ public class QualificationServiceImpl implements QualificationService {
 
         if (entity.getQualificationSections() == null && entity.getQualification() != null) {
             throw new IllegalStateException("Ваша квалификация старого образца, сгенерируйте заново");
-        }
-        if (entity.getQualificationSections() == null) {
-            throw new IllegalStateException("Квалификация не найдена для дела: " + caseNumber);
         }
 
         CaseQualification qualification = getOrCreateQualification(entity);
@@ -404,9 +427,6 @@ public class QualificationServiceImpl implements QualificationService {
             List<Map<String, Object>> sections = entity.getQualificationSections();
 
             if (sections == null) {
-                if (entity.getQualification() == null) {
-                    throw new IllegalStateException("Квалификация не найдена для дела: " + caseNumber);
-                }
                 sections = List.of(Map.of("id", 0, "category", "legacy", "text", entity.getQualification()));
             }
 

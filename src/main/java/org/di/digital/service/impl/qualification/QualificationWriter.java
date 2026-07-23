@@ -71,14 +71,16 @@ public class QualificationWriter {
 
         try {
             var node = mapper.readTree(rawJson);
-            if (!node.has("result")) return;
 
-            Map<String, Object> newSection = mapper.convertValue(node.get("result"), Map.class);
-            Integer sectionId = (Integer) newSection.get("id");
-            if (sectionId == null) {
-                log.warn("Section without id in response for case {}", caseNumber);
+            var sectionNode = node.has("result") ? node.get("result") : node;
+
+            if (sectionNode == null || !sectionNode.isObject() || !sectionNode.has("id")) {
+                log.warn("Unexpected section response for case {}: {}", caseNumber, rawJson);
                 return;
             }
+
+            Map<String, Object> newSection = mapper.convertValue(sectionNode, Map.class);
+            Integer sectionId = (Integer) newSection.get("id");
 
             CaseQualification qualification = getOrCreate(caseNumber);
 

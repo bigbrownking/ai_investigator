@@ -32,7 +32,7 @@ public class CaseReportController {
 
         Resource resource = reportService.generateReport(caseNumber, authentication.getName());
 
-        String filename = String.format("отчёт_%s.docx", caseNumber.replace("/", "-"));
+        String filename = String.format("справка_%s.docx", caseNumber.replace("/", "-"));
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,
@@ -55,7 +55,7 @@ public class CaseReportController {
 
         Resource resource = reportService.downloadReport(caseNumber, authentication.getName());
 
-        String filename = String.format("отчёт_%s.docx", caseNumber.replace("/", "-"));
+        String filename = String.format("справка_%s.docx", caseNumber.replace("/", "-"));
 
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,

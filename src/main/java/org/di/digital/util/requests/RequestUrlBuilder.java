@@ -24,7 +24,7 @@ public class RequestUrlBuilder {
                         caseNumber, userId, language));
     }
     public static String qualificationSectionUrl(String host, String port, String caseNumber) {
-        return buildUrl(host, port, String.format("/qualification/%s/regenerate-qualification?mode=hybrid", caseNumber));
+        return buildUrl(host, port, String.format("/qualification/%s/regenerate-qualification", caseNumber));
     }
     public static String qualificationPromptUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, String.format("/qualification/%s/rephrase", caseNumber));
