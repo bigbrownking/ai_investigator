@@ -103,4 +103,26 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
         """)
     List<User> searchAllUsersByRegions(@Param("regionIds") List<Long> regionIds,
                                        @Param("query") String query);
+
+    @Query(value = "SELECT user_id FROM region_admins WHERE region_id = :regionId LIMIT 1", nativeQuery = true)
+    Optional<Long> findAdminUserIdByRegionId(@Param("regionId") Long regionId);
+
+    @Query(value = "SELECT EXISTS(SELECT 1 FROM region_admins WHERE user_id = :userId) " +
+            "OR EXISTS(SELECT 1 FROM regions WHERE admin_id = :userId)", nativeQuery = true)
+    boolean isRegionAdmin(@Param("userId") Long userId);
+
+    @Modifying
+    @Transactional
+    @Query(value = "DELETE FROM user_roles WHERE user_id = :userId", nativeQuery = true)
+    void deleteUserRoles(@Param("userId") Long userId);
+
+    @Modifying
+    @Transactional
+    @Query(value = "DELETE FROM user_settings WHERE user_id = :userId", nativeQuery = true)
+    void deleteUserSettings(@Param("userId") Long userId);
+
+    @Modifying
+    @Transactional
+    @Query(value = "DELETE FROM user_face_templates WHERE user_id = :userId", nativeQuery = true)
+    void deleteUserFaceTemplates(@Param("userId") Long userId);
 }

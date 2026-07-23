@@ -6,7 +6,11 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -19,4 +23,9 @@ public interface AppealRepository extends JpaRepository<Appeal, Long>,
     long countByRegionIdAndStatus(Long regionId, AppealStatus status);
     long countByRegionIdInAndStatus(List<Long> regionIds, AppealStatus status);
     long countByStatusAndCreatedAtBetween(AppealStatus status, LocalDateTime start, LocalDateTime end);
+
+    @Modifying
+    @Transactional
+    @Query(value = "DELETE FROM appeals WHERE user_id = :userId OR reviewed_by = :userId", nativeQuery = true)
+    void deleteAllByUserId(@Param("userId") Long userId);
 }

@@ -2,20 +2,16 @@ package org.di.digital.service.impl.report;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.message.ReportProcessingMessage;
 import org.di.digital.dto.message.ReportResultMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
-import org.di.digital.model.report.CaseReview;
-import org.di.digital.model.user.User;
+import org.di.digital.model.report.CaseReport;
 import org.di.digital.repository.cases.CaseRepository;
-import org.di.digital.repository.review.CaseReviewRepository;
-import org.di.digital.repository.user.UserRepository;
+import org.di.digital.repository.review.CaseReportRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.service.core.MinioService;
-import org.di.digital.service.impl.queue.ReportQueueService;
 import org.di.digital.service.report.ReportService;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -35,7 +31,7 @@ import java.util.concurrent.TimeoutException;
 @RequiredArgsConstructor
 public class ReportServiceImpl implements ReportService {
 
-    private final CaseReviewRepository caseReviewRepository;
+    private final CaseReportRepository caseReportRepository;
     private final CaseRepository caseRepository;
     private final MinioService minioService;
     private final LogService logService;
@@ -89,23 +85,23 @@ public class ReportServiceImpl implements ReportService {
     @Override
     @Transactional
     public void saveProcessing(ReportResultMessage message) {
-        CaseReview review = getOrCreate(message);
+        CaseReport review = getOrCreate(message);
         review.setStatus(CaseFileStatusEnum.PROCESSING);
-        caseReviewRepository.save(review);
+        caseReportRepository.save(review);
         log.info("Review for case {} -> PROCESSING", message.getCaseNumber());
     }
 
     @Override
     @Transactional
     public void saveCompleted(ReportResultMessage message) {
-        CaseReview review = getOrCreate(message);
+        CaseReport review = getOrCreate(message);
         review.setStatus(CaseFileStatusEnum.COMPLETED);
         review.setReportFileUrl(message.getReportFileUrl());
         review.setFileName(message.getFileName());
         review.setProcessingDurationSeconds(message.getProcessingDurationSeconds());
         review.setCompletedAt(LocalDateTime.now());
         review.setErrorMessage(null);
-        caseReviewRepository.save(review);
+        caseReportRepository.save(review);
 
         awaitRegistry.complete(review.getId(), new ReportAwaitRegistry.ReportOutcome(
                 true, message.getReportFileUrl(), null));
@@ -118,11 +114,11 @@ public class ReportServiceImpl implements ReportService {
     @Override
     @Transactional
     public void saveFailed(ReportResultMessage message) {
-        CaseReview review = getOrCreate(message);
+        CaseReport review = getOrCreate(message);
         review.setStatus(CaseFileStatusEnum.FAILED);
         review.setErrorMessage(message.getErrorMessage());
         review.setCompletedAt(LocalDateTime.now());
-        caseReviewRepository.save(review);
+        caseReportRepository.save(review);
 
         awaitRegistry.complete(review.getId(), new ReportAwaitRegistry.ReportOutcome(
                 false, null, message.getErrorMessage()));
@@ -133,22 +129,22 @@ public class ReportServiceImpl implements ReportService {
 
     @Override
     @Transactional(readOnly = true)
-    public CaseReview getByCaseNumber(String caseNumber) {
-        return caseReviewRepository.findByCaseEntityNumber(caseNumber)
+    public CaseReport getByCaseNumber(String caseNumber) {
+        return caseReportRepository.findByCaseEntityNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException(
                         "Отчёт не найден для дела: " + caseNumber));
     }
 
-    private CaseReview getOrCreate(ReportResultMessage message) {
-        return caseReviewRepository.findByCaseEntityNumber(message.getCaseNumber())
+    private CaseReport getOrCreate(ReportResultMessage message) {
+        return caseReportRepository.findByCaseEntityNumber(message.getCaseNumber())
                 .orElseGet(() -> buildNew(message));
     }
 
-    private CaseReview buildNew(ReportResultMessage message) {
+    private CaseReport buildNew(ReportResultMessage message) {
         Case caseEntity = caseRepository.findByNumber(message.getCaseNumber())
                 .orElseThrow(() -> new IllegalStateException(
                         "Дело не найдено: " + message.getCaseNumber()));
-        return CaseReview.builder()
+        return CaseReport.builder()
                 .caseEntity(caseEntity)
                 .fileName(message.getFileName())
                 .userEmail(message.getUserEmail())
@@ -159,7 +155,7 @@ public class ReportServiceImpl implements ReportService {
     @Override
     @Transactional(readOnly = true)
     public Resource downloadReport(String caseNumber, String userEmail) {
-        CaseReview review = caseReviewRepository.findByCaseEntityNumber(caseNumber)
+        CaseReport review = caseReportRepository.findByCaseEntityNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException(
                         "Отчёт не найден для дела: " + caseNumber));
 

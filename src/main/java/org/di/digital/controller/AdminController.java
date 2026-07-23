@@ -21,6 +21,7 @@ import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.admin.AdminService;
 import org.di.digital.service.auth.AuthService;
+import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.impl.core.DevService;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -44,6 +45,7 @@ public class AdminController {
     private final AdminService adminService;
     private final AuthService authService;
     private final DevService devService;
+    private final CaseService caseService;
 
     @PostMapping("/reg_admin")
     public ResponseEntity<String> regAdmin(@RequestBody SignUpRequest signUpRequest) {
@@ -64,6 +66,19 @@ public class AdminController {
             @RequestParam(defaultValue = "20") int size,
             @ModelAttribute CaseSearchRequest caseSearchRequest) {
         return ResponseEntity.ok(adminService.getUserCases(userId, page, size, caseSearchRequest));
+    }
+
+    @PatchMapping("/cases/{caseId}/status")
+    public ResponseEntity<CaseResponse> updateCaseStatus(
+            @PathVariable Long caseId,
+            @RequestParam boolean status,
+            Authentication authentication
+    ) {
+        log.info("Updating case {} status to {} by user: {}",
+                caseId, status, authentication.getName());
+
+        caseService.updateCaseStatus(caseId, status, authentication.getName());
+        return ResponseEntity.ok().build();
     }
 
     @GetMapping("/cases")
@@ -126,6 +141,12 @@ public class AdminController {
     @PutMapping("/users/{id}/deactivate")
     public ResponseEntity<Void> deactivate(@PathVariable Long id) {
         adminService.deactivateUser(id);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/users/{id}/delete")
+    public ResponseEntity<Void> deleteUser(@PathVariable Long id) {
+        adminService.deleteUser(id);
         return ResponseEntity.ok().build();
     }
 

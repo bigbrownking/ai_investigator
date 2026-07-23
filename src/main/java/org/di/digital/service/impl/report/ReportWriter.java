@@ -5,10 +5,10 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.ReportProcessingMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseFileStatusEnum;
-import org.di.digital.model.report.CaseReview;
+import org.di.digital.model.report.CaseReport;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseRepository;
-import org.di.digital.repository.review.CaseReviewRepository;
+import org.di.digital.repository.review.CaseReportRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.impl.queue.ReportQueueService;
 import org.springframework.stereotype.Service;
@@ -21,7 +21,7 @@ import java.time.LocalDateTime;
 @RequiredArgsConstructor
 public class ReportWriter {
 
-    private final CaseReviewRepository caseReviewRepository;
+    private final CaseReportRepository caseReportRepository;
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final ReportQueueService reportQueueService;
@@ -33,15 +33,15 @@ public class ReportWriter {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
 
-        CaseReview review = caseReviewRepository.findByCaseEntityNumber(caseNumber)
-                .orElseGet(() -> CaseReview.builder().caseEntity(caseEntity).build());
+        CaseReport review = caseReportRepository.findByCaseEntityNumber(caseNumber)
+                .orElseGet(() -> CaseReport.builder().caseEntity(caseEntity).build());
 
         review.setUserEmail(userEmail);
         review.setStatus(CaseFileStatusEnum.PENDING);
         review.setTimestamp(LocalDateTime.now());
         review.setErrorMessage(null);
         review.setCompletedAt(null);
-        review = caseReviewRepository.save(review);
+        review = caseReportRepository.save(review);
 
         reportQueueService.sendReportForProcessing(ReportProcessingMessage.builder()
                 .caseNumber(caseNumber)
