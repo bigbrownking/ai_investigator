@@ -142,8 +142,14 @@ public class OsmotrServiceImpl implements OsmotrService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
         validateUserAccess(caseEntity, user);
+
         return osmotrResultRepository.findByCaseNumber(caseNumber).stream()
-                .map(mapper::toOsmotrResultDto).toList();
+                .map(result -> {
+                    OsmotrResultDto dto = mapper.toOsmotrResultDto(result);
+                    attachReportBase64(result, dto);
+                    return dto;
+                })
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -153,8 +159,22 @@ public class OsmotrServiceImpl implements OsmotrService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
         validateUserAccess(caseEntity, user);
-        return osmotrResultRepository.findById(resultId).stream()
-                .map(mapper::toOsmotrResultDto).findFirst();
+
+        return osmotrResultRepository.findById(resultId)
+                .map(result -> {
+                    OsmotrResultDto dto = mapper.toOsmotrResultDto(result);
+                    attachReportBase64(result, dto);
+                    return dto;
+                });
+    }
+
+    private void attachReportBase64(OsmotrResult result, OsmotrResultDto dto) {
+        if (result.getReportFile() == null) return;
+        try (InputStream is = minioService.downloadFile(result.getReportFile())) {
+            dto.setReportFileBase64(getEncoder().encodeToString(is.readAllBytes()));
+        } catch (Exception e) {
+            log.error("Failed to read report docx for result {}: {}", result.getId(), e.getMessage(), e);
+        }
     }
 
     @Transactional
