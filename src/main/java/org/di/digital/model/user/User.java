@@ -90,6 +90,8 @@ public class User {
     @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
 
+    @Column(name = "is_deleted")
+    private Boolean is_deleted;
 
     @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)

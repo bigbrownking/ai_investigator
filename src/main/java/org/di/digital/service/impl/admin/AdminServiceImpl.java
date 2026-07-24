@@ -43,6 +43,7 @@ import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.repository.user.*;
 import org.di.digital.service.admin.AdminService;
 import org.di.digital.service.admin.RegAdminService;
+import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.LocalizationHelper;
@@ -58,6 +59,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 
@@ -91,6 +93,7 @@ public class AdminServiceImpl implements AdminService {
     private final SupportTicketRepository supportTicketRepository;
     private final ReviewRepository reviewRepository;
     private final InterrogationExportService interrogationExportService;
+    private final CaseService  caseService;
 
     @Override
     public PagedUserResponse getAllUsers(int page, int size, UserSearchRequest req) {
@@ -360,42 +363,31 @@ public class AdminServiceImpl implements AdminService {
                     "Пользователь является администратором региона, сначала назначьте другого админа");
         }
 
-        // 1. Переносим владение кейсами на админа региона и архивируем их
+        User regionAdmin = null;
         if (user.getRegion() != null) {
             Long regionId = user.getRegion().getId();
             Long adminUserId = userRepository.findAdminUserIdByRegionId(regionId)
                     .orElseThrow(() -> new IllegalStateException(
                             "Админ региона не найден для региона " + regionId));
-
-            User regionAdmin = userRepository.getReferenceById(adminUserId);
-            caseRepository.reassignOwnerAndDeactivate(userId, regionAdmin);
+            regionAdmin = userRepository.getReferenceById(adminUserId);
         }
 
-        // 2. Убираем юзера из участников кейсов
+        List<Case> ownedCases = new ArrayList<>(user.getOwnedCases());
+
+        for (Case c : ownedCases) {
+            caseService.updateCaseStatus(c.getId(), false, user.getEmail());
+
+            if (regionAdmin != null) {
+                c.setOwner(regionAdmin);
+                user.getOwnedCases().remove(c);
+            }
+        }
+
         caseRepository.removeUserFromAllCases(userId);
 
-        // 3. Обращения — удаляем полностью
-        appealRepository.deleteAllByUserId(userId);
-
-        // 4. Исторические ссылки — обнуляем
-        caseRepository.clearChatAuthor(userId);
-        caseRepository.clearInterrogationChatAuthor(userId);
-        caseRepository.clearPlanApprovedBy(userId);
-        caseRepository.clearPlanSubmittedBy(userId);
-        caseRepository.clearPlanReviewedBy(userId);
-        caseRepository.clearApprovalHistoryReviewer(userId);
-        caseRepository.clearEditHistoryEditor(userId);
-        reviewRepository.clearReviewAuthor(userId);
-        supportTicketRepository.clearTicketAuthor(userId);
-
-        // 5. Личные данные юзера
-//        userRepository.deleteUserRoles(userId);
-//        userRepository.deleteUserSettings(userId);
-//        userRepository.deleteUserFaceTemplates(userId);
-
-        // 6. Сам юзер
-        userRepository.delete(user);
-        log.info("User {} deleted by admin", userId);
+        user.setIs_deleted(true);
+        userRepository.save(user);
+        log.info("User {} soft-deleted by admin", userId);
     }
 
     @Override
