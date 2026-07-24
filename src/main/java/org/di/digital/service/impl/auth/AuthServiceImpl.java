@@ -272,6 +272,9 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByIin(request.getIin())
                 .orElseThrow(() -> new IllegalStateException("Пользователь с таким ИИН не найден: " + request.getIin()));
 
+        if (user.getIs_deleted()){
+            throw new IllegalStateException("Данный аккаунт удален");
+        }
         if (!user.isActive()) {
             throw new IllegalStateException("Пользователь еще не был подтвержден админом");
         }
