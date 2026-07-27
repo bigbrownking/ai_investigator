@@ -4,6 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.di.digital.model.enums.ReportRejectionReason;
 
 import java.time.LocalDateTime;
 
@@ -20,4 +21,7 @@ public class ReportResultMessage {
     private String errorMessage;
     private LocalDateTime timestamp;
     private long processingDurationSeconds;
+    private Boolean reportStatus;
+    private ReportRejectionReason reportRejectionReason;
+    
 }

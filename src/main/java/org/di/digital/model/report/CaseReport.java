@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.enums.ReportRejectionReason;
 
 import java.time.LocalDateTime;
 
@@ -38,6 +39,11 @@ public class CaseReport {
 
     @Column(name = "error_message", columnDefinition = "TEXT")
     private String errorMessage;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "rejection_reason")
+    private ReportRejectionReason reportRejectionReason;
+
 
     @Column(name = "processing_duration_seconds")
     private Long processingDurationSeconds;

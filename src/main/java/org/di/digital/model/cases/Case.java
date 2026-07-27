@@ -45,6 +45,12 @@ public class Case {
     @Builder.Default
     private boolean status = true;
 
+    
+
+    //прерванные сроки
+    //прекращенные
+    //направленные в суд 
+
     @OneToOne(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private CasePlan casePlan;
 

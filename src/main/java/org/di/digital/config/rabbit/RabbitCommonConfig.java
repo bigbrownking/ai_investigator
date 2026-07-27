@@ -1,4 +1,4 @@
-package org.di.digital.config;
+package org.di.digital.config.rabbit;
 
 import org.springframework.amqp.rabbit.connection.ConnectionFactory;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
