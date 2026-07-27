@@ -33,6 +33,7 @@ import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.context.request.RequestAttributes;
 import org.springframework.web.context.request.RequestContextHolder;
 import org.springframework.web.reactive.function.client.WebClient;
+import org.springframework.web.reactive.function.client.WebClientResponseException;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
@@ -293,23 +294,40 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     }
     private void checkContradictions(InterrogationQuestionsWriter.PreparedInterrogation prep,
                                      Long interrogationId, SseEmitter emitter) {
+        long start = System.currentTimeMillis();
+        String url = interrogationContradictionUrl(pythonHost, interrogationChatPort, prep.caseNumber());
+
+        log.info("Contradiction check started: interrogation={}, case={}, fio={}, language={}, indication='{}'",
+                interrogationId, prep.caseNumber(), prep.fio(), prep.language(), truncate(prep.answer(), 150));
+        log.debug("Contradiction request URL: {}", url);
+
         try {
             ContradictionResponse response = webClientBuilder.build()
                     .post()
-                    .uri(interrogationContradictionUrl(pythonHost, interrogationChatPort, prep.caseNumber()))
+                    .uri(url)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(interrogationContradictionBody(prep.answer(), prep.language()))
-                    .retrieve()
+                    .bodyValue(interrogationContradictionBody(prep.fio(), prep.answer(), prep.language()))                    .retrieve()
                     .bodyToMono(ContradictionResponse.class)
                     .block();
+
+            long duration = System.currentTimeMillis() - start;
 
             List<ContradictionResponse.ContradictionItem> items =
                     response == null ? null : response.getContradictions();
 
-            if (items == null || items.isEmpty()) {
-                log.debug("No contradictions for interrogation {}", interrogationId);
+            if (response == null) {
+                log.warn("Contradiction service returned null body for interrogation {} ({}ms)",
+                        interrogationId, duration);
                 return;
             }
+
+            if (items == null || items.isEmpty()) {
+                log.info("No contradictions found for interrogation {} ({}ms)", interrogationId, duration);
+                return;
+            }
+
+            log.info("Contradiction service returned {} items for interrogation {} ({}ms)",
+                    items.size(), interrogationId, duration);
 
             List<ContradictionDto> saved = contradictionWriter
                     .save(prep.chatId(), prep.userMessageId(), prep.answer(), items)
@@ -319,12 +337,21 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
 
             emitter.send(SseEmitter.event().name("contradictions").data(saved));
 
-            log.info("Found {} contradictions for interrogation {}", saved.size(), interrogationId);
+            log.info("Sent {} contradictions via SSE for interrogation {}, sourceMessageId={}",
+                    saved.size(), interrogationId, prep.userMessageId());
 
+        } catch (WebClientResponseException e) {
+            log.warn("Contradiction service HTTP error for interrogation {}: {} — body: {}",
+                    interrogationId, e.getStatusCode(), truncate(e.getResponseBodyAsString(), 500));
         } catch (Exception e) {
-            log.warn("Contradiction check failed for interrogation {}: {}",
-                    interrogationId, e.getMessage());
+            log.warn("Contradiction check failed for interrogation {} ({}ms): {}",
+                    interrogationId, System.currentTimeMillis() - start, e.getMessage(), e);
         }
+    }
+
+    private String truncate(String s, int max) {
+        if (s == null) return "null";
+        return s.length() <= max ? s : s.substring(0, max) + "...";
     }
 
     // NOTE: грузит ВСЕ сообщения чата в память (PageRequest Integer.MAX_VALUE).

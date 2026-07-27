@@ -182,6 +182,9 @@ public class QualificationServiceImpl implements QualificationService {
                                             int sectionId, String mode) {
         Case entity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
         String language = entity.getLanguage();
 
         if (entity.getQualificationSections() == null && entity.getQualification() != null) {
@@ -202,7 +205,7 @@ public class QualificationServiceImpl implements QualificationService {
         try {
             String responseJson = webClientBuilder.build()
                     .post()
-                    .uri(qualificationSectionUrl(pythonHost, pythonPort, caseNumber))
+                    .uri(qualificationSectionUrl(pythonHost, pythonPort, caseNumber, user.getId()))
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(qualificationSectionBody(sectionId, mode, language))
                     .retrieve()

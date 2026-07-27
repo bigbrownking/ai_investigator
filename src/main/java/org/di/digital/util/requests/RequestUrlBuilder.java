@@ -23,8 +23,8 @@ public class RequestUrlBuilder {
                 String.format("/workspaces/%s/generate-qualification?user_id=%d&mode=hybrid&language=%s",
                         caseNumber, userId, language));
     }
-    public static String qualificationSectionUrl(String host, String port, String caseNumber) {
-        return buildUrl(host, port, String.format("/qualification/%s/regenerate-qualification", caseNumber));
+    public static String qualificationSectionUrl(String host, String port, String caseNumber, long userId) {
+        return buildUrl(host, port, String.format("/qualification/%s/regenerate-qualification?user_id=%d", caseNumber, userId));
     }
     public static String qualificationPromptUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, String.format("/qualification/%s/rephrase", caseNumber));

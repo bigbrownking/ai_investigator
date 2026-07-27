@@ -79,7 +79,8 @@ public class InterrogationQuestionsWriter {
                 requestBody,
                 userMessage.getContent(),
                 answer,
-                language
+                language,
+                interrogation.getFio()
         );
     }
 
@@ -146,6 +147,7 @@ public class InterrogationQuestionsWriter {
             Object requestBody,
             String userMessageContent,
             String answer,
-            String language
+            String language,
+            String fio
     ) {}
 }

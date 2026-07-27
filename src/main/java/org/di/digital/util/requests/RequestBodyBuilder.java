@@ -79,8 +79,9 @@ public class RequestBodyBuilder {
         return body;
     }
 
-    public static Map<String, Object> interrogationContradictionBody(String indication, String language) {
+    public static Map<String, Object> interrogationContradictionBody(String fio, String indication, String language) {
         Map<String, Object> body = new HashMap<>();
+        body.put("fio", fio);
         body.put("indication", indication);
         body.put("language", language);
         return body;

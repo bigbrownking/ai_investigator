@@ -13,10 +13,10 @@ import java.util.regex.Pattern;
 @Service
 public class QualificationDocumentFormatter extends BaseDocumentFormatter {
 
-    private static final Pattern INLINE_HEADER =
-            Pattern.compile("^(.*?[\\.,;:\\s])(УСТАНОВИЛ:|ПОСТАНОВИЛ:)\\s*$");
+    // RU + KZ inline-заголовки в конце строки
+    private static final Pattern INLINE_HEADER = Pattern.compile(
+            "^(.*?[\\.,;:\\s])(УСТАНОВИЛ:|ПОСТАНОВИЛ:|АНЫҚТАДЫМ:|ҚАУЛЫ ЕТТІМ:)\\s*$");
 
-    // === НОВОЕ: рендер из секций ===
     public byte[] generate(List<Map<String, Object>> sections) throws IOException {
         if (sections == null || sections.isEmpty()) {
             throw new IllegalStateException("Квалификация пуста");
@@ -28,47 +28,68 @@ public class QualificationDocumentFormatter extends BaseDocumentFormatter {
             for (Map<String, Object> section : sections) {
                 String text = (String) section.get("text");
                 if (text == null || text.isBlank()) continue;
-                renderSection(doc, text);
+                DocumentDictionary dict = DocumentDictionary.detect(text);
+                renderSection(doc, text, dict);
             }
 
             return writeDocument(doc);
         }
     }
 
-    // Построчная логика — ровно та же, что была в старом generate(String)
-    private void renderSection(XWPFDocument doc, String text) {
+    private void renderSection(XWPFDocument doc, String text, DocumentDictionary dict) {
         String[] paragraphs = text.replace("\r\n", "\n").replace("\r", "\n").split("\\n");
 
         for (int i = 0; i < paragraphs.length; i++) {
             String clean = stripStars(paragraphs[i].trim());
             if (clean.isEmpty()) continue;
 
-            if (clean.equals("ПОСТАНОВЛЕНИЕ")) {
+            if (isTitle(clean, dict)) {
                 formatTitle(doc.createParagraph(), clean);
-            } else if (clean.startsWith("о квалификации")) {
+            } else if (isSubtitle(clean, dict)) {
                 formatSubtitle(doc.createParagraph(), clean);
                 addEmptyLine(doc);
-            } else if (isCity(clean)) {
-                i = handleCityDateLine(paragraphs, i, doc, clean);
+            } else if (isCity(clean, dict)) {
+                i = handleCityDateLine(paragraphs, i, doc, clean, dict);
                 addEmptyLine(doc);
-            } else if (clean.equals("УСТАНОВИЛ:") || clean.equals("ПОСТАНОВИЛ:")) {
+            } else if (isStandaloneHeader(clean, dict)) {
                 addEmptyLine(doc);
                 formatSectionHeader(doc.createParagraph(), clean);
                 addEmptyLine(doc);
             } else if (containsInlineHeader(clean)) {
                 handleTrailingHeader(doc, clean, INLINE_HEADER);
-            } else if (isInvestigatorSignatureBlock(clean, paragraphs, i)) {
+            } else if (isInvestigatorSignatureBlock(clean, paragraphs, i, dict)) {
                 addEmptyLine(doc);
                 addEmptyLine(doc);
-                i = handleInvestigatorSignatureBlock(paragraphs, i, doc);
+                i = handleInvestigatorSignatureBlock(paragraphs, i, doc, dict);
             } else {
                 formatRegularParagraph(doc.createParagraph(), clean);
             }
         }
     }
 
+    private boolean isTitle(String clean, DocumentDictionary dict) {
+        return clean.equals(dict.qualificationTitle)
+                || clean.equals("ПОСТАНОВЛЕНИЕ") || clean.equals("ҚАУЛЫ");
+    }
+
+    private boolean isSubtitle(String clean, DocumentDictionary dict) {
+        for (String m : dict.qualificationSubtitleMarkers) {
+            if (clean.startsWith(m) || clean.contains(m)) return true;
+        }
+        return false;
+    }
+
+    private boolean isStandaloneHeader(String clean, DocumentDictionary dict) {
+        return dict.establishedHeaders.contains(clean)
+                || dict.resolutionHeaders.contains(clean)
+                // на случай смешанного языка секций
+                || clean.equals("УСТАНОВИЛ:") || clean.equals("ПОСТАНОВИЛ:")
+                || clean.equals("АНЫҚТАДЫМ:") || clean.equals("ҚАУЛЫ ЕТТІМ:");
+    }
+
     private boolean containsInlineHeader(String text) {
-        if (text.equals("УСТАНОВИЛ:") || text.equals("ПОСТАНОВИЛ:")) return false;
+        if (text.equals("УСТАНОВИЛ:") || text.equals("ПОСТАНОВИЛ:")
+                || text.equals("АНЫҚТАДЫМ:") || text.equals("ҚАУЛЫ ЕТТІМ:")) return false;
         return INLINE_HEADER.matcher(text).matches();
     }
 }

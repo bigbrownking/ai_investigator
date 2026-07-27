@@ -115,6 +115,7 @@ public abstract class BaseDocumentFormatter {
         r.setFontSize(FONT_SIZE);
         r.setFontFamily(FONT);
     }
+
     protected void formatListHeader(XWPFParagraph p, String text) {
         p.setAlignment(ParagraphAlignment.LEFT);
         p.setIndentationFirstLine(convertPtToTwips(32));
@@ -125,6 +126,7 @@ public abstract class BaseDocumentFormatter {
         r.setFontSize(FONT_SIZE);
         r.setFontFamily(FONT);
     }
+
     protected void formatSubjectParagraph(XWPFParagraph p, String text) {
         p.setAlignment(ParagraphAlignment.BOTH);
         p.setIndentationFirstLine(0);
@@ -136,12 +138,13 @@ public abstract class BaseDocumentFormatter {
         r.setFontSize(FONT_SIZE);
         r.setFontFamily(FONT);
     }
+
     protected int handleHeaderDateLine(String[] paragraphs, int currentIndex,
-                                       XWPFDocument doc, String left) {
+                                       XWPFDocument doc, String left, DocumentDictionary dict) {
         for (int j = currentIndex + 1; j < paragraphs.length; j++) {
             String next = stripStars(paragraphs[j].trim());
             if (next.isEmpty()) continue;
-            if (isDate(next)) {
+            if (isDate(next, dict)) {
                 formatCityDateLine(doc, left, next);
                 return j;
             }
@@ -150,6 +153,7 @@ public abstract class BaseDocumentFormatter {
         formatRegularParagraph(doc.createParagraph(), left);
         return currentIndex;
     }
+
     protected void formatCityDateLine(XWPFDocument doc, String city, String date) {
         XWPFParagraph para = doc.createParagraph();
         para.setAlignment(ParagraphAlignment.LEFT);
@@ -180,25 +184,34 @@ public abstract class BaseDocumentFormatter {
         return text.replace("*", "").trim();
     }
 
-    protected boolean isCity(String text) {
-        return text.startsWith("Составлен")
-                || text.startsWith("г.")
-                || text.startsWith("г ")
-                || text.startsWith("город ");
+    /** Проверка строки-города с учётом языка (префиксы + суффиксы вида "қ."). */
+    protected boolean isCity(String text, DocumentDictionary dict) {
+        for (String p : dict.cityPrefixes) {
+            if (text.startsWith(p)) return true;
+        }
+        for (String s : dict.citySuffixes) {
+            // "Астана қ." — короткая строка, заканчивающаяся на суффикс
+            if (text.endsWith(s) && text.length() <= 40) return true;
+        }
+        return false;
     }
 
-    protected boolean isDate(String text) {
-        return text.contains("года") && (
-                text.matches(".*\\d{1,2}\\s+[\\p{L}\\p{M}]+\\s+\\d{4}.*") ||
-                        (text.contains("«") && text.contains("»"))
-        );
+    protected boolean isDate(String text, DocumentDictionary dict) {
+        return dict.datePattern.matcher(text).matches();
     }
 
-    protected boolean isInvestigatorSignatureBlock(String text, String[] paragraphs, int currentIndex) {
-        if (!(text.startsWith("Следователь") || text.startsWith("Дознаватель") || text.startsWith("Старший следователь")))
-            return false;
-        if (text.contains("рассмотрев") || text.contains("УСТАНОВИЛ") || text.contains("допросил"))
-            return false;
+    protected boolean isInvestigatorSignatureBlock(String text, String[] paragraphs,
+                                                   int currentIndex, DocumentDictionary dict) {
+        boolean startsPos = false;
+        for (String p : dict.investigatorPrefixes) {
+            if (text.startsWith(p)) { startsPos = true; break; }
+        }
+        if (!startsPos) return false;
+
+        for (String stop : dict.investigatorStopWords) {
+            if (text.contains(stop)) return false;
+        }
+
         int nonEmptyAhead = 0;
         for (int j = currentIndex + 1; j < paragraphs.length; j++) {
             if (!stripStars(paragraphs[j].trim()).isEmpty()) nonEmptyAhead++;
@@ -209,11 +222,11 @@ public abstract class BaseDocumentFormatter {
     // ─── Handlers ─────────────────────────────────────────────────────────────
 
     protected int handleCityDateLine(String[] paragraphs, int currentIndex,
-                                     XWPFDocument doc, String city) {
+                                     XWPFDocument doc, String city, DocumentDictionary dict) {
         for (int j = currentIndex + 1; j < paragraphs.length; j++) {
             String next = stripStars(paragraphs[j].trim());
             if (next.isEmpty()) continue;
-            if (isDate(next)) {
+            if (isDate(next, dict)) {
                 formatCityDateLine(doc, city, next);
                 return j;
             }
@@ -225,14 +238,14 @@ public abstract class BaseDocumentFormatter {
     }
 
     protected int handleInvestigatorSignatureBlock(String[] paragraphs, int currentIndex,
-                                                 XWPFDocument doc) {
+                                                   XWPFDocument doc, DocumentDictionary dict) {
         List<String> lines = new ArrayList<>();
         int lastIndex = currentIndex;
 
         for (int j = currentIndex; j < paragraphs.length; j++) {
             String line = stripStars(paragraphs[j].trim());
             if (line.isEmpty()) continue;
-            lines.addAll(splitPositionLine(line));
+            lines.addAll(splitPositionLine(line, dict));
             lastIndex = j;
         }
 
@@ -249,7 +262,6 @@ public abstract class BaseDocumentFormatter {
 
             formatSignatureLineWithTabTwoParts(doc, regionLine, fioLine);
         } else {
-            // Только одна строка — выводим как есть
             formatSignatureLine(doc, lines.get(0));
         }
 
@@ -271,18 +283,16 @@ public abstract class BaseDocumentFormatter {
         }
     }
 
-    protected List<String> splitPositionLine(String line) {
-        String[] splitPoints = {
-                "Следственного", "Департамента", "Агентства", "Управления", "отдела", "отдел", "по "
-        };
-        boolean startsWithPosition = line.startsWith("Следователь") || line.startsWith("Дознаватель")
-                || line.startsWith("Старший следователь") || line.startsWith("Заместитель руководителя")
-                || line.startsWith("Руководитель");
+    protected List<String> splitPositionLine(String line, DocumentDictionary dict) {
+        boolean startsWithPosition = false;
+        for (String p : dict.investigatorPrefixes) {
+            if (line.startsWith(p)) { startsWithPosition = true; break; }
+        }
         if (!startsWithPosition) return List.of(line);
 
         List<String> result = new ArrayList<>();
         String remaining = line;
-        for (String sp : splitPoints) {
+        for (String sp : dict.positionSplitPoints) {
             int idx = remaining.indexOf(" " + sp);
             if (idx > 0) {
                 result.add(remaining.substring(0, idx).trim());
@@ -301,14 +311,6 @@ public abstract class BaseDocumentFormatter {
         CTTabStop tab = tabs.addNewTab();
         tab.setVal(STTabJc.RIGHT);
         tab.setPos(BigInteger.valueOf(TAB_RIGHT_POS));
-    }
-
-    private void writeTabLine(XWPFParagraph para, String left, String right) {
-        XWPFRun l = para.createRun();
-        l.setText(left); l.setFontFamily(FONT); l.setFontSize(FONT_SIZE);
-        l.addTab();
-        XWPFRun r = para.createRun();
-        r.setText(right); r.setFontFamily(FONT); r.setFontSize(FONT_SIZE);
     }
 
     protected byte[] writeDocument(XWPFDocument doc) throws IOException {

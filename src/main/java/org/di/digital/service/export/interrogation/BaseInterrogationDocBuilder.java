@@ -272,7 +272,6 @@ public abstract class BaseInterrogationDocBuilder {
         if (qaList == null || qaList.isEmpty()) return;
 
         for (CaseInterrogationQAResponse qa : qaList) {
-            // Вопрос печатаем, только если он есть (первый элемент может быть «свободным рассказом»)
             if (qa.getQuestion() != null && !qa.getQuestion().isBlank()) {
                 XWPFParagraph qPara = doc.createParagraph();
                 qPara.setAlignment(ParagraphAlignment.BOTH);
