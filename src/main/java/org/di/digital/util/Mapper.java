@@ -221,7 +221,8 @@ public class Mapper {
                 .files(caseEntity.getFiles().stream()
                         .sorted(Comparator
                                 .comparing(CaseFile::getTom, Comparator.nullsLast(Comparator.naturalOrder()))
-                                .thenComparing(f -> extractLeadingNumber(f.getOriginalFileName()), Comparator.nullsLast(Comparator.naturalOrder())).thenComparing(CaseFile::getOriginalFileName, Comparator.nullsLast(Comparator.naturalOrder())))
+                                .thenComparing(CaseFile::getOrderIndex, Comparator.nullsLast(Comparator.naturalOrder()))
+                                .thenComparing(CaseFile::getUploadedAt, Comparator.nullsLast(Comparator.naturalOrder())))
                         .map(this::mapToCaseFileResponse)
                         .collect(Collectors.toList()))
                 .interrogations(caseEntity.getInterrogations().stream()
