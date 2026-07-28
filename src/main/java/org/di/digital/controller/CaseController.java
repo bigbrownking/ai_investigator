@@ -410,4 +410,18 @@ public class CaseController {
         CaseFileResponse response = caseService.getFileByName(caseId, fileName, authentication.getName());
         return ResponseEntity.ok(response);
     }
+
+    @GetMapping("/{caseNumber}/rejection-reason")
+        public ResponseEntity<RejectionReasonResponse> getRejectionReason(
+                @PathVariable String caseNumber,
+                Authentication authentication
+        ) {
+        log.info("Getting rejection reason for case: {} by user: {}",
+                caseNumber, authentication.getName());
+
+        RejectionReasonResponse response = caseService.getRejectionReason(caseNumber, authentication.getName());
+        return ResponseEntity.ok(response);
+}
+
+
 }

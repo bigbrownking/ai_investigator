@@ -977,4 +977,26 @@ public class CaseServiceImpl implements CaseService {
 
                 return mapper.mapToCaseFileResponse(caseFile);
         }
+
+        @Override
+        @Transactional
+        public RejectionReasonResponse getRejectionReason(String caseNumber, String email) {
+                Case caseEntity = caseRepository.findByNumber(caseNumber)
+                                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+
+                RejectionReasonStatus rejection = rejectionReasonStatusRepository
+                                .findByCaseNumber(caseNumber)
+                                .orElse(null);
+                if (rejection == null) {
+                        return null;
+                }
+                return RejectionReasonResponse.builder()
+                                .id(rejection.getId())
+                                .caseNumber(rejection.getCaseNumber())
+                                .status(rejection.isStatus())
+                                .rejectionReason(rejection.getRejectionReason())
+                                .timestamp(rejection.getTimestamp())
+                                .build();
+
+        }
 }

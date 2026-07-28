@@ -53,6 +53,8 @@ public interface CaseService {
 
     CaseFileResponse getFileByName(Long caseId, String fileName, String email);
 
+    RejectionReasonResponse getRejectionReason(String caseNumber, String email);
+
 
     // Migration methods
     void migrateAllCaseToms();
