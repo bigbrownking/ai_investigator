@@ -23,13 +23,13 @@ public class RejectionReasonStatus{
     private Long id;
 
     @Column(name = "user_id")
-    private Long user_id;
+    private Long userId;
 
     @Column(name = "case_id")
-    private Long case_id;
+    private Long caseId;
 
     @Column(name = "case_number")
-    private String case_number;
+    private String caseNumber;
 
     @Column(nullable = false)
     private boolean status;

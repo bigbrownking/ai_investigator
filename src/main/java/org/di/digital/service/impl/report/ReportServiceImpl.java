@@ -7,7 +7,7 @@ import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
-import org.di.digital.model.enums.ReportRejectionReason;
+
 import org.di.digital.model.report.CaseReport;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.review.CaseReportRepository;
@@ -178,21 +178,5 @@ public class ReportServiceImpl implements ReportService {
         } catch (IOException e) {
             throw new IllegalStateException("Не удалось прочитать файл отчёта", e);
         }
-    }
-    @Override
-    @Transactional
-    public CaseReport updateCaseReport(String caseNumber, ReportRejectionReason reason) {
-        CaseReport report = caseReportRepository.findByCaseEntityNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Отчет не найден: " + caseNumber));
-
-        if (reason != null){
-            report.setStatus(CaseFileStatusEnum.FAILED);
-            report.setReportRejectionReason(reason);
-        } else{
-            report.setStatus(CaseFileStatusEnum.COMPLETED);
-            report.setReportRejectionReason(null);
-        }
-        report.setCompletedAt(LocalDateTime.now());
-        return caseReportRepository.save(report);
     }
 }
