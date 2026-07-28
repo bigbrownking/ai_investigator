@@ -375,7 +375,7 @@ public class AdminServiceImpl implements AdminService {
         List<Case> ownedCases = new ArrayList<>(user.getOwnedCases());
 
         for (Case c : ownedCases) {
-            caseService.updateCaseStatus(c.getId(), false, user.getEmail());
+            caseService.updateCaseStatus(c.getId(), false, user.getEmail(), null);
 
             if (regionAdmin != null) {
                 c.setOwner(regionAdmin);

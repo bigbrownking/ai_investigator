@@ -18,6 +18,7 @@ import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
+import org.di.digital.model.enums.CaseRejectionReason;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.admin.AdminService;
 import org.di.digital.service.auth.AuthService;
@@ -72,12 +73,13 @@ public class AdminController {
     public ResponseEntity<CaseResponse> updateCaseStatus(
             @PathVariable Long caseId,
             @RequestParam boolean status,
+            @RequestParam(required = false) CaseRejectionReason reason,
             Authentication authentication
     ) {
         log.info("Updating case {} status to {} by user: {}",
                 caseId, status, authentication.getName());
 
-        caseService.updateCaseStatus(caseId, status, authentication.getName());
+        caseService.updateCaseStatus(caseId, status, authentication.getName(), reason);
         return ResponseEntity.ok().build();
     }
 

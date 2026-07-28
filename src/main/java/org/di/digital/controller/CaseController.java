@@ -11,6 +11,7 @@ import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.FigurantResponse;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.enums.CaseRejectionReason;
 import org.di.digital.model.enums.FileType;
 import org.di.digital.service.cases.CaseFileService;
 import org.di.digital.service.cases.CaseService;
@@ -34,6 +35,7 @@ public class CaseController {
     private final CaseService caseService;
     private final CaseFileService caseFileService;
     private final FigurantSyncService figurantSyncService;
+    
 
     @PostMapping(consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<CaseResponse> createCase(
@@ -175,12 +177,13 @@ public class CaseController {
     public ResponseEntity<CaseResponse> updateCaseStatus(
             @PathVariable Long caseId,
             @RequestParam boolean status,
+            @RequestParam(required = false) CaseRejectionReason reason,
             Authentication authentication
     ) {
         log.info("Updating case {} status to {} by user: {}",
-                caseId, status, authentication.getName());
+                caseId, status, authentication.getName(), reason);
 
-        caseService.updateCaseStatus(caseId, status, authentication.getName());
+        caseService.updateCaseStatus(caseId, status, authentication.getName(), reason);
         return ResponseEntity.ok().build();
     }
 
