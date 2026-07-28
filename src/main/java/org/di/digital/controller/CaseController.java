@@ -411,17 +411,17 @@ public class CaseController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/{caseNumber}/rejection-reason")
-        public ResponseEntity<RejectionReasonResponse> getRejectionReason(
+    @GetMapping("/caseNumber/status/history")
+    public ResponseEntity<List<RejectionReasonResponse>> getRejectionReasonResponseHistory(
                 @PathVariable String caseNumber,
                 Authentication authentication
-        ) {
-        log.info("Getting rejection reason for case: {} by user: {}",
-                caseNumber, authentication.getName());
-
-        RejectionReasonResponse response = caseService.getRejectionReason(caseNumber, authentication.getName());
-        return ResponseEntity.ok(response);
-}
+    ){
+        log.info("Getting rejection reason history for case: {} by user: {}",
+            caseNumber, authentication.getName());
+        return ResponseEntity.ok(
+                caseService.getRejectionReasonResponseHistory(caseNumber, authentication.getName())
+        );
+    }
 
 
 }

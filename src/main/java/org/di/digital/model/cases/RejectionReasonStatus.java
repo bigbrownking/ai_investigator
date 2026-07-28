@@ -31,6 +31,9 @@ public class RejectionReasonStatus{
     @Column(name = "case_number")
     private String caseNumber;
 
+    @Column(name = "performed_by_fio")
+    private String performedByFio;
+
     @Column(nullable = false)
     private boolean status;
 

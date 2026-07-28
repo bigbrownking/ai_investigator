@@ -20,5 +20,6 @@ public class RejectionReasonResponse{
     private boolean status;
     private CaseRejectionReason rejectionReason;
     private LocalDateTime timestamp;
+    private String performedByFio;
 
 }

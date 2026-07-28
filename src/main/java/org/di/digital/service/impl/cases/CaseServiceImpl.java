@@ -364,17 +364,16 @@ public class CaseServiceImpl implements CaseService {
 
                 if (!status && reason != null) {
                         User user = userRepository.findByEmail(email).orElse(null);
-                        RejectionReasonStatus rejection = rejectionReasonStatusRepository
-                                        .findByCaseNumber(caseNumber)
-                                        .orElseGet(() -> RejectionReasonStatus.builder()
-                                                        .caseNumber(caseNumber)
-                                                        .build());
-
-                        rejection.setUserId(user != null ? user.getId() : null);
-                        rejection.setStatus(false);
-                        rejection.setRejectionReason(reason);
+                        RejectionReasonStatus rejection = RejectionReasonStatus.builder()
+                                .caseNumber(caseNumber)
+                                .caseId(caseId)
+                                .userId(user != null ? user.getId() : null)
+                                .status(false)
+                                .performedByFio(user.getFio())
+                                .rejectionReason(reason)
+                                .build();
                         rejectionReasonStatusRepository.save(rejection);
-                }
+}
 
                 devService.setCasePriority(caseNumber, status ? 0 : -1);
 
@@ -978,25 +977,32 @@ public class CaseServiceImpl implements CaseService {
                 return mapper.mapToCaseFileResponse(caseFile);
         }
 
+        
+
         @Override
         @Transactional
-        public RejectionReasonResponse getRejectionReason(String caseNumber, String email) {
+        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(String caseNumber, String email){
                 Case caseEntity = caseRepository.findByNumber(caseNumber)
-                                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                        .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                User user = userRepository.findByEmail(email)
+                      .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
-                RejectionReasonStatus rejection = rejectionReasonStatusRepository
-                                .findByCaseNumber(caseNumber)
-                                .orElse(null);
-                if (rejection == null) {
-                        return null;
-                }
-                return RejectionReasonResponse.builder()
+                validateOwnerAccess(caseEntity, user);
+
+                // log.info("Rejection reason history for case {}: {} records", caseNumber, result.size());
+
+                return rejectionReasonStatusRepository
+                        .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
+                        .stream()
+                        .map(rejection -> RejectionReasonResponse.builder()
                                 .id(rejection.getId())
                                 .caseNumber(rejection.getCaseNumber())
                                 .status(rejection.isStatus())
                                 .rejectionReason(rejection.getRejectionReason())
+                                .performedByFio(rejection.getPerformedByFio())
                                 .timestamp(rejection.getTimestamp())
-                                .build();
+                                .build())
+                        .toList();
 
         }
 }
