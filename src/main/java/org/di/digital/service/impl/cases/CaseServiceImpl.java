@@ -980,18 +980,16 @@ public class CaseServiceImpl implements CaseService {
         
 
         @Override
-        @Transactional
-        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(String caseNumber, String email){
+        @Transactional(readOnly = true)
+        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(String caseNumber, String email) {
                 Case caseEntity = caseRepository.findByNumber(caseNumber)
                         .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
                 User user = userRepository.findByEmail(email)
-                      .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                        .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
                 validateOwnerAccess(caseEntity, user);
 
-                // log.info("Rejection reason history for case {}: {} records", caseNumber, result.size());
-
-                return rejectionReasonStatusRepository
+                List<RejectionReasonResponse> result = rejectionReasonStatusRepository
                         .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
                         .stream()
                         .map(rejection -> RejectionReasonResponse.builder()
@@ -1004,5 +1002,13 @@ public class CaseServiceImpl implements CaseService {
                                 .build())
                         .toList();
 
-        }
+                if (!user.hasRole("ADMIN")) {
+                        logService.log(
+                                String.format("Viewed rejection reason history for case %s by user %s (%d records)",
+                                        caseNumber, email, result.size()),
+                                LogLevel.INFO, LogAction.CASE_STATUS_CHANGED, caseNumber, email);
+                }
+
+                return result;
+}
 }
