@@ -22,15 +22,6 @@ public class RejectionReasonStatus{
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "user_id")
-    private Long userId;
-
-    @Column(name = "case_id")
-    private Long caseId;
-
-    @Column(name = "case_number")
-    private String caseNumber;
-
     @Column(name = "performed_by_fio")
     private String performedByFio;
 

@@ -365,9 +365,6 @@ public class CaseServiceImpl implements CaseService {
                 if (!status && reason != null) {
                         User user = userRepository.findByEmail(email).orElse(null);
                         RejectionReasonStatus rejection = RejectionReasonStatus.builder()
-                                        .caseNumber(caseNumber)
-                                        .caseId(caseId)
-                                        .userId(user != null ? user.getId() : null)
                                         .status(false)
                                         .performedByFio(user.getFio())
                                         .rejectionReason(reason)
@@ -979,30 +976,23 @@ public class CaseServiceImpl implements CaseService {
 
         @Override
         @Transactional(readOnly = true)
-        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(String caseNumber, String email) {
-                Case caseEntity = caseRepository.findByNumber(caseNumber)
-                                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(String email) {
+        
                 User user = userRepository.findByEmail(email)
                                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
-                String userFio = user.getFio();
+                List<RejectionReasonResponse> result = rejectionReasonStatusRepository
+                .findAllByCaseNumberAndPerformedByFioOrderByTimestampDesc(user.getFio())
+                .stream()
+                .map(mapper::toRejectionReasonResponse)
+                .toList();
 
-                validateOwnerAccess(caseEntity, user);
+        logService.log(
+                String.format("Viewed rejection reason history by user %s (%d records)",
+                        email, result.size()),
+                LogLevel.INFO, LogAction.CASE_STATUS_CHANGED, null, email);
 
-                logService.log(
-                                String.format("Viewed rejection reason history for case %s by user %s",
-                                                caseNumber, email),
-                                LogLevel.INFO, LogAction.CASE_STATUS_CHANGED, caseNumber, email);
-
-                return rejectionReasonStatusRepository
-                                .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
-                                .stream()
-                                .filter(rej -> userFio.equals(rej.getPerformedByFio()))
-                                .map(mapper::toRejectionReasonResponse)
-                                .toList();
-
-                
-
+        return result;
                
         }
 }

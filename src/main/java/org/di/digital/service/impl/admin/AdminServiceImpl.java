@@ -711,13 +711,13 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-    @Override
+        @Override
         @Transactional(readOnly = true)
-        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(String caseNumber, String email) {
+        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(String email) {
              
 
                 List<RejectionReasonResponse> result = rejectionReasonStatusRepository
-                                .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
+                                .findAllByCaseNumberOrderByTimestampDesc()
                                 .stream()
                                 .map(mapper::toRejectionReasonResponse)
                                 .toList();

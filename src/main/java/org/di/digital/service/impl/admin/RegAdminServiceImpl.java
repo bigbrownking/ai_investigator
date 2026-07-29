@@ -367,25 +367,31 @@ public class RegAdminServiceImpl implements RegAdminService {
         return caseEntity.getPlan();
     }
     
-    @Override
+        @Override
         @Transactional(readOnly = true)
-        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long adminId, String caseNumber, String email) {
+        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long adminId,String email) {
                 User admin = userRepository.findById(adminId)
                         .orElseThrow(() -> new IllegalStateException("Региональный админ не найден"));
 
-                Case caseEntity = caseRepository.findByNumber(caseNumber)
-                        .orElseThrow(() -> new IllegalStateException("Дело не найдено"));
-                validateRegionAccess(admin, caseEntity, regionRepository);
+                List<Region> adminRegions = getAdminRegions(admin, regionRepository);
+                List<Long> regionIds = adminRegions.stream().map(Region::getId).toList();
 
-                List<RejectionReasonResponse> result = rejectionReasonStatusRepository
-                                .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
-                                .stream()
-                                .map(mapper::toRejectionReasonResponse)
-                                .toList();
+                if (regionIds.isEmpty()) return List.of();
 
+                List<String> caseNumbers = caseRepository.findByOwnerRegionIdIn(regionIds)
+                        .stream()
+                        .map(Case::getNumber)
+                        .toList();
 
-                return result;
-        }
+                if (caseNumbers.isEmpty()) return List.of();
+                
+
+                 return rejectionReasonStatusRepository
+                        .findAllByCaseNumberInOrderByTimestampDesc(caseNumbers)
+                        .stream()
+                        .map(mapper::toRejectionReasonResponse)
+                        .toList();
+                        }
 
 
 }

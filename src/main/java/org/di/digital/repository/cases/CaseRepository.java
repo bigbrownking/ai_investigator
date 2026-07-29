@@ -81,4 +81,6 @@ public interface CaseRepository extends JpaRepository<Case, Long>, JpaSpecificat
     @Transactional
     @Query(value = "DELETE FROM case_users WHERE user_id = :userId", nativeQuery = true)
     void removeUserFromAllCases(@Param("userId") Long userId);
+
+    List<Case> findByOwnerRegionIdIn(List<Long> regionIds);
 }

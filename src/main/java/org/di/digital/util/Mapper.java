@@ -776,7 +776,6 @@ public class Mapper {
     public RejectionReasonResponse toRejectionReasonResponse(RejectionReasonStatus rejection) {
     return RejectionReasonResponse.builder()
             .id(rejection.getId())
-            .caseNumber(rejection.getCaseNumber())
             .status(rejection.isStatus())
             .rejectionReason(rejection.getRejectionReason())
             .performedByFio(rejection.getPerformedByFio())

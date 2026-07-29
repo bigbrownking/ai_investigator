@@ -53,7 +53,7 @@ public interface CaseService {
 
     CaseFileResponse getFileByName(Long caseId, String fileName, String email);
 
-    List<RejectionReasonResponse> getRejectionReasonResponseHistory(String caseNumber, String email);
+    List<RejectionReasonResponse> getRejectionReasonResponseHistory(String email);
     
 
 
