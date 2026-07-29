@@ -378,16 +378,16 @@ public class RegAdminServiceImpl implements RegAdminService {
 
                 if (regionIds.isEmpty()) return List.of();
 
-                List<String> caseNumbers = caseRepository.findByOwnerRegionIdIn(regionIds)
+                List<Long> caseIds = caseRepository.findByOwnerRegionIdIn(regionIds)
                         .stream()
-                        .map(Case::getNumber)
+                        .map(Case::getId)
                         .toList();
 
-                if (caseNumbers.isEmpty()) return List.of();
+                if (caseIds.isEmpty()) return List.of();
                 
 
                  return rejectionReasonStatusRepository
-                        .findAllByCaseNumberInOrderByTimestampDesc(caseNumbers)
+                        .findAllByCaseIdInOrderByTimestampDesc(caseIds)
                         .stream()
                         .map(mapper::toRejectionReasonResponse)
                         .toList();

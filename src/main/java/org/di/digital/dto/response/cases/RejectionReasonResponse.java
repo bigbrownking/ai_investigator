@@ -17,7 +17,6 @@ import lombok.NoArgsConstructor;
 public class RejectionReasonResponse{
     private Long id;
     private Long userId;
-    private String caseNumber;
     private boolean status;
     private CaseRejectionReason rejectionReason;
     private LocalDateTime timestamp;
