@@ -66,6 +66,9 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final AudioUploadWriter audioUploadWriter;
     private final ApplicationFileWriter applicationFileWriter;
 
+    @Value("${files.max-pages-per-file}")
+    private int maxPagesPerFile;
+
     @Value("${model.host}")
     private String pythonHost;
 
@@ -690,28 +693,37 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 continue;
             }
 
+            Integer pages = null;
             try {
-                CaseInterrogationApplicationFile appFile =
-                        minioService.uploadApplicationFile(file, ctx.caseNumber(), ctx.fio());
+                pages = pageCounter.countPages(file.getBytes(), file.getContentType());
+            } catch (Exception e) {
+                log.warn("Could not count pages for {}: {}", originalName, e.getMessage());
+            }
 
-                Integer pages = null;
-                try {
-                    pages = pageCounter.countPagesByUrl(appFile.getFileUrl(), appFile.getContentType());
-                } catch (Exception e) {
-                    log.warn("Could not count pages for {}: {}", appFile.getOriginalFileName(), e.getMessage());
+            if (pages != null && pages > maxPagesPerFile) {
+                for (ApplicationFileWriter.UploadedFile u : uploaded) {
+                    minioService.deleteFile(u.fileUrl());
                 }
+                throw new IllegalArgumentException(
+                        String.format("Файл \"%s\" содержит %d страниц. Максимум — %d страниц на файл.",
+                                originalName, pages, maxPagesPerFile));
+            }
 
-                String displayName = displayNames.getOrDefault(originalName, originalName);
-
-                uploaded.add(new ApplicationFileWriter.UploadedFile(
-                        appFile.getOriginalFileName(), appFile.getStoredFileName(), appFile.getFileUrl(),
-                        appFile.getContentType(), appFile.getFileSize(), appFile.getUploadedAt(),
-                        displayName, pages));
-                seenInThisBatch.add(originalName);
-
+            CaseInterrogationApplicationFile appFile;
+            try {
+                appFile = minioService.uploadApplicationFile(file, ctx.caseNumber(), ctx.fio());
             } catch (Exception e) {
                 log.error("Failed to upload application file: {} for interrogation: {}", originalName, interrogationId, e);
+                continue;
             }
+
+            String displayName = displayNames.getOrDefault(originalName, originalName);
+
+            uploaded.add(new ApplicationFileWriter.UploadedFile(
+                    appFile.getOriginalFileName(), appFile.getStoredFileName(), appFile.getFileUrl(),
+                    appFile.getContentType(), appFile.getFileSize(), appFile.getUploadedAt(),
+                    displayName, pages));
+            seenInThisBatch.add(originalName);
         }
 
         if (uploaded.isEmpty()) {

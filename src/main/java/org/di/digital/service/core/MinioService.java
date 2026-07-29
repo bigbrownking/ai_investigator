@@ -8,6 +8,7 @@ import java.io.InputStream;
 
 public interface MinioService {
     CaseFile uploadFile(MultipartFile file, String folder);
+    CaseFile uploadFile(MultipartFile file, String folder, boolean validateType);
     CaseInterrogationApplicationFile uploadApplicationFile(MultipartFile file, String folder, String fio);
     String uploadAudio(MultipartFile file, String folder, String fio);
     String generatePresignedUrlForPreview(String objectPath);

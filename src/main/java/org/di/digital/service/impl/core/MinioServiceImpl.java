@@ -43,8 +43,15 @@ public class MinioServiceImpl implements MinioService {
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "doc", "docx", "xls", "xlsx");
 
 
+    @Override
     public CaseFile uploadFile(MultipartFile file, String folder) {
-        validateFileType(file.getOriginalFilename());
+        return uploadFile(file, folder, true);
+    }
+    @Override
+    public CaseFile uploadFile(MultipartFile file, String folder, boolean validateType) {
+        if (validateType) {
+            validateFileType(file.getOriginalFilename());
+        }
 
         try {
             ensureBucketExists();
@@ -63,7 +70,6 @@ public class MinioServiceImpl implements MinioService {
                 );
             }
 
-            // Store the object path instead of direct URL
             String objectPath = bucketName + "/" + objectName;
 
             return CaseFile.builder()

@@ -7,6 +7,8 @@ import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Getter
@@ -26,22 +28,19 @@ public class Review {
     @JoinColumn(name = "user_id")
     private User user;
 
-    @Column(nullable = false)
+    @Column(columnDefinition = "TEXT")
     private String subject;
 
-    @Column(nullable = false, columnDefinition = "TEXT")
-    private String message;
-
-    @Column(name = "file_url")
-    private String fileUrl;
-
-    @Column(name = "original_file_name")
-    private String originalFileName;
-
-    @Column(name = "content_type")
-    private String contentType;
+    @Builder.Default
+    @OneToMany(mappedBy = "review", cascade = CascadeType.ALL, orphanRemoval = true)
+    private List<ReviewItem> items = new ArrayList<>();
 
     @CreatedDate
     @Column(name = "created_at", updatable = false)
     private LocalDateTime createdAt;
+
+    public void addItem(ReviewItem item) {
+        items.add(item);
+        item.setReview(this);
+    }
 }

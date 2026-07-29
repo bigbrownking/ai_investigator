@@ -29,7 +29,6 @@ public class LogServiceImpl implements LogService {
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(String description, LogLevel level, LogAction action,
                     String caseNumber, String email) {
-        // старый путь — только для синхронного контекста (есть HTTP-запрос)
         String ip = tryGetIp();
         log(description, level, action, caseNumber, email, ip);
     }

@@ -10,15 +10,15 @@ import org.di.digital.dto.response.osmotr.OsmotrResultSegmentDto;
 import org.di.digital.dto.response.plan.ManagementPendingPlanDto;
 import org.di.digital.dto.response.plan.PlanApprovalHistoryDto;
 import org.di.digital.dto.response.plan.PlanEditHistoryDto;
-import org.di.digital.dto.response.support.ReviewDto;
-import org.di.digital.dto.response.support.SupportTicketDto;
-import org.di.digital.dto.response.support.SupportTicketPhotoDto;
+import org.di.digital.dto.response.support.*;
 import org.di.digital.dto.response.user.*;
 import org.di.digital.model.cases.CaseMemberHistory;
+import org.di.digital.model.enums.dictionary.ModuleType;
 import org.di.digital.model.osmotr.OsmotrResult;
 import org.di.digital.model.plan.CasePlan;
 import org.di.digital.model.plan.PlanApprovalHistory;
 import org.di.digital.model.plan.PlanEditHistory;
+import org.di.digital.model.support.ReviewItem;
 import org.di.digital.model.user.Administration;
 import org.di.digital.model.user.Appeal;
 import org.di.digital.model.cases.Case;
@@ -583,31 +583,31 @@ public class Mapper {
                 .build();
     }
 
-    public ProfessionDto toProfessionDto(Profession profession) {
-        return ProfessionDto.builder()
-                .id(profession.getId())
-                .name(profession.getRuName())
-                .build();
-    }
-
-    public RankDto toRankDto(Rank rank) {
-        return RankDto.builder()
-                .id(rank.getId())
-                .name(rank.getRuName())
-                .build();
-    }
-
-    public RegionDto toRegionDto(Region region) {
+    public RegionDto toRegionDto(Region region, UserSettingsLanguage lang) {
         return RegionDto.builder()
                 .id(region.getId())
-                .name(region.getRuName())
+                .name(localizationHelper.getLocalizedName(region, lang))
                 .build();
     }
 
-    public AdministrationDto toAdministrationDto(Administration administration) {
+    public AdministrationDto toAdministrationDto(Administration administration, UserSettingsLanguage lang) {
         return AdministrationDto.builder()
                 .id(administration.getId())
-                .name(administration.getRuName())
+                .name(localizationHelper.getLocalizedName(administration, lang))
+                .build();
+    }
+
+    public ProfessionDto toProfessionDto(Profession profession, UserSettingsLanguage lang) {
+        return ProfessionDto.builder()
+                .id(profession.getId())
+                .name(localizationHelper.getLocalizedName(profession, lang))
+                .build();
+    }
+
+    public RankDto toRankDto(Rank rank, UserSettingsLanguage lang) {
+        return RankDto.builder()
+                .id(rank.getId())
+                .name(localizationHelper.getLocalizedName(rank, lang))
                 .build();
     }
 
@@ -676,26 +676,45 @@ public class Mapper {
     }
 
     public ReviewDto mapToReviewDto(Review review) {
-        String previewUrl = review.getFileUrl() != null
-                ? minioService.generatePresignedUrlForPreview(review.getFileUrl())
-                : null;
-        String downloadUrl = review.getFileUrl() != null
-                ? minioService.generatePresignedUrlForDownload(review.getFileUrl(), review.getOriginalFileName())
-                : null;
-
         User user = review.getUser();
         return ReviewDto.builder()
                 .id(review.getId())
-                .fio(user.getSurname() + " " + user.getName() + " " + user.getFathername())
-                .region(user.getRegion().getRuName())
-                .profession(user.getProfession().getRuName())
                 .subject(review.getSubject())
-                .message(review.getMessage())
                 .createdAt(review.getCreatedAt())
-                .originalFileName(review.getOriginalFileName())
-                .contentType(review.getContentType())
-                .previewUrl(previewUrl)
-                .downloadUrl(downloadUrl)
+                .fio(user != null ? user.getFio() : null)
+                .region(user != null && user.getRegion() != null ? user.getRegion().getRuName() : null)
+                .profession(user != null && user.getProfession() != null ? user.getProfession().getRuName() : null)
+                .items(review.getItems() == null ? List.of()
+                        : review.getItems().stream()
+                        .map(this::mapToReviewItemDto)
+                        .collect(Collectors.toList()))
+                .build();
+    }
+
+    private ReviewItemDto mapToReviewItemDto(ReviewItem item) {
+        ModuleType module = null;
+        if (item.getModule() != null) {
+            try {
+                module = ModuleType.from(item.getModule());
+            } catch (IllegalArgumentException ignored) {
+            }
+        }
+
+        List<ReviewFileDto> files = item.getFiles() == null ? List.of()
+                : item.getFiles().stream()
+                .map(f -> ReviewFileDto.builder()
+                        .originalFileName(f.getOriginalFileName())
+                        .contentType(f.getContentType())
+                        .previewUrl(minioService.generatePresignedUrlForPreview(f.getFileUrl()))
+                        .downloadUrl(minioService.generatePresignedUrlForDownload(f.getFileUrl(), f.getOriginalFileName()))
+                        .build())
+                .collect(Collectors.toList());
+
+        return ReviewItemDto.builder()
+                .moduleCode(item.getModule())
+                .moduleName(module != null ? module.localized(UserSettingsLanguage.RU) : null)
+                .message(item.getMessage())
+                .files(files)
                 .build();
     }
 

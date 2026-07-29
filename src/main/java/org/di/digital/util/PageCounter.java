@@ -133,4 +133,34 @@ public class PageCounter {
         int charsPerPage = 3000;
         return (int) Math.ceil((double) text.length() / charsPerPage);
     }
+
+    public Integer countPages(byte[] bytes, String contentType) {
+        if (contentType == null || bytes == null || bytes.length == 0) return null;
+        try {
+            return switch (contentType) {
+                case "application/pdf" -> countPdfPages(bytes);
+                case "application/vnd.openxmlformats-officedocument.wordprocessingml.document" ->
+                        countByConvertingToPdf(bytes, "docx");
+                case "application/msword" ->
+                        countByConvertingToPdf(bytes, "doc");
+                case "text/plain" -> countTxtPagesFromBytes(bytes);
+                default -> null;
+            };
+        } catch (Exception e) {
+            log.warn("Could not count pages from bytes: {}", e.getMessage());
+            return null;
+        }
+    }
+
+    private Integer countPdfPages(byte[] bytes) throws Exception {
+        try (PDDocument doc = Loader.loadPDF(bytes)) {
+            return doc.getNumberOfPages();
+        }
+    }
+
+    private Integer countTxtPagesFromBytes(byte[] bytes) {
+        String text = new String(bytes, StandardCharsets.UTF_8);
+        int charsPerPage = 3000;
+        return (int) Math.ceil((double) text.length() / charsPerPage);
+    }
 }

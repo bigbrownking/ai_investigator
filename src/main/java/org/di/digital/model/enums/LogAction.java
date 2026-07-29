@@ -55,6 +55,8 @@ public enum LogAction {
     INTERROGATION_CATEGORY_CONFIRMED("Подтверждение категории допрашиваемого"),
     INTERROGATION_BREAK_STARTED("Начало перерыва допроса"),
     INTERROGATION_LIMIT_OVERRIDE("Превышение лимита проведения допроса"),
+    REVIEW_CREATE("Создание рецензии"),
+    SUPPORT_TICKET_CREATE("Создание обращения в поддержку"),
     NO_ACCESS("Нет доступа");
 
     private final String description;

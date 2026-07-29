@@ -12,6 +12,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.multipart.MultipartHttpServletRequest;
 
 import java.util.List;
 
@@ -34,8 +35,9 @@ public class FeedbackController {
     @PostMapping(value = "/review", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
     public ResponseEntity<ReviewDto> createReview(
             @RequestPart("request") ReviewRequest request,
-            @RequestPart(value = "file", required = false) MultipartFile file,
+            MultipartHttpServletRequest multipart,
             Authentication authentication) {
-        return ResponseEntity.ok(feedbackService.createReview(request, file, authentication.getName()));
+        return ResponseEntity.ok(
+                feedbackService.createReview(request, multipart, authentication.getName()));
     }
 }

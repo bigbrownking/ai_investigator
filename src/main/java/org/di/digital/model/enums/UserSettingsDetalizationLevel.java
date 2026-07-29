@@ -4,14 +4,26 @@ import lombok.Getter;
 
 @Getter
 public enum UserSettingsDetalizationLevel {
-    LOW("Легкий"),
-    MEDIUM("Средний"),
-    HIGH("Тяжелый");
+    LOW("Легкий", "Жеңіл", "Easy"),
+    MEDIUM("Средний", "Орташа", "Medium"),
+    HIGH("Тяжелый", "Ауыр", "Hard");
 
     private final String level;
+    private final String kzName;
+    private final String enName;
 
-    UserSettingsDetalizationLevel(String level) {
+    UserSettingsDetalizationLevel(String level, String kzName, String enName) {
         this.level = level;
+        this.kzName = kzName;
+        this.enName = enName;
+    }
+
+    public String localized(UserSettingsLanguage lang) {
+        return switch (lang) {
+            case KZ -> kzName;
+            case EN -> enName;
+            case RU -> level;
+        };
     }
 
     public static UserSettingsDetalizationLevel fromDisplayName(String displayName) {

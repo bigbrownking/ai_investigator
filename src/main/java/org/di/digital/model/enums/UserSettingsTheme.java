@@ -4,13 +4,25 @@ import lombok.Getter;
 
 @Getter
 public enum UserSettingsTheme {
-    DARK("Темная"),
-    LIGHT("Светлая");
+    DARK("Темная", "Қараңғы", "Dark"),
+    LIGHT("Светлая", "Ашық", "Light");
 
     private final String theme;
+    private final String kzName;
+    private final String enName;
 
-    UserSettingsTheme(String theme) {
+    UserSettingsTheme(String theme, String kzName, String enName) {
         this.theme = theme;
+        this.kzName = kzName;
+        this.enName = enName;
+    }
+
+    public String localized(UserSettingsLanguage lang) {
+        return switch (lang) {
+            case KZ -> kzName;
+            case EN -> enName;
+            case RU -> theme;
+        };
     }
 
     public static UserSettingsTheme fromDisplayName(String displayName) {

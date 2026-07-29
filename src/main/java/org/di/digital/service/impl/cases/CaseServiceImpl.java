@@ -68,8 +68,8 @@ public class CaseServiceImpl implements CaseService {
     private final CaseWriter caseWriter;
     private final CaseMemberHistoryRepository caseMemberHistoryRepository;
 
-    private static final int MAX_PAGES_PER_TOM = 180;
-
+    @Value("${files.max-pages-per-file}")
+    private int maxPagesPerFile;
 
     @Value("${model.host}")
     private String pythonHost;
@@ -105,7 +105,7 @@ public class CaseServiceImpl implements CaseService {
         for (CaseFile file : newFiles) {
             int filePages = file.getPages() == null ? 0 : file.getPages();
 
-            if (currentPages > 0 && currentPages + filePages > MAX_PAGES_PER_TOM) {
+            if (currentPages > 0 && currentPages + filePages > maxPagesPerFile) {
                 currentTom++;
                 currentPages = 0;
             }
@@ -916,30 +916,43 @@ public class CaseServiceImpl implements CaseService {
 
         for (MultipartFile file : files) {
             if (file.isEmpty()) continue;
+
             String originalName = file.getOriginalFilename();
             if (seen.contains(originalName)) {
                 log.warn("File already exists: {} in case {}", originalName, caseNumber);
                 continue;
             }
+
+            Integer pages = null;
             try {
-                CaseFile caseFile = minioService.uploadFile(file, caseNumber);
+                pages = pageCounter.countPages(file.getBytes(), file.getContentType());
+            } catch (Exception e) {
+                log.warn("Could not count pages for {}: {}", originalName, e.getMessage());
+            }
 
-                Integer pages = null;
-                try {
-                    pages = pageCounter.countPagesByUrl(caseFile.getFileUrl(), caseFile.getContentType());
-                } catch (Exception e) {
-                    log.warn("Could not count pages for {}: {}", caseFile.getOriginalFileName(), e.getMessage());
+            if (pages != null && pages > maxPagesPerFile) {
+                for (CaseFileWriter.UploadedFile u : uploaded) {
+                    minioService.deleteFile(u.fileUrl());
                 }
+                throw new IllegalArgumentException(
+                        String.format("Файл \"%s\" содержит %d страниц. Максимум — %d страниц на файл.",
+                                originalName, pages, maxPagesPerFile));
+            }
 
-                uploaded.add(new CaseFileWriter.UploadedFile(
-                        caseFile.getOriginalFileName(), caseFile.getStoredFileName(), caseFile.getFileUrl(),
-                        caseFile.getContentType(), caseFile.getFileSize(), caseFile.getUploadedAt(), pages));
-                seen.add(originalName);
-
+            CaseFile caseFile;
+            try {
+                caseFile = minioService.uploadFile(file, caseNumber);
             } catch (Exception e) {
                 log.error("Failed to upload file: {} to case {}", originalName, caseNumber, e);
+                continue;
             }
+
+            uploaded.add(new CaseFileWriter.UploadedFile(
+                    caseFile.getOriginalFileName(), caseFile.getStoredFileName(), caseFile.getFileUrl(),
+                    caseFile.getContentType(), caseFile.getFileSize(), caseFile.getUploadedAt(), pages));
+            seen.add(originalName);
         }
+
         return uploaded;
     }
 
