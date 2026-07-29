@@ -273,11 +273,8 @@ public class AdminController {
 
     @GetMapping("/status/history")
     public ResponseEntity<List<RejectionReasonResponse>> getRejectionReasonResponseHistory(
-                @PathVariable String caseNumber,
                 Authentication authentication
     ){
-        log.info("Getting rejection reason history for case: {} by user: {}",
-            caseNumber, authentication.getName());
         return ResponseEntity.ok(
                 caseService.getRejectionReasonResponseHistory(authentication.getName())
         );

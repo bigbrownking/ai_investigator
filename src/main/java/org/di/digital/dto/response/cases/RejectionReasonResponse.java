@@ -16,6 +16,7 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class RejectionReasonResponse{
     private Long id;
+    private Long userId;
     private String caseNumber;
     private boolean status;
     private CaseRejectionReason rejectionReason;

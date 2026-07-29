@@ -48,7 +48,7 @@ public interface AdminService {
     void changeOwner(Long caseId, Long id);
     UserProfile updateUserProfile(Long id, UpdateProfileRequest request);
     List<RejectionReasonResponse> getRejectionReasonResponseHistory(String email);
-    //жалал что админ пидр
+
     String getIndictment(Long caseId);
     String getQualification(Long caseId);
     CasePlanResponse getPlan(Long caseId);

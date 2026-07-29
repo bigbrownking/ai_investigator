@@ -365,6 +365,7 @@ public class CaseServiceImpl implements CaseService {
                 if (!status && reason != null) {
                         User user = userRepository.findByEmail(email).orElse(null);
                         RejectionReasonStatus rejection = RejectionReasonStatus.builder()
+                                        .caseId(caseId)
                                         .status(false)
                                         .performedByFio(user.getFio())
                                         .rejectionReason(reason)
@@ -982,7 +983,7 @@ public class CaseServiceImpl implements CaseService {
                                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
                 List<RejectionReasonResponse> result = rejectionReasonStatusRepository
-                .findAllByCaseNumberAndPerformedByFioOrderByTimestampDesc(user.getFio())
+                .findAllByPerformedByFioOrderByTimestampDesc(user.getFio())
                 .stream()
                 .map(mapper::toRejectionReasonResponse)
                 .toList();
