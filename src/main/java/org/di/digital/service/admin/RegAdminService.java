@@ -48,5 +48,5 @@ public interface RegAdminService {
     String getMyRegionQualification(Long adminId, Long caseId);
 
     Map<String, Object> getMyRegionPlan(Long adminId, Long caseId);
-    List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long adminId, String email);
+    List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long adminId,Long caseId, String email);
 }

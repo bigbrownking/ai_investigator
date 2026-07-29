@@ -977,13 +977,16 @@ public class CaseServiceImpl implements CaseService {
 
         @Override
         @Transactional(readOnly = true)
-        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(String email) {
+        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId,String email) {
+                Case caseEntity = caseRepository.findById(caseId)
+                        .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
         
                 User user = userRepository.findByEmail(email)
                                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
-
+                
+                validateUserAccess(caseEntity, user);
                 List<RejectionReasonResponse> result = rejectionReasonStatusRepository
-                .findAllByPerformedByFioOrderByTimestampDesc(user.getFio())
+                .findAllByCaseIdOrderByTimestampDesc(caseId)
                 .stream()
                 .map(mapper::toRejectionReasonResponse)
                 .toList();

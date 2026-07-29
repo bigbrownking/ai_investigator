@@ -47,7 +47,7 @@ public interface AdminService {
     void removeRegAdminRole(String email, List<String> regions);
     void changeOwner(Long caseId, Long id);
     UserProfile updateUserProfile(Long id, UpdateProfileRequest request);
-    List<RejectionReasonResponse> getRejectionReasonResponseHistory(String email);
+    List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId);
 
     String getIndictment(Long caseId);
     String getQualification(Long caseId);

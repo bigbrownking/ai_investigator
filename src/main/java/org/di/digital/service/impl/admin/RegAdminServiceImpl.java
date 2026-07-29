@@ -369,7 +369,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     
         @Override
         @Transactional(readOnly = true)
-        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long adminId,String email) {
+        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId, Long adminId,String email) {
                 User admin = userRepository.findById(adminId)
                         .orElseThrow(() -> new IllegalStateException("Региональный админ не найден"));
 

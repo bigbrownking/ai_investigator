@@ -9,8 +9,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 @Repository
 public interface RejectionReasonStatusRepository extends JpaRepository<RejectionReasonStatus, Long> {
-    List<RejectionReasonStatus> findAllByOrderByTimestampDesc();
-    List<RejectionReasonStatus> findAllByPerformedByFioOrderByTimestampDesc(String performedByFio);
+    List<RejectionReasonStatus> findAllByCaseIdOrderByTimestampDesc(Long caseId);
     List<RejectionReasonStatus> findAllByCaseIdInOrderByTimestampDesc(List<Long> caseIds);
     
 

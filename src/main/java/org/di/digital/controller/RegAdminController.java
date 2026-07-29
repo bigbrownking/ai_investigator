@@ -192,12 +192,14 @@ public class RegAdminController {
         return ResponseEntity.ok(regAdminService.getMyRegionPlan(userDetails.getId(), caseId));
     }
 
-    @GetMapping("/status/history")
+    @GetMapping("{caseId}/status/history")
     public ResponseEntity<List<RejectionReasonResponse>> getRejectionReasonResponseHistory(
+                @PathVariable Long caseId,
                 Authentication authentication
     ){
+        Long adminId = getCurrentUser().getId();
         return ResponseEntity.ok(
-                caseService.getRejectionReasonResponseHistory(authentication.getName())
+                regAdminService.getRejectionReasonResponseHistory(caseId, adminId, authentication.getName())
         );
     }
 }
