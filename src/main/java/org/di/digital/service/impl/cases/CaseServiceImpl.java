@@ -365,15 +365,15 @@ public class CaseServiceImpl implements CaseService {
                 if (!status && reason != null) {
                         User user = userRepository.findByEmail(email).orElse(null);
                         RejectionReasonStatus rejection = RejectionReasonStatus.builder()
-                                .caseNumber(caseNumber)
-                                .caseId(caseId)
-                                .userId(user != null ? user.getId() : null)
-                                .status(false)
-                                .performedByFio(user.getFio())
-                                .rejectionReason(reason)
-                                .build();
+                                        .caseNumber(caseNumber)
+                                        .caseId(caseId)
+                                        .userId(user != null ? user.getId() : null)
+                                        .status(false)
+                                        .performedByFio(user.getFio())
+                                        .rejectionReason(reason)
+                                        .build();
                         rejectionReasonStatusRepository.save(rejection);
-}
+                }
 
                 devService.setCasePriority(caseNumber, status ? 0 : -1);
 
@@ -977,38 +977,34 @@ public class CaseServiceImpl implements CaseService {
                 return mapper.mapToCaseFileResponse(caseFile);
         }
 
-        
-
         @Override
         @Transactional(readOnly = true)
         public List<RejectionReasonResponse> getRejectionReasonResponseHistory(String caseNumber, String email) {
                 Case caseEntity = caseRepository.findByNumber(caseNumber)
-                        .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
                 User user = userRepository.findByEmail(email)
-                        .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
                 validateOwnerAccess(caseEntity, user);
 
                 List<RejectionReasonResponse> result = rejectionReasonStatusRepository
-                        .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
-                        .stream()
-                        .map(rejection -> RejectionReasonResponse.builder()
-                                .id(rejection.getId())
-                                .caseNumber(rejection.getCaseNumber())
-                                .status(rejection.isStatus())
-                                .rejectionReason(rejection.getRejectionReason())
-                                .performedByFio(rejection.getPerformedByFio())
-                                .timestamp(rejection.getTimestamp())
-                                .build())
-                        .toList();
+                                .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
+                                .stream()
+                                .map(rejection -> RejectionReasonResponse.builder()
+                                                .id(rejection.getId())
+                                                .caseNumber(rejection.getCaseNumber())
+                                                .status(rejection.isStatus())
+                                                .rejectionReason(rejection.getRejectionReason())
+                                                .performedByFio(rejection.getPerformedByFio())
+                                                .timestamp(rejection.getTimestamp())
+                                                .build())
+                                .toList();
 
-                if (!user.hasRole("ADMIN")) {
-                        logService.log(
+                logService.log(
                                 String.format("Viewed rejection reason history for case %s by user %s (%d records)",
-                                        caseNumber, email, result.size()),
+                                                caseNumber, email, result.size()),
                                 LogLevel.INFO, LogAction.CASE_STATUS_CHANGED, caseNumber, email);
-                }
 
                 return result;
-}
+        }
 }

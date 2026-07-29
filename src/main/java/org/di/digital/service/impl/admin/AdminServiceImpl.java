@@ -12,6 +12,7 @@ import org.di.digital.dto.response.cases.CaseListResponse;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CasePreviewResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
@@ -21,6 +22,7 @@ import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.AppealStatus;
+import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.MessageRole;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.support.Review;
@@ -31,6 +33,7 @@ import org.di.digital.repository.cases.CaseAnalyticsRepository;
 import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.cases.RejectionReasonStatusRepository;
 import org.di.digital.repository.indictment.CaseIndictmentRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationQARepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
@@ -94,6 +97,7 @@ public class AdminServiceImpl implements AdminService {
     private final ReviewRepository reviewRepository;
     private final InterrogationExportService interrogationExportService;
     private final CaseService  caseService;
+    private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
 
     @Override
     public PagedUserResponse getAllUsers(int page, int size, UserSearchRequest req) {
@@ -706,5 +710,29 @@ public class AdminServiceImpl implements AdminService {
                 .plan(planService.enrichPlanWithStatus(caseEntity.getPlan()))
                 .build();
     }
+
+    @Override
+        @Transactional(readOnly = true)
+        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(String caseNumber, String email) {
+             
+
+                List<RejectionReasonResponse> result = rejectionReasonStatusRepository
+                                .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
+                                .stream()
+                                .map(rejection -> RejectionReasonResponse.builder()
+                                                .id(rejection.getId())
+                                                .caseNumber(rejection.getCaseNumber())
+                                                .status(rejection.isStatus())
+                                                .rejectionReason(rejection.getRejectionReason())
+                                                .performedByFio(rejection.getPerformedByFio())
+                                                .timestamp(rejection.getTimestamp())
+                                                .build())
+                                .toList();
+
+
+                return result;
+        }
+
+
 }
 

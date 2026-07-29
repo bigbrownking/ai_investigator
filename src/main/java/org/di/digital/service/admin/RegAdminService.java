@@ -8,6 +8,7 @@ import org.di.digital.dto.response.admin.AppealDto;
 import org.di.digital.dto.response.admin.RegionStatsDto;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
@@ -47,4 +48,5 @@ public interface RegAdminService {
     String getMyRegionQualification(Long adminId, Long caseId);
 
     Map<String, Object> getMyRegionPlan(Long adminId, Long caseId);
+    List<RejectionReasonResponse> getRejectionReasonResponseHistory(String caseNumber, String email);
 }

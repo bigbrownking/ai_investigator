@@ -411,7 +411,7 @@ public class CaseController {
         return ResponseEntity.ok(response);
     }
 
-    @GetMapping("/caseNumber/status/history")
+    @GetMapping("/{caseNumber}/status/history")
     public ResponseEntity<List<RejectionReasonResponse>> getRejectionReasonResponseHistory(
                 @PathVariable String caseNumber,
                 Authentication authentication

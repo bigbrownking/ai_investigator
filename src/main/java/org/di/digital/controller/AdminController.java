@@ -12,6 +12,7 @@ import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.*;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
@@ -269,4 +270,18 @@ public class AdminController {
         devService.setCasePriority(caseNumber, priority);
         return ResponseEntity.ok().build();
     }
+
+    @GetMapping("/{caseNumber}/status/history")
+    public ResponseEntity<List<RejectionReasonResponse>> getRejectionReasonResponseHistory(
+                @PathVariable String caseNumber,
+                Authentication authentication
+    ){
+        log.info("Getting rejection reason history for case: {} by user: {}",
+            caseNumber, authentication.getName());
+        return ResponseEntity.ok(
+                caseService.getRejectionReasonResponseHistory(caseNumber, authentication.getName())
+        );
+    }
+
+    
 }

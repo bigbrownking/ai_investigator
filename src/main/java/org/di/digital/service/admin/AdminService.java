@@ -8,6 +8,7 @@ import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.*;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
@@ -46,6 +47,7 @@ public interface AdminService {
     void removeRegAdminRole(String email, List<String> regions);
     void changeOwner(Long caseId, Long id);
     UserProfile updateUserProfile(Long id, UpdateProfileRequest request);
+    List<RejectionReasonResponse> getRejectionReasonResponseHistory(String caseNumber, String email);
     //жалал что админ пидр
     String getIndictment(Long caseId);
     String getQualification(Long caseId);
