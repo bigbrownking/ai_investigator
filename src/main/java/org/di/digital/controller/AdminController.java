@@ -271,7 +271,7 @@ public class AdminController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/{caseId}/status/history")
+    @GetMapping("/{case_caseId}/status/history")
     public ResponseEntity<List<RejectionReasonResponse>> getRejectionReasonResponseHistory(
                 @PathVariable Long caseId,
                 Authentication authentication
