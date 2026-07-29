@@ -15,21 +15,14 @@ import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.support.SupportTicketPhotoDto;
 import org.di.digital.dto.response.user.*;
 import org.di.digital.model.cases.CaseMemberHistory;
+import org.di.digital.model.cases.RejectionReasonStatus;
 import org.di.digital.model.osmotr.OsmotrResult;
 import org.di.digital.model.plan.CasePlan;
 import org.di.digital.model.plan.PlanApprovalHistory;
 import org.di.digital.model.plan.PlanEditHistory;
-import org.di.digital.model.user.Administration;
-import org.di.digital.model.user.Appeal;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
-import org.di.digital.model.interrogation.CaseFigurant;
 import org.di.digital.model.Log;
-import org.di.digital.model.user.Profession;
-import org.di.digital.model.user.Rank;
-import org.di.digital.model.user.Region;
-import org.di.digital.model.user.Role;
-import org.di.digital.model.user.User;
 import org.di.digital.model.enums.UserSettingsLanguage;
 import org.di.digital.model.interrogation.*;
 import org.di.digital.model.support.Review;
@@ -778,4 +771,19 @@ public class Mapper {
                 .timestamp(h.getTimestamp())
                 .build();
     }
+
+
+    public RejectionReasonResponse toRejectionReasonResponse(RejectionReasonStatus rejection) {
+    return RejectionReasonResponse.builder()
+            .id(rejection.getId())
+            .caseNumber(rejection.getCaseNumber())
+            .status(rejection.isStatus())
+            .rejectionReason(rejection.getRejectionReason())
+            .performedByFio(rejection.getPerformedByFio())
+            .timestamp(rejection.getTimestamp())
+            .build();
+}
+
+
+    
 }

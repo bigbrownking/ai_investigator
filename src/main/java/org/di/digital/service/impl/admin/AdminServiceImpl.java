@@ -719,14 +719,7 @@ public class AdminServiceImpl implements AdminService {
                 List<RejectionReasonResponse> result = rejectionReasonStatusRepository
                                 .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
                                 .stream()
-                                .map(rejection -> RejectionReasonResponse.builder()
-                                                .id(rejection.getId())
-                                                .caseNumber(rejection.getCaseNumber())
-                                                .status(rejection.isStatus())
-                                                .rejectionReason(rejection.getRejectionReason())
-                                                .performedByFio(rejection.getPerformedByFio())
-                                                .timestamp(rejection.getTimestamp())
-                                                .build())
+                                .map(mapper::toRejectionReasonResponse)
                                 .toList();
 
 

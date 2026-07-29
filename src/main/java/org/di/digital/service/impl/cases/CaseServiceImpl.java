@@ -985,26 +985,24 @@ public class CaseServiceImpl implements CaseService {
                 User user = userRepository.findByEmail(email)
                                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
 
+                String userFio = user.getFio();
+
                 validateOwnerAccess(caseEntity, user);
 
-                List<RejectionReasonResponse> result = rejectionReasonStatusRepository
-                                .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
-                                .stream()
-                                .map(rejection -> RejectionReasonResponse.builder()
-                                                .id(rejection.getId())
-                                                .caseNumber(rejection.getCaseNumber())
-                                                .status(rejection.isStatus())
-                                                .rejectionReason(rejection.getRejectionReason())
-                                                .performedByFio(rejection.getPerformedByFio())
-                                                .timestamp(rejection.getTimestamp())
-                                                .build())
-                                .toList();
-
                 logService.log(
-                                String.format("Viewed rejection reason history for case %s by user %s (%d records)",
-                                                caseNumber, email, result.size()),
+                                String.format("Viewed rejection reason history for case %s by user %s",
+                                                caseNumber, email),
                                 LogLevel.INFO, LogAction.CASE_STATUS_CHANGED, caseNumber, email);
 
-                return result;
+                return rejectionReasonStatusRepository
+                                .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
+                                .stream()
+                                .filter(rej -> userFio.equals(rej.getPerformedByFio()))
+                                .map(mapper::toRejectionReasonResponse)
+                                .toList();
+
+                
+
+               
         }
 }

@@ -369,20 +369,18 @@ public class RegAdminServiceImpl implements RegAdminService {
     
     @Override
         @Transactional(readOnly = true)
-        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(String caseNumber, String email) {
-               
+        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long adminId, String caseNumber, String email) {
+                User admin = userRepository.findById(adminId)
+                        .orElseThrow(() -> new IllegalStateException("Региональный админ не найден"));
+
+                Case caseEntity = caseRepository.findByNumber(caseNumber)
+                        .orElseThrow(() -> new IllegalStateException("Дело не найдено"));
+                validateRegionAccess(admin, caseEntity, regionRepository);
 
                 List<RejectionReasonResponse> result = rejectionReasonStatusRepository
                                 .findAllByCaseNumberOrderByTimestampDesc(caseNumber)
                                 .stream()
-                                .map(rejection -> RejectionReasonResponse.builder()
-                                                .id(rejection.getId())
-                                                .caseNumber(rejection.getCaseNumber())
-                                                .status(rejection.isStatus())
-                                                .rejectionReason(rejection.getRejectionReason())
-                                                .performedByFio(rejection.getPerformedByFio())
-                                                .timestamp(rejection.getTimestamp())
-                                                .build())
+                                .map(mapper::toRejectionReasonResponse)
                                 .toList();
 
 
