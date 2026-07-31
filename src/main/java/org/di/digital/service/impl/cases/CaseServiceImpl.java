@@ -10,6 +10,7 @@ import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.cases.CaseMemberHistory;
+import org.di.digital.model.cases.RejectionReasonStatus;
 import org.di.digital.model.enums.*;
 import org.di.digital.dto.request.interrogation.AddFigurantToCaseRequest;
 import org.di.digital.dto.request.cases.CreateCaseRequest;
@@ -19,6 +20,7 @@ import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseMemberHistoryRepository;
 import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.cases.RejectionReasonStatusRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.LogService;
@@ -67,6 +69,7 @@ public class CaseServiceImpl implements CaseService {
     private final CaseFileWriter caseFileWriter;
     private final CaseWriter caseWriter;
     private final CaseMemberHistoryRepository caseMemberHistoryRepository;
+    private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
 
     @Value("${files.max-pages-per-file}")
     private int maxPagesPerFile;
@@ -90,6 +93,7 @@ public class CaseServiceImpl implements CaseService {
 
         return caseEntity;
     }
+
     private void assignToms(List<CaseFile> newFiles, List<CaseFile> existingFiles) {
         Map<Integer, Integer> tomPageCounts = new HashMap<>();
         for (CaseFile f : existingFiles) {
@@ -114,6 +118,7 @@ public class CaseServiceImpl implements CaseService {
             currentPages += filePages;
         }
     }
+
     public CaseResponse createCase(CreateCaseRequest request, String email) {
         CaseFileWriter.CreatedCase created = caseFileWriter.createCaseShell(
                 new CaseFileWriter.CreateCaseData(
@@ -148,7 +153,6 @@ public class CaseServiceImpl implements CaseService {
         return response;
     }
 
-
     @Override
     public CaseResponse changeCaseLanguage(Long caseId, ChangeCaseLanguageRequest request, String email) {
         Case caseEntity = caseRepository.findById(caseId)
@@ -164,7 +168,7 @@ public class CaseServiceImpl implements CaseService {
         }
 
         String fromLanguage = caseEntity.getLanguage();
-        if(request.getLanguage() != null){
+        if (request.getLanguage() != null) {
             caseEntity.setLanguage(request.getLanguage());
         }
 
@@ -173,12 +177,12 @@ public class CaseServiceImpl implements CaseService {
         log.info("Case {} edited by user: {}", caseId, email);
 
         logService.log(
-                String.format("Case %s has changed its language from %s to %s by user %s", savedCase.getNumber(),fromLanguage, request.getLanguage(),email),
+                String.format("Case %s has changed its language from %s to %s by user %s",
+                        savedCase.getNumber(), fromLanguage, request.getLanguage(), email),
                 LogLevel.INFO,
                 LogAction.CASE_LANGUAGE_UPDATE,
                 savedCase.getNumber(),
-                email
-        );
+                email);
 
         return mapper.mapToCaseResponse(savedCase);
     }
@@ -199,9 +203,7 @@ public class CaseServiceImpl implements CaseService {
                     .onStatus(
                             status -> status.value() == 409,
                             response -> Mono.error(new IllegalStateException(
-                                    MessageConstant.WORKSPACE_ALREADY_EXISTS.format(newNumber)
-                            ))
-                    )
+                                    MessageConstant.WORKSPACE_ALREADY_EXISTS.format(newNumber))))
                     .bodyToMono(String.class)
                     .block();
 
@@ -210,9 +212,11 @@ public class CaseServiceImpl implements CaseService {
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {
-            log.warn(MessageConstant.WORKSPACE_RENAME_FAILED.format(oldNumber, newNumber) + ": " + e.getMessage());
+            log.warn(MessageConstant.WORKSPACE_RENAME_FAILED.format(oldNumber, newNumber) + ": "
+                    + e.getMessage());
         }
     }
+
     @Transactional(readOnly = true)
     public CaseResponse getCaseById(Long id, String email) {
         Case caseEntity = caseRepository.findById(id)
@@ -225,6 +229,7 @@ public class CaseServiceImpl implements CaseService {
 
         return mapper.mapToCaseResponse(caseEntity);
     }
+
     @Transactional
     public GroupedCaseFileResponse recalculateToms(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
@@ -253,11 +258,11 @@ public class CaseServiceImpl implements CaseService {
         logService.log(
                 String.format("Toms recalculated in case %s by user %s", caseEntity.getNumber(), email),
                 LogLevel.INFO, LogAction.FILE_REORDER,
-                caseEntity.getNumber(), email
-        );
+                caseEntity.getNumber(), email);
 
         return getGroupedCaseFilesById(caseId, email);
     }
+
     @Override
     @Transactional
     public GroupedCaseFileResponse getGroupedCaseFilesById(Long id, String email) {
@@ -270,24 +275,22 @@ public class CaseServiceImpl implements CaseService {
 
         validateUserAccess(caseEntity, user);
 
-        Map<Integer, List<CaseFile>> grouped =
-                caseEntity.getFiles().stream()
-                        .sorted(Comparator
-                                .comparing(CaseFile::getTom, Comparator.nullsLast(Integer::compareTo))
-                                .thenComparing(CaseFile::getOrderIndex, Comparator.nullsLast(Integer::compareTo))
-                                .thenComparing(CaseFile::getUploadedAt, Comparator.nullsLast(Comparator.naturalOrder())))
-                        .collect(Collectors.groupingBy(
-                                file -> file.getTom() == null ? 0 : file.getTom(),
-                                LinkedHashMap::new,
-                                Collectors.toList()
-                        ));
+        Map<Integer, List<CaseFile>> grouped = caseEntity.getFiles().stream()
+                .sorted(Comparator
+                        .comparing(CaseFile::getTom, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(CaseFile::getOrderIndex, Comparator.nullsLast(Integer::compareTo))
+                        .thenComparing(CaseFile::getUploadedAt, Comparator.nullsLast(Comparator.naturalOrder())))
+                .collect(Collectors.groupingBy(
+                        file -> file.getTom() == null ? 0 : file.getTom(),
+                        LinkedHashMap::new,
+                        Collectors.toList()));
 
         List<TomGroupResponse> toms = grouped.entrySet().stream()
                 .map(entry -> {
                     Integer tom = entry.getKey();
                     List<CaseFile> tomFiles = entry.getValue();
 
-                    int[] pageCounter = {1};
+                    int[] pageCounter = { 1 };
 
                     List<CaseFileResponse> files = tomFiles.stream()
                             .map(f -> {
@@ -343,20 +346,30 @@ public class CaseServiceImpl implements CaseService {
     public List<CasePreviewResponse> getUserCases(String email, String sort) {
         List<CasePreviewResponse> previews = caseRepository.findPreviewsForUser(email);
 
-        Comparator<CasePreviewResponse> cmp =
-                Comparator.comparing(CasePreviewResponse::getCreatedDate,
-                        "asc".equalsIgnoreCase(sort)
-                                ? Comparator.nullsLast(Comparator.naturalOrder())
-                                : Comparator.nullsLast(Comparator.reverseOrder()));
+        Comparator<CasePreviewResponse> cmp = Comparator.comparing(CasePreviewResponse::getCreatedDate,
+                "asc".equalsIgnoreCase(sort)
+                        ? Comparator.nullsLast(Comparator.naturalOrder())
+                        : Comparator.nullsLast(Comparator.reverseOrder()));
 
         return previews.stream().sorted(cmp).collect(Collectors.toList());
     }
 
     @Override
-    public void updateCaseStatus(Long caseId, boolean status, String email) {
-        log.info("Updating status for case: {} to {} by user: {}", caseId, status, email);
+    public void updateCaseStatus(Long caseId, boolean status, String email, CaseRejectionReason reason) {
+        log.info("Updating status for case: {} to {} by user: {} with reason: {}", caseId, status, email, reason);
 
         String caseNumber = caseWriter.updateStatus(caseId, status, email);
+
+        if (!status && reason != null) {
+            User user = userRepository.findByEmail(email).orElse(null);
+            RejectionReasonStatus rejection = RejectionReasonStatus.builder()
+                    .caseId(caseId)
+                    .status(false)
+                    .performedByFio(user.getFio())
+                    .rejectionReason(reason)
+                    .build();
+            rejectionReasonStatusRepository.save(rejection);
+        }
 
         devService.setCasePriority(caseNumber, status ? 0 : -1);
 
@@ -373,7 +386,6 @@ public class CaseServiceImpl implements CaseService {
 
         CaseFileWriter.AddFilesContext ctx = caseFileWriter.prepareAddFiles(caseId, email);
 
-
         List<CaseFileWriter.UploadedFile> uploaded =
                 uploadAndCount(files, ctx.caseNumber(), ctx.existingNames());
 
@@ -388,7 +400,6 @@ public class CaseServiceImpl implements CaseService {
         log.info("Added {}/{} files to case: {}", uploaded.size(), files.size(), caseId);
         return result;
     }
-
 
     @Transactional
     public GroupedCaseFileResponse reorderCaseFiles(Long caseId, ReorderCaseFilesRequest request,
@@ -425,12 +436,10 @@ public class CaseServiceImpl implements CaseService {
         logService.log(
                 String.format("Files reordered in case %s by user %s", caseEntity.getNumber(), email),
                 LogLevel.INFO, LogAction.FILE_REORDER,
-                caseEntity.getNumber(), email
-        );
+                caseEntity.getNumber(), email);
 
         return getGroupedCaseFilesById(caseId, email);
     }
-
 
     @Override
     public void deleteFileFromCase(Long caseId, String fileName, String email) {
@@ -494,6 +503,7 @@ public class CaseServiceImpl implements CaseService {
             log.warn("⚠️ Failed to delete file from workspace (continuing anyway): {}", e.getMessage());
         }
     }
+
     @Transactional(readOnly = true)
     public InputStreamResource downloadFile(Long caseId, String originalFileName, String email) {
         Case caseEntity = caseRepository.findById(caseId)
@@ -515,8 +525,7 @@ public class CaseServiceImpl implements CaseService {
                 LogLevel.INFO,
                 LogAction.FILE_DOWNLOAD,
                 caseNumber,
-                email
-        );
+                email);
         InputStream inputStream = minioService.downloadFile(caseFile.getFileUrl());
         return new InputStreamResource(inputStream);
     }
@@ -543,8 +552,7 @@ public class CaseServiceImpl implements CaseService {
                     LogLevel.ERROR,
                     LogAction.USER_ADD,
                     caseEntity.getNumber(),
-                    currentUserEmail
-            );
+                    currentUserEmail);
             throw new IllegalStateException("Следователь уже есть в деле!");
         }
 
@@ -562,8 +570,7 @@ public class CaseServiceImpl implements CaseService {
                 LogLevel.INFO,
                 LogAction.USER_ADD,
                 caseNumber,
-                currentUserEmail
-        );
+                currentUserEmail);
         return mapper.mapToCaseUserResponse(userToAdd, savedCase);
     }
 
@@ -637,8 +644,7 @@ public class CaseServiceImpl implements CaseService {
                     LogLevel.ERROR,
                     LogAction.FIGURANT_ADDED,
                     caseEntity.getNumber(),
-                    currentUserEmail
-            );
+                    currentUserEmail);
             throw new IllegalStateException("Figurant already exists in this case");
         }
 
@@ -665,8 +671,7 @@ public class CaseServiceImpl implements CaseService {
                 LogLevel.INFO,
                 LogAction.FIGURANT_ADDED,
                 caseEntity.getNumber(),
-                currentUserEmail
-        );
+                currentUserEmail);
         return mapper.mapToFigurantResponse(saved);
     }
 
@@ -691,8 +696,7 @@ public class CaseServiceImpl implements CaseService {
                     LogLevel.ERROR,
                     LogAction.USER_DELETE,
                     caseEntity.getNumber(),
-                    currentUserEmail
-            );
+                    currentUserEmail);
             throw new IllegalStateException("Cannot remove the case owner");
         }
 
@@ -703,8 +707,7 @@ public class CaseServiceImpl implements CaseService {
                     LogLevel.ERROR,
                     LogAction.USER_DELETE,
                     caseEntity.getNumber(),
-                    currentUserEmail
-            );
+                    currentUserEmail);
             throw new IllegalStateException("User is not a member of this case");
         }
         String caseNumber = caseEntity.getNumber();
@@ -720,8 +723,7 @@ public class CaseServiceImpl implements CaseService {
                 LogLevel.INFO,
                 LogAction.USER_DELETE,
                 caseNumber,
-                currentUserEmail
-        );
+                currentUserEmail);
         log.info("User {} removed from case {} by {}", userToRemove.getEmail(), caseId, currentUserEmail);
     }
 
@@ -750,8 +752,7 @@ public class CaseServiceImpl implements CaseService {
                 LogLevel.INFO,
                 LogAction.FIGURANT_DELETED,
                 caseEntity.getNumber(),
-                currentUserEmail
-        );
+                currentUserEmail);
         log.info("Figurant {} removed from case {} by {}", figurantId, caseId, currentUserEmail);
     }
 
@@ -972,5 +973,30 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new IllegalStateException("Файл не найден: " + fileName));
 
         return mapper.mapToCaseFileResponse(caseFile);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId, String email) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+
+        validateUserAccess(caseEntity, user);
+
+        List<RejectionReasonResponse> result = rejectionReasonStatusRepository
+                .findAllByCaseIdOrderByTimestampDesc(caseId)
+                .stream()
+                .map(mapper::toRejectionReasonResponse)
+                .toList();
+
+        logService.log(
+                String.format("Viewed rejection reason history by user %s (%d records)",
+                        email, result.size()),
+                LogLevel.INFO, LogAction.CASE_STATUS_CHANGED, null, email);
+
+        return result;
     }
 }

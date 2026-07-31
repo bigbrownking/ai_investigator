@@ -7,6 +7,7 @@ import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.enums.LogLevel;
+
 import org.di.digital.model.report.CaseReport;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.review.CaseReportRepository;
@@ -38,16 +39,15 @@ public class ReportServiceImpl implements ReportService {
     private final ReportWriter reportWriter;
     private final ReportAwaitRegistry awaitRegistry;
     private static final long REPORT_TIMEOUT_MINUTES = 5;
+
     @Override
     public Resource generateReport(String caseNumber, String userEmail) {
         Long reviewId = reportWriter.queueReport(caseNumber, userEmail);
 
-        CompletableFuture<ReportAwaitRegistry.ReportOutcome> future =
-                awaitRegistry.register(reviewId);
+        CompletableFuture<ReportAwaitRegistry.ReportOutcome> future = awaitRegistry.register(reviewId);
 
         try {
-            ReportAwaitRegistry.ReportOutcome outcome =
-                    future.get(REPORT_TIMEOUT_MINUTES, TimeUnit.MINUTES);
+            ReportAwaitRegistry.ReportOutcome outcome = future.get(REPORT_TIMEOUT_MINUTES, TimeUnit.MINUTES);
 
             if (!outcome.success()) {
                 throw new IllegalStateException(
@@ -109,7 +109,6 @@ public class ReportServiceImpl implements ReportService {
         log.info("Review for case {} -> COMPLETED, url={}",
                 message.getCaseNumber(), message.getReportFileUrl());
     }
-
 
     @Override
     @Transactional

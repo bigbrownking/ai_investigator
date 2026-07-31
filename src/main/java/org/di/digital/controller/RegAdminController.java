@@ -11,9 +11,12 @@ import org.di.digital.dto.response.admin.AppealDto;
 import org.di.digital.dto.response.admin.RegionStatsDto;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
+import org.di.digital.model.cases.RejectionReasonStatus;
+import org.di.digital.model.enums.CaseRejectionReason;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.admin.RegAdminService;
 import org.di.digital.service.cases.CaseService;
@@ -98,12 +101,13 @@ public class RegAdminController {
     public ResponseEntity<CaseResponse> updateCaseStatus(
             @PathVariable Long caseId,
             @RequestParam boolean status,
+            @RequestParam(required = false) CaseRejectionReason reason,
             Authentication authentication
     ) {
         log.info("Updating case {} status to {} by user: {}",
                 caseId, status, authentication.getName());
 
-        caseService.updateCaseStatus(caseId, status, authentication.getName());
+        caseService.updateCaseStatus(caseId, status, authentication.getName(),reason);
         return ResponseEntity.ok().build();
     }
 
@@ -186,5 +190,16 @@ public class RegAdminController {
     public ResponseEntity<Map<String, Object>> getPlan(@PathVariable Long caseId,Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return ResponseEntity.ok(regAdminService.getMyRegionPlan(userDetails.getId(), caseId));
+    }
+
+    @GetMapping("{case_caseId}/status/history")
+    public ResponseEntity<List<RejectionReasonResponse>> getRejectionReasonResponseHistory(
+                @PathVariable Long caseId,
+                Authentication authentication
+    ){
+        Long adminId = getCurrentUser().getId();
+        return ResponseEntity.ok(
+                regAdminService.getRejectionReasonResponseHistory(caseId, adminId, authentication.getName())
+        );
     }
 }

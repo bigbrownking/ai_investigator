@@ -2,6 +2,8 @@ package org.di.digital.controller;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+
 import org.di.digital.model.report.CaseReport;
 import org.di.digital.service.report.ReportService;
 import org.springframework.core.io.Resource;
@@ -63,4 +65,6 @@ public class CaseReportController {
                         "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
                 .body(resource);
     }
+
+
 }

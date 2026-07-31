@@ -14,6 +14,7 @@ import org.di.digital.dto.response.support.*;
 import org.di.digital.dto.response.user.*;
 import org.di.digital.model.cases.CaseMemberHistory;
 import org.di.digital.model.enums.dictionary.ModuleType;
+import org.di.digital.model.cases.RejectionReasonStatus;
 import org.di.digital.model.osmotr.OsmotrResult;
 import org.di.digital.model.plan.CasePlan;
 import org.di.digital.model.plan.PlanApprovalHistory;
@@ -23,13 +24,7 @@ import org.di.digital.model.user.Administration;
 import org.di.digital.model.user.Appeal;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
-import org.di.digital.model.interrogation.CaseFigurant;
 import org.di.digital.model.Log;
-import org.di.digital.model.user.Profession;
-import org.di.digital.model.user.Rank;
-import org.di.digital.model.user.Region;
-import org.di.digital.model.user.Role;
-import org.di.digital.model.user.User;
 import org.di.digital.model.enums.UserSettingsLanguage;
 import org.di.digital.model.interrogation.*;
 import org.di.digital.model.support.Review;
@@ -54,8 +49,6 @@ public class Mapper {
     private final MinioService minioService;
     private final LocalizationHelper localizationHelper;
     private final RegionRepository regionRepository;
-    private final TaskQueueRepository taskQueueRepository;
-
 
     @Value("${last.seen.ttl}")
     private int ttl;
@@ -795,4 +788,19 @@ public class Mapper {
                 .timestamp(h.getTimestamp())
                 .build();
     }
+
+
+    public RejectionReasonResponse toRejectionReasonResponse(RejectionReasonStatus rejection) {
+    return RejectionReasonResponse.builder()
+            .id(rejection.getId())
+            .userId(rejection.getUserId())
+            .status(rejection.isStatus())
+            .rejectionReason(rejection.getRejectionReason())
+            .performedByFio(rejection.getPerformedByFio())
+            .timestamp(rejection.getTimestamp())
+            .build();
+}
+
+
+    
 }

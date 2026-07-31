@@ -20,4 +20,5 @@ public class ReportResultMessage {
     private String errorMessage;
     private LocalDateTime timestamp;
     private long processingDurationSeconds;
+    private Boolean reportStatus;
 }

@@ -8,6 +8,7 @@ import org.di.digital.dto.request.cases.ReorderCaseFilesRequest;
 import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.enums.CaseRejectionReason;
 import org.di.digital.model.enums.FileType;
 import org.di.digital.dto.response.interrogation.FigurantResponse;
 import org.springframework.core.io.InputStreamResource;
@@ -27,7 +28,7 @@ public interface CaseService {
     GroupedCaseFileResponse reorderCaseFiles(Long caseId, ReorderCaseFilesRequest request, String email);
     GroupedCaseFileResponse recalculateToms(Long caseId, String email);
     CaseResponse createCase(CreateCaseRequest request, String username);
-    void updateCaseStatus(Long caseId, boolean status, String email);
+    void updateCaseStatus(Long caseId, boolean status, String email, CaseRejectionReason reason);
     InputStreamResource downloadFile(Long caseId, String fileUrl, String email);
     List<CaseFileResponse> addFilesToCase(Long caseId, List<MultipartFile> files, FileType type, String email);
     void deleteFileFromCase(Long caseId, String fileName, String email);
@@ -51,6 +52,9 @@ public interface CaseService {
     void deleteCaseById(Long id, String currentEmail);
 
     CaseFileResponse getFileByName(Long caseId, String fileName, String email);
+
+    List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId, String email);
+    
 
 
     // Migration methods

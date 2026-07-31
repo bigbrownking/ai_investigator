@@ -11,6 +11,7 @@ import org.di.digital.dto.response.admin.RegionStatsDto;
 import org.di.digital.dto.response.cases.CaseListResponse;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
@@ -19,9 +20,11 @@ import org.di.digital.model.cases.Case;
 import org.di.digital.model.user.Region;
 import org.di.digital.model.user.User;
 import org.di.digital.model.enums.AppealStatus;
+import org.di.digital.model.enums.LogAction;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.repository.user.AppealRepository;
 import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.cases.RejectionReasonStatusRepository;
 import org.di.digital.repository.LogRepository;
 import org.di.digital.repository.user.RegionRepository;
 import org.di.digital.repository.user.UserRepository;
@@ -59,6 +62,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final InterrogationExportService interrogationExportService;
     private final Mapper mapper;
+    private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
 
     @Override
     public Page<AppealDto> getMyRegionAppeals(Long adminId, int page, int size, AppealSearchRequest req) {
@@ -362,4 +366,32 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         return caseEntity.getPlan();
     }
+    
+        @Override
+        @Transactional(readOnly = true)
+        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId, Long adminId,String email) {
+                User admin = userRepository.findById(adminId)
+                        .orElseThrow(() -> new IllegalStateException("Региональный админ не найден"));
+
+                List<Region> adminRegions = getAdminRegions(admin, regionRepository);
+                List<Long> regionIds = adminRegions.stream().map(Region::getId).toList();
+
+                if (regionIds.isEmpty()) return List.of();
+
+                List<Long> caseIds = caseRepository.findByOwnerRegionIdIn(regionIds)
+                        .stream()
+                        .map(Case::getId)
+                        .toList();
+
+                if (caseIds.isEmpty()) return List.of();
+                
+
+                 return rejectionReasonStatusRepository
+                        .findAllByCaseIdInOrderByTimestampDesc(caseIds)
+                        .stream()
+                        .map(mapper::toRejectionReasonResponse)
+                        .toList();
+                        }
+
+
 }

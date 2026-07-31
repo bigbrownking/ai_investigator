@@ -1,4 +1,4 @@
-package org.di.digital.service;
+package org.di.digital.util.schedule.qualification;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
