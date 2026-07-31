@@ -2,6 +2,7 @@ package org.di.digital.service.impl.auth;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.client.FaceAuthClient;
 import org.di.digital.dto.request.auth.*;
 import org.di.digital.dto.response.auth.JwtResponse;
 import org.di.digital.model.enums.*;
@@ -9,6 +10,7 @@ import org.di.digital.model.user.*;
 import org.di.digital.repository.user.*;
 import org.di.digital.security.crypto.RsaDecryptor;
 import org.di.digital.security.jwt.JwtTokenUtil;
+import org.di.digital.security.jwt.PreAuthTokenUtil;
 import org.di.digital.service.auth.AuthService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.impl.core.EmailService;
@@ -48,8 +50,8 @@ public class AuthServiceImpl implements AuthService {
     private final RsaDecryptor rsaDecryptor;
     private final NotificationService notificationService;
     private final EmailService emailService;
-    private final UserFaceTemplateRepository faceTemplateRepository;
-
+    private final FaceAuthClient faceAuthClient;
+    private final PreAuthTokenUtil preAuthTokenUtil;
     private String decryptAndValidatePassword(String encryptedPassword) {
         String raw = rsaDecryptor.decrypt(encryptedPassword);
         if (!PASSWORD_PATTERN.matcher(raw).matches()) {
@@ -173,7 +175,17 @@ public class AuthServiceImpl implements AuthService {
         user.setSettings(userSettings);
         User savedUser = userRepository.save(user);
         log.info("User created successfully with ID: {}", savedUser.getId());
-
+        if (request.getFaceReferenceJobId() != null) {
+            try {
+                faceAuthClient.adopt(request.getFaceReferenceJobId(),
+                        request.getJobToken(), savedUser.getId());
+                savedUser.setFaceEnabled(true);
+                userRepository.save(savedUser);
+            } catch (Exception e) {
+                log.error("Face adopt failed: {}", e.getMessage());
+                throw new IllegalStateException("Не удалось привязать Face ID к регистрации");
+            }
+        }
         Appeal appeal = Appeal.builder()
                 .user(savedUser)
                 .region(region)
@@ -272,37 +284,38 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByIin(request.getIin())
                 .orElseThrow(() -> new IllegalStateException("Пользователь с таким ИИН не найден: " + request.getIin()));
 
-        if (user.getIs_deleted()){
-            throw new IllegalStateException("Данный аккаунт удален");
-        }
-        if (!user.isActive()) {
-            throw new IllegalStateException("Пользователь еще не был подтвержден админом");
-        }
-        String rawPassword = rsaDecryptor.decrypt(request.getPassword());
+        if (user.getIs_deleted()) throw new IllegalStateException("Данный аккаунт удален");
+        if (!user.isActive()) throw new IllegalStateException("Пользователь еще не был подтвержден админом");
 
+        String rawPassword = rsaDecryptor.decrypt(request.getPassword());
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new IllegalStateException("Вы ввели неправильный пароль");
         }
 
-        boolean faceEnabled = !faceTemplateRepository.findByUserAndRevokedAtIsNull(user).isEmpty();
+        logService.log(String.format("User logged in %s user", request.getIin()),
+                LogLevel.INFO, LogAction.LOGIN, null, user.getEmail());
 
-        String token = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
-        String refreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());
+        // Сценарий 2: лицо ещё НЕ поставлено -> pre-auth в режиме ENROLLMENT,
+        // фронт обязан провести reference-set/enroll, потом face-complete.
+        if (!user.isFaceEnabled()) {
+            String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), true); // enrollment=true, TTL 10 мин
+            return JwtResponse.builder()
+                    .type("Bearer").username(user.getEmail())
+                    .faceEnabled(false)
+                    .requiresFaceId(true)
+                    .faceEnrollmentRequired(true)   // <-- фронту: надо ПОСТАВИТЬ лицо
+                    .preAuthToken(preAuth)
+                    .build();
+        }
 
-        logService.log(
-                String.format("User logged in %s user", request.getIin()),
-                LogLevel.INFO,
-                LogAction.LOGIN,
-                null,
-                user.getEmail()
-        );
-
+        // Сценарий 3: лицо есть -> pre-auth в режиме AUTH, фронт проводит verify.
+        String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), false); // TTL 5 мин
         return JwtResponse.builder()
-                .token(token)
-                .refreshToken(refreshToken)
-                .type("Bearer")
-                .username(user.getEmail())
-                .faceEnabled(false)
+                .type("Bearer").username(user.getEmail())
+                .faceEnabled(true)
+                .requiresFaceId(true)
+                .faceEnrollmentRequired(false)  // <-- фронту: надо ПРОВЕРИТЬ лицо
+                .preAuthToken(preAuth)
                 .build();
     }
 
@@ -321,7 +334,13 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + username));
 
-        boolean faceEnabled = !faceTemplateRepository.findByUserAndRevokedAtIsNull(user).isEmpty();
+        boolean faceEnabled;
+        try {
+            faceEnabled = faceAuthClient.isEnrolled(user.getId());
+        } catch (Exception e) {
+            log.warn("FaceAuth unavailable, faceEnabled=false: {}", e.getMessage());
+            faceEnabled = false;
+        }
 
         String newAccessToken = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
         String newRefreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());

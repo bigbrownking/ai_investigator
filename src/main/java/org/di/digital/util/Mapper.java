@@ -37,7 +37,6 @@ import org.di.digital.model.support.SupportTicket;
 import org.di.digital.model.user.*;
 import org.di.digital.repository.queue.TaskQueueRepository;
 import org.di.digital.repository.user.RegionRepository;
-import org.di.digital.repository.user.UserFaceTemplateRepository;
 import org.di.digital.service.core.MinioService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
@@ -54,7 +53,6 @@ import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 public class Mapper {
     private final MinioService minioService;
     private final LocalizationHelper localizationHelper;
-    private final UserFaceTemplateRepository faceTemplateRepository;
     private final RegionRepository regionRepository;
     private final TaskQueueRepository taskQueueRepository;
 
@@ -319,7 +317,7 @@ public class Mapper {
                 .region(localizationHelper.getLocalizedName(user.getRegion(), language))
                 .responsibleRegions(responsibleRegions)
                 .email(user.getEmail())
-                .faceEnabled(!faceTemplateRepository.findByUserAndRevokedAtIsNull(user).isEmpty())
+                .faceEnabled(user.isFaceEnabled())
                 .active(user.isActive())
                 .online(user.isOnline(ttl))
                 .settings(settingsDto)

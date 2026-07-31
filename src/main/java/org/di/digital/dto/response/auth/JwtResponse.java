@@ -7,8 +7,12 @@ import lombok.Getter;
 @Getter
 public class JwtResponse {
     private String token;
+    private String accessToken;
     private String refreshToken;
     private String type;
     private String username;
+    private boolean faceEnrollmentRequired;
     private boolean faceEnabled;
+    private boolean requiresFaceId;
+    private String preAuthToken;
 }

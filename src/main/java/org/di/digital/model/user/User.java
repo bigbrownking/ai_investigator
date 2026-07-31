@@ -94,6 +94,10 @@ public class User {
     private Boolean is_deleted;
 
     @Builder.Default
+    @Column(name = "face_enabled", nullable = false)
+    private boolean faceEnabled = false;
+
+    @Builder.Default
     @ManyToMany(fetch = FetchType.EAGER)
     @JoinTable(
             name = "user_roles",
