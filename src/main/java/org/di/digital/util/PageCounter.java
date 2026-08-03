@@ -57,7 +57,7 @@ public class PageCounter {
 
             try (InputStream stdout = process.getInputStream()) {
                 String output = new String(stdout.readAllBytes());
-                log.debug("LibreOffice output: {}", output);
+                log.info("LibreOffice output: {}", output);
             }
 
             int exitCode = process.waitFor();

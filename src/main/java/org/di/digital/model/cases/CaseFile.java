@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.user.User;
 
 import java.time.LocalDateTime;
 
@@ -48,6 +49,10 @@ public class CaseFile {
     @ManyToOne(fetch = FetchType.LAZY)
     @JoinColumn(name = "case_id", nullable = false)
     private Case caseEntity;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User userEntity;
 
     @Column(name = "classification_status")
     private String classificationStatus;

@@ -17,4 +17,5 @@ public class CaseInterrogationResponse {
     private String status;
     private Boolean isDop;
     private boolean audioUsed;
+    private String ownerFio;
 }

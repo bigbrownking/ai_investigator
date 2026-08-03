@@ -351,7 +351,11 @@ public class CaseServiceImpl implements CaseService {
                 "asc".equalsIgnoreCase(sort)
                         ? Comparator.nullsLast(Comparator.naturalOrder())
                         : Comparator.nullsLast(Comparator.reverseOrder()));
-
+        previews.forEach(p -> {
+            if (p.getOwnerFio() != null) {
+                p.setOwnerFio(p.getOwnerFio().trim().replaceAll("\\s+", " "));
+            }
+        });
         return previews.stream().sorted(cmp).collect(Collectors.toList());
     }
 
@@ -798,7 +802,7 @@ public class CaseServiceImpl implements CaseService {
         caseEntity.updateActivity(activityType);
         caseRepository.save(caseEntity);
 
-        log.debug("Updated activity for case {}: {}", caseNumber, activityType);
+        log.info("Updated activity for case {}: {}", caseNumber, activityType);
     }
 
     @Override
@@ -897,9 +901,9 @@ public class CaseServiceImpl implements CaseService {
                     file.setPages(pages);
                     caseFileRepository.save(file);
                     updated++;
-                    log.debug("File {} — pages: {}", file.getOriginalFileName(), pages);
+                    log.info("File {} — pages: {}", file.getOriginalFileName(), pages);
                 } else {
-                    log.debug("File {} — pages: null, skipping", file.getOriginalFileName());
+                    log.info("File {} — pages: null, skipping", file.getOriginalFileName());
                 }
             } catch (Exception e) {
                 failed++;

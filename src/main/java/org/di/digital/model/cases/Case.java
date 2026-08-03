@@ -45,12 +45,6 @@ public class Case {
     @Builder.Default
     private boolean status = true;
 
-    
-
-    //прерванные сроки
-    //прекращенные
-    //направленные в суд 
-
     @OneToOne(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private CasePlan casePlan;
 
@@ -110,13 +104,13 @@ public class Case {
     public void addUser(User user) {
         this.users.add(user);
         user.getCases().add(this);
-        log.debug("Added user {} to case {}", user.getEmail(), this.number);
+        log.info("Added user {} to case {}", user.getEmail(), this.number);
     }
 
     public void removeUser(User user) {
         this.users.remove(user);
         user.getCases().remove(this);
-        log.debug("Removed user {} from case {}", user.getEmail(), this.number);
+        log.info("Removed user {} from case {}", user.getEmail(), this.number);
     }
 
     public boolean hasUser(User user) {

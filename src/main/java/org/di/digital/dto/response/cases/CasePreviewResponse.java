@@ -16,11 +16,11 @@ public class CasePreviewResponse {
     private String language;
     private LocalDateTime createdDate;
     private LocalDateTime updatedDate;
-    private String ownerEmail;
+    private String ownerFio;
 
     public CasePreviewResponse(Long id, String title, String number, boolean status,
                                String language, LocalDateTime createdDate,
-                               LocalDateTime updatedDate, String ownerEmail) {
+                               LocalDateTime updatedDate, String ownerFio) {
         this.id = id;
         this.title = title;
         this.number = number;
@@ -28,6 +28,6 @@ public class CasePreviewResponse {
         this.language = language;
         this.createdDate = createdDate;
         this.updatedDate = updatedDate;
-        this.ownerEmail = ownerEmail;
+        this.ownerFio = ownerFio;
     }
 }

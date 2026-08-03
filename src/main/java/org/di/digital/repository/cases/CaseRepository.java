@@ -67,14 +67,15 @@ public interface CaseRepository extends JpaRepository<Case, Long>, JpaSpecificat
     long countByCreatedDateBetween(LocalDateTime start, LocalDateTime end);
 
     @Query("""
-            select new org.di.digital.dto.response.cases.CasePreviewResponse(
-                                                  c.id, c.title, c.number, c.status, c.language,
-                                                  c.createdDate, c.updatedDate, o.email)
-    from Case c
-    left join c.owner o
-    where o.email = :email
-       or exists (select 1 from c.users u where u.email = :email)
-    """)
+                    select new org.di.digital.dto.response.cases.CasePreviewResponse(
+                            c.id, c.title, c.number, c.status, c.language,
+                            c.createdDate, c.updatedDate,
+                            concat(o.surname, ' ', o.name, ' ', o.fathername))
+            from Case c
+            left join c.owner o
+            where o.email = :email
+               or exists (select 1 from c.users u where u.email = :email)
+            """)
     List<CasePreviewResponse> findPreviewsForUser(@Param("email") String email);
 
     @Modifying

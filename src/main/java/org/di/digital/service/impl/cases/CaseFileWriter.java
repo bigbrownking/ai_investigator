@@ -69,9 +69,11 @@ public class CaseFileWriter {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
 
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
         List<CaseFile> newFiles = new ArrayList<>();
         for (UploadedFile uf : uploaded) {
-            CaseFile caseFile = buildCaseFile(uf, language, false);
+            CaseFile caseFile = buildCaseFile(uf, language, false, user);
             caseFile.addCaseEntity(caseEntity);
             newFiles.add(caseFile);
         }
@@ -118,6 +120,9 @@ public class CaseFileWriter {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
 
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+
         List<CaseFile> existingFiles = new ArrayList<>(caseEntity.getFiles());
         Set<String> existingNames = existingFiles.stream()
                 .map(CaseFile::getOriginalFileName)
@@ -129,7 +134,7 @@ public class CaseFileWriter {
                 log.warn("File already exists at persist: {} in case {}", uf.originalFileName(), caseId);
                 continue;
             }
-            CaseFile caseFile = buildCaseFile(uf, language, isQualification);
+            CaseFile caseFile = buildCaseFile(uf, language, isQualification, user);
             caseFile.addCaseEntity(caseEntity);
             newFiles.add(caseFile);
             existingNames.add(uf.originalFileName());
@@ -152,7 +157,7 @@ public class CaseFileWriter {
     }
 
 
-    private CaseFile buildCaseFile(UploadedFile uf, String language, boolean isQualification) {
+    private CaseFile buildCaseFile(UploadedFile uf, String language, boolean isQualification, User user) {
         return CaseFile.builder()
                 .originalFileName(uf.originalFileName())
                 .storedFileName(uf.storedFileName())
@@ -164,6 +169,7 @@ public class CaseFileWriter {
                 .status(CaseFileStatusEnum.QUEUED)
                 .isQualification(isQualification)
                 .language(language)
+                .userEntity(user)
                 .build();
     }
 

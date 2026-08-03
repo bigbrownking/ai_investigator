@@ -110,7 +110,7 @@ public class NotificationService {
 
         for (String userEmail : userEmails) {
             messagingTemplate.convertAndSendToUser(userEmail, destination, notification);
-            log.debug("Case notification sent to user: {}", userEmail);
+            log.info("Case notification sent to user: {}", userEmail);
         }
 
         log.info("Case notification sent to all {} users for case {} - Files: {} total, {} processing, {} completed, {} failed",
@@ -223,7 +223,7 @@ public class NotificationService {
 
         for (String userEmail : userEmails) {
             messagingTemplate.convertAndSendToUser(userEmail, destination, notification);
-            log.debug("Interrogation notification sent to user: {}", userEmail);
+            log.info("Interrogation notification sent to user: {}", userEmail);
         }
 
         log.info("Interrogation notification sent to {} users for interrogation: {} qa: {} ({})",
@@ -291,7 +291,7 @@ public class NotificationService {
 
         for (String userEmail : userEmails) {
             messagingTemplate.convertAndSendToUser(userEmail, destination, notification);
-            log.debug("Interrogation notification sent to user: {}", userEmail);
+            log.info("Interrogation notification sent to user: {}", userEmail);
         }
 
         log.info("Interrogation notification sent to {} users for interrogation: {} qa: {} ({})",
@@ -308,7 +308,7 @@ public class NotificationService {
                 .planStatus(caseEntity.getPlanStatus())
                 .approvalLevel(level)
                 .reviewerProfession(approver.getProfession().getRuName())
-                .reviewerName(approver.getSurname() + " " + approver.getName().charAt(0) + ".")
+                .reviewerName(approver.getFio())
                 .comment(null)
                 .timestamp(LocalDateTime.now())
                 .build();
@@ -355,7 +355,7 @@ public class NotificationService {
                 .planStatus(PlanStatus.REJECTED)
                 .approvalLevel(level)
                 .reviewerProfession(approver.getProfession().getRuName())
-                .reviewerName(approver.getSurname() + " " + approver.getName().charAt(0) + ".")
+                .reviewerName(approver.getFio())
                 .comment(comment)
                 .timestamp(LocalDateTime.now())
                 .build();
@@ -391,7 +391,7 @@ public class NotificationService {
                 .planStatus(caseEntity.getPlanStatus())
                 .approvalLevel(0)
                 .reviewerName(reviewer != null
-                        ? reviewer.getSurname() + " " + reviewer.getName().charAt(0) + "."
+                        ? reviewer.getFio()
                         : null)
                 .reviewerProfession(reviewer != null && reviewer.getProfession() != null
                         ? reviewer.getProfession().getRuName()
@@ -417,7 +417,7 @@ public class NotificationService {
 
         for (String email : userEmails) {
             messagingTemplate.convertAndSendToUser(email, destination, notification);
-            log.debug("Plan status notification sent to user: {}", email);
+            log.info("Plan status notification sent to user: {}", email);
         }
 
         log.info("Plan notification [{}] sent to {} users for case {}",
@@ -430,7 +430,7 @@ public class NotificationService {
                 buildGlobalPlanDestination(),
                 notification
         );
-        log.debug("Global plan notification [{}] sent to user: {}", notification.getPlanStatus(), userEmail);
+        log.info("Global plan notification [{}] sent to user: {}", notification.getPlanStatus(), userEmail);
     }
     @Transactional(readOnly = true)
     public void sendInterrogationTimeNotification(String caseNumber,

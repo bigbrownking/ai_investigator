@@ -5,9 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.TaskStatus;
 import org.di.digital.service.impl.core.DevService;
-import org.di.digital.util.IndictmentMigrationService;
-import org.di.digital.util.PlanMigrationService;
-import org.di.digital.util.QualificationMigrationService;
+import org.di.digital.util.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -24,6 +22,8 @@ public class DevController {
     private final PlanMigrationService planMigrationService;
     private final QualificationMigrationService qualificationMigrationService;
     private final IndictmentMigrationService indictmentMigrationService;
+    private final FileOwnerMigrationService fileOwnerMigrationService;
+    private final InterrogationOwnerMigrationService interrogationOwnerMigrationService;
 
     // ─── Stats ────────────────────────────────────────────────────
 
@@ -139,6 +139,16 @@ public class DevController {
     public ResponseEntity<String> migrate3() {
         int count = planMigrationService.migrateExistingPlans();
         return ResponseEntity.ok("Migrated " + count + " plans");
+    }
+
+    @PostMapping("/migrate-fileOwner")
+    public ResponseEntity<FileOwnerMigrationService.FileOwnerMigrationResult> migrate4() {
+        return ResponseEntity.ok(fileOwnerMigrationService.migrateFileOwners());
+    }
+
+    @PostMapping("/migrate-interrogationOwners")
+    public ResponseEntity<InterrogationOwnerMigrationService.InterrogationOwnerMigrationResult> migrate5() {
+        return ResponseEntity.ok(interrogationOwnerMigrationService.migrateInterrogationOwners());
     }
 
     @GetMapping("/avg-page")

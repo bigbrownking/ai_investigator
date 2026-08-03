@@ -190,7 +190,7 @@ public class PlanServiceImpl implements PlanService {
     private String getExecutorName(Case caseEntity) {
         User owner = caseEntity.getOwner();
         if (owner == null) return null;
-        return owner.getSurname() + " " + owner.getName().charAt(0) + "." + owner.getFathername().charAt(0);
+        return owner.getFio();
     }
 
     public Map<String, Object> enrichPlanWithStatus(Map<String, Object> plan) {
@@ -608,12 +608,12 @@ public class PlanServiceImpl implements PlanService {
     public String getReviewerName(Case caseEntity) {
         User reviewer = caseEntity.getPlanReviewedBy();
         if (reviewer == null) return null;
-        return reviewer.getSurname() + " " + reviewer.getName().charAt(0) + ".";
+        return reviewer.getFio();
     }
 
     public String getApproverName(Case caseEntity) {
         User approver = caseEntity.getPlanApprovedBy();
         if (approver == null) return null;
-        return approver.getSurname() + " " + approver.getName().charAt(0) + ".";
+        return approver.getFio();
     }
 }

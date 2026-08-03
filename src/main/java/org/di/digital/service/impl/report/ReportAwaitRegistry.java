@@ -24,7 +24,7 @@ public class ReportAwaitRegistry {
         if (future != null) {
             future.complete(outcome);
         } else {
-            log.debug("No waiter for reviewId={} (already timed out or async call)", reviewId);
+            log.info("No waiter for reviewId={} (already timed out or async call)", reviewId);
         }
     }
 

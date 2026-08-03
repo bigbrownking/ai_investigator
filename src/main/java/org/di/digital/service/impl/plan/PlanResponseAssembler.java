@@ -37,13 +37,13 @@ public class PlanResponseAssembler {
     public String getReviewerName(Case caseEntity) {
         User reviewer = caseEntity.getPlanReviewedBy();
         if (reviewer == null) return null;
-        return reviewer.getSurname() + " " + reviewer.getName().charAt(0) + ".";
+        return reviewer.getFio();
     }
 
     public String getApproverName(Case caseEntity) {
         User approver = caseEntity.getPlanApprovedBy();
         if (approver == null) return null;
-        return approver.getSurname() + " " + approver.getName().charAt(0) + ".";
+        return approver.getFio();
     }
 
     @SuppressWarnings("unchecked")

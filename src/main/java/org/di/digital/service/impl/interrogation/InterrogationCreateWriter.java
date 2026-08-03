@@ -138,6 +138,7 @@ public class InterrogationCreateWriter {
                 .isDop(isDop)
                 .protocol(protocol)
                 .status(CaseInterrogationStatusEnum.IN_PROGRESS)
+                .userEntity(user)
                 .isPaused(true)
                 .timerSessions(new ArrayList<>())
                 .specialGround(ground != null ? ground : InterrogationSpecialGround.NONE)

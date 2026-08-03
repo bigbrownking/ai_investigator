@@ -21,7 +21,9 @@ public class InterrogationTimeGuard {
     private InterrogationLimitProfile profileOf(CaseInterrogation i) {
         return i.getLimitProfile() == null ? InterrogationLimitProfile.STANDARD : i.getLimitProfile();
     }
-
+    public Duration abandonLimit(CaseInterrogation i) {
+        return profileOf(i).dailyMax;
+    }
     /**
      * Непрерывная продолжительность = сумма сессий ТЕКУЩЕЙ серии
      * (начавшихся не раньше currentSeriesStartedAt).
