@@ -299,7 +299,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
 
         log.info("Contradiction check started: interrogation={}, case={}, fio={}, language={}, indication='{}'",
                 interrogationId, prep.caseNumber(), prep.fio(), prep.language(), truncate(prep.answer(), 150));
-        log.debug("Contradiction request URL: {}", url);
+        log.info("Contradiction request URL: {}", url);
 
         try {
             ContradictionResponse response = webClientBuilder.build()

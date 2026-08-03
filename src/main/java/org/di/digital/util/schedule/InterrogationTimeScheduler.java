@@ -15,6 +15,7 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
@@ -40,7 +41,7 @@ public class InterrogationTimeScheduler {
         if (active.isEmpty()) return;
 
         LocalDateTime now = LocalDateTime.now();
-        log.debug("Interrogation time check: {} active", active.size());
+        log.info("Interrogation time check: {} active", active.size());
 
         for (CaseInterrogation i : active) {
             try {
@@ -54,6 +55,30 @@ public class InterrogationTimeScheduler {
     private void checkOne(CaseInterrogation i, LocalDateTime now) {
         if (!Boolean.TRUE.equals(i.getCategoryConfirmed())) {
             return;
+        }
+
+        // ── БРОШЕННАЯ СЕССИЯ: следователь ушёл, допрос висит IN_PROGRESS ──
+        // Смотрим реальное календарное время от старта серии (растёт даже на паузе,
+        // в отличие от accumulated/continuous, которые заморожены).
+        LocalDateTime seriesStart = i.getCurrentSeriesStartedAt() != null
+                ? i.getCurrentSeriesStartedAt()
+                : i.getStartedAt();
+
+        if (seriesStart != null) {
+            Duration wallClock = Duration.between(seriesStart, now);
+            Duration abandonLimit = timeGuard.abandonLimit(i);
+            if (wallClock.compareTo(abandonLimit) >= 0) {
+                log.warn("Interrogation {} auto-completed as abandoned: {} elapsed since series start (limit {})",
+                        i.getId(), wallClock, abandonLimit);
+                InterrogationTimeStatusResponse status = timeGuard.status(i, now);
+                notificationService.sendInterrogationTimeNotification(
+                        i.getCaseEntity().getNumber(), i,
+                        InterrogationTimeEvent.DAILY_LIMIT_REACHED,
+                        "Допрос автоматически завершён по истечении предельного времени.",
+                        status);
+                interrogationService.completeInterrogationByScheduler(i);
+                return;
+            }
         }
 
         InterrogationTimeStatusResponse status = timeGuard.status(i, now);

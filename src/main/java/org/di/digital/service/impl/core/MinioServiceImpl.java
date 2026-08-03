@@ -171,7 +171,7 @@ public class MinioServiceImpl implements MinioService {
                             .build()
             );
 
-            log.debug("Generated presigned preview URL for: {}", objectName);
+            log.info("Generated presigned preview URL for: {}", objectName);
             return toPublicUrl(presignedUrl);
 
         } catch (Exception e) {

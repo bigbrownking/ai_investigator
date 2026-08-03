@@ -6,6 +6,8 @@ import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChat;
+import org.di.digital.model.cases.CaseFile;
+import org.di.digital.model.interrogation.CaseInterrogation;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
@@ -90,11 +92,12 @@ public class User {
     @Column(name = "reset_token_expiry")
     private LocalDateTime resetTokenExpiry;
 
+    @Builder.Default
     @Column(name = "is_deleted")
-    private Boolean is_deleted;
+    private Boolean is_deleted = false;
 
     @Builder.Default
-    @Column(name = "face_enabled", nullable = false)
+    @Column(name = "face_enabled")
     private boolean faceEnabled = false;
 
     @Builder.Default
@@ -111,12 +114,20 @@ public class User {
     private Set<Case> cases = new HashSet<>();
 
     @Builder.Default
+    @OneToMany(mappedBy = "userEntity", fetch = FetchType.LAZY)
+    private List<CaseFile> files = new ArrayList<>();
+
+    @Builder.Default
     @OneToMany(mappedBy = "owner", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<Case> ownedCases = new ArrayList<>();
 
     @Builder.Default
     @OneToMany(mappedBy = "user", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CaseChat> chats = new ArrayList<>();
+
+    @Builder.Default
+    @OneToMany(mappedBy = "userEntity", fetch = FetchType.LAZY)
+    private List<CaseInterrogation> interrogations = new ArrayList<>();
 
     public boolean isOnline(int ttl) {
         return lastSeenAt != null &&
@@ -126,6 +137,7 @@ public class User {
         return roles.stream().anyMatch(r -> r.getName().equals(roleName));
     }
     public String getFio(){
+        if(name == null || surname == null) return null;
         return surname + " " + name + " " + fathername;
     }
 }

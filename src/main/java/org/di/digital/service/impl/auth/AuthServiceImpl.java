@@ -1,8 +1,405 @@
+//package org.di.digital.service.impl.auth;
+//
+//import lombok.RequiredArgsConstructor;
+//import lombok.extern.slf4j.Slf4j;
+//import org.di.digital.client.FaceAuthClient;
+//import org.di.digital.dto.request.auth.*;
+//import org.di.digital.dto.response.auth.JwtResponse;
+//import org.di.digital.model.enums.*;
+//import org.di.digital.model.user.*;
+//import org.di.digital.repository.user.*;
+//import org.di.digital.security.crypto.RsaDecryptor;
+//import org.di.digital.security.jwt.JwtTokenUtil;
+//import org.di.digital.security.jwt.PreAuthTokenUtil;
+//import org.di.digital.service.auth.AuthService;
+//import org.di.digital.service.LogService;
+//import org.di.digital.service.impl.core.EmailService;
+//import org.di.digital.service.impl.core.NotificationService;
+//import org.springframework.beans.factory.annotation.Value;
+//import org.springframework.security.crypto.password.PasswordEncoder;
+//import org.springframework.stereotype.Service;
+//import org.springframework.transaction.annotation.Transactional;
+//
+//import java.time.LocalDateTime;
+//import java.util.HashSet;
+//import java.util.UUID;
+//import java.util.regex.Pattern;
+//
+//@Slf4j
+//@Service
+//@RequiredArgsConstructor
+//public class AuthServiceImpl implements AuthService {
+//
+//    @Value("${app.frontend.url}")
+//    private String frontendUrl;
+//
+//    private static final Pattern PASSWORD_PATTERN = Pattern.compile(
+//            "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]).{8,}$"
+//    );
+//
+//    private final UserRepository userRepository;
+//    private final RoleRepository roleRepository;
+//    private final RegionRepository regionRepository;
+//    private final AdministrationRepository administrationRepository;
+//    private final RankRepository rankRepository;
+//    private final ProfessionRepository professionRepository;
+//    private final AppealRepository appealRepository;
+//    private final LogService logService;
+//    private final JwtTokenUtil jwtTokenUtil;
+//    private final PasswordEncoder passwordEncoder;
+//    private final RsaDecryptor rsaDecryptor;
+//    private final NotificationService notificationService;
+//    private final EmailService emailService;
+//    private final FaceAuthClient faceAuthClient;
+//    private final PreAuthTokenUtil preAuthTokenUtil;
+//    private String decryptAndValidatePassword(String encryptedPassword) {
+//        String raw = rsaDecryptor.decrypt(encryptedPassword);
+//        if (!PASSWORD_PATTERN.matcher(raw).matches()) {
+//            throw new IllegalStateException(
+//                    "Пароль не соответствует требованиям: минимум 8 символов, " +
+//                            "хотя бы одна заглавная буква, одна строчная, одна цифра и один спецсимвол"
+//            );
+//        }
+//        return raw;
+//    }
+//
+//    @Override
+//    public String signupAlisher(SignUpRequest request) {
+//        log.info("Creating new user: {} {}", request.getName(), request.getSurname());
+//
+//        if (userRepository.existsByEmail(request.getEmail())) {
+//            log.warn("Email already exists: {}", request.getEmail());
+//            return "Email is already registered";
+//        }
+//
+//        String rawPassword = request.getPassword();
+//
+//        Role userRole = roleRepository.findByName("ADMIN")
+//                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
+//
+//        User user = User.builder()
+//                .email(request.getEmail())
+//                .iin(request.getIin())
+//                .name(request.getName())
+//                .surname(request.getSurname())
+//                .fathername(request.getFathername())
+//                .profession(null)
+//                .administration(null)
+//                .region(null)
+//                .password(passwordEncoder.encode(rawPassword))
+//                .roles(new HashSet<>() {{
+//                    add(userRole);
+//                }})
+//                .active(true)
+//                .build();
+//
+//        UserSettings userSettings = UserSettings.builder()
+//                .level(UserSettingsDetalizationLevel.HIGH)
+//                .theme(UserSettingsTheme.LIGHT)
+//                .language(UserSettingsLanguage.RU)
+//                .user(user)
+//                .build();
+//
+//        user.setSettings(userSettings);
+//        User savedUser = userRepository.save(user);
+//        log.info("User created successfully with ID: {}", savedUser.getId());
+//        return "User registered successfully";
+//    }
+//
+//    @Override
+//    public String signup(SignUpRequest request) {
+//        log.info("Creating new user: {} {}", request.getName(), request.getSurname());
+//
+//        if (userRepository.existsByEmail(request.getEmail())) {
+//            log.warn("Email already exists: {}", request.getEmail());
+//            return "Email is already registered";
+//        }
+//
+//        String rawPassword = decryptAndValidatePassword(request.getPassword());
+//
+//        Role userRole = roleRepository.findByName("USER")
+//                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
+//
+//        boolean isZamDep = false;
+//        Profession profession = null;
+//        if (request.getProfessionId() != null) {
+//            profession = professionRepository.findById(request.getProfessionId())
+//                    .orElseThrow(() -> new IllegalStateException("Профессия не найдена"));
+//            if(profession.getId() == 7){
+//                isZamDep = true;
+//            }
+//        }
+//
+//        Region region = null;
+//        if (request.getRegionId() != null) {
+//            region = regionRepository.findById(request.getRegionId())
+//                    .orElseThrow(() -> new IllegalStateException("Регион не найден"));
+//        }
+//
+//        Rank rank = null;
+//        if (request.getRankId() != null) {
+//            rank = rankRepository.findById(request.getRankId())
+//                    .orElseThrow(() -> new IllegalStateException("Звание не найдено"));
+//        }
+//
+//        Administration administration = null;
+//        if (request.getAdministrationId() != null && !isZamDep) {
+//            administration = administrationRepository.findById(request.getAdministrationId())
+//                    .orElseThrow(() -> new IllegalStateException("Управление не найдено"));
+//        }
+//
+//        User user = User.builder()
+//                .email(request.getEmail())
+//                .iin(request.getIin())
+//                .name(request.getName())
+//                .surname(request.getSurname())
+//                .fathername(request.getFathername())
+//                .region(region)
+//                .profession(profession)
+//                .rank(rank)
+//                .administration(administration)
+//                .password(passwordEncoder.encode(rawPassword))
+//                .roles(new HashSet<>() {{
+//                    add(userRole);
+//                }})
+//                .active(false)
+//                .build();
+//
+//        UserSettings userSettings = UserSettings.builder()
+//                .level(UserSettingsDetalizationLevel.HIGH)
+//                .theme(UserSettingsTheme.LIGHT)
+//                .language(UserSettingsLanguage.RU)
+//                .user(user)
+//                .build();
+//
+//        user.setSettings(userSettings);
+//        User savedUser = userRepository.save(user);
+//        log.info("User created successfully with ID: {}", savedUser.getId());
+//        if (request.getFaceReferenceJobId() != null) {
+//            try {
+//                faceAuthClient.adopt(request.getFaceReferenceJobId(),
+//                        request.getJobToken(), savedUser.getId());
+//                savedUser.setFaceEnabled(true);
+//                userRepository.save(savedUser);
+//            } catch (Exception e) {
+//                log.error("Face adopt failed: {}", e.getMessage());
+//                throw new IllegalStateException("Не удалось привязать Face ID к регистрации");
+//            }
+//        }
+//        Appeal appeal = Appeal.builder()
+//                .user(savedUser)
+//                .region(region)
+//                .status(AppealStatus.PENDING)
+//                .createdAt(LocalDateTime.now())
+//                .build();
+//
+//        appealRepository.save(appeal);
+//
+//        if (region != null && !region.getAdmins().isEmpty()) {
+//            region.getAdmins().forEach(admin ->
+//                    notificationService.sendNotificationToUser(
+//                            admin.getEmail(),
+//                            "Новый пользователь хочет зарегистрироваться в вашем регионе: "
+//                                    + request.getName() + " " + request.getSurname()
+//                    )
+//            );
+//        }
+//        logService.log(
+//                String.format("User registered as %s user", request.getIin()),
+//                LogLevel.INFO,
+//                LogAction.SIGNUP,
+//                null,
+//                user.getEmail()
+//        );
+//        return "User registered successfully";
+//    }
+//
+//
+//    @Override
+//    public String signupRegAdmin(SignUpRequest request) {
+//        if (userRepository.existsByEmail(request.getEmail())) {
+//            log.warn("Email already exists: {}", request.getEmail());
+//            return "Email is already registered";
+//        }
+//
+//        String rawPassword = decryptAndValidatePassword(request.getPassword());
+//
+//        Role userRole = roleRepository.findByName("REG_ADMIN")
+//                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
+//
+//        Region region = null;
+//        if (request.getRegionId() != null) {
+//            region = regionRepository.findById(request.getRegionId())
+//                    .orElseThrow(() -> new IllegalStateException("Регион не найден"));
+//        }
+//
+//        Profession profession = null;
+//        if (request.getProfessionId() != null) {
+//            profession = professionRepository.findById(request.getProfessionId())
+//                    .orElseThrow(() -> new IllegalStateException("Профессия не найдена"));
+//        }
+//
+//        Administration administration = null;
+//        if (request.getAdministrationId() != null) {
+//            administration = administrationRepository.findById(request.getAdministrationId())
+//                    .orElseThrow(() -> new IllegalStateException("Управление не найдено"));
+//        }
+//
+//        User user = User.builder()
+//                .email(request.getEmail())
+//                .iin(request.getIin())
+//                .name(request.getName())
+//                .surname(request.getSurname())
+//                .fathername(request.getFathername())
+//                .region(region)
+//                .profession(profession)
+//                .administration(administration)
+//                .password(passwordEncoder.encode(rawPassword))
+//                .roles(new HashSet<>() {{
+//                    add(userRole);
+//                }})
+//                .active(false)
+//                .build();
+//
+//        if (region != null) {
+//            region.getAdmins().add(user);
+//            regionRepository.save(region);
+//        }
+//
+//        UserSettings userSettings = UserSettings.builder()
+//                .level(UserSettingsDetalizationLevel.HIGH)
+//                .theme(UserSettingsTheme.LIGHT)
+//                .language(UserSettingsLanguage.RU)
+//                .user(user)
+//                .build();
+//
+//        user.setSettings(userSettings);
+//        User savedUser = userRepository.save(user);
+//        log.info("User created successfully with ID: {}", savedUser.getId());
+//        return "Reg admin registered successfully";
+//    }
+//
+//    @Override
+//    public JwtResponse login(LoginRequest request) {
+//        User user = userRepository.findByIin(request.getIin())
+//                .orElseThrow(() -> new IllegalStateException("Пользователь с таким ИИН не найден: " + request.getIin()));
+//
+//        if (user.getIs_deleted()) throw new IllegalStateException("Данный аккаунт удален");
+//        if (!user.isActive()) throw new IllegalStateException("Пользователь еще не был подтвержден админом");
+//
+//        String rawPassword = rsaDecryptor.decrypt(request.getPassword());
+//        if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
+//            throw new IllegalStateException("Вы ввели неправильный пароль");
+//        }
+//
+//        logService.log(String.format("User logged in %s user", request.getIin()),
+//                LogLevel.INFO, LogAction.LOGIN, null, user.getEmail());
+//
+//        // Сценарий 2: лицо ещё НЕ поставлено -> pre-auth в режиме ENROLLMENT,
+//        // фронт обязан провести reference-set/enroll, потом face-complete.
+//        if (!user.isFaceEnabled()) {
+//            String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), true); // enrollment=true, TTL 10 мин
+//            return JwtResponse.builder()
+//                    .type("Bearer").username(user.getEmail())
+//                    .faceEnabled(false)
+//                    .requiresFaceId(true)
+//                    .faceEnrollmentRequired(true)   // <-- фронту: надо ПОСТАВИТЬ лицо
+//                    .preAuthToken(preAuth)
+//                    .build();
+//        }
+//
+//        // Сценарий 3: лицо есть -> pre-auth в режиме AUTH, фронт проводит verify.
+//        String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), false); // TTL 5 мин
+//        return JwtResponse.builder()
+//                .type("Bearer").username(user.getEmail())
+//                .faceEnabled(true)
+//                .requiresFaceId(true)
+//                .faceEnrollmentRequired(false)  // <-- фронту: надо ПРОВЕРИТЬ лицо
+//                .preAuthToken(preAuth)
+//                .build();
+//    }
+//
+//    @Override
+//    public JwtResponse refreshToken(RefreshTokenRequest request) {
+//        String refreshToken = request.getRefreshToken();
+//        log.info("Attempting to refresh token");
+//
+//        if (!jwtTokenUtil.validateRefreshToken(refreshToken)) {
+//            log.error("Invalid refresh token");
+//            throw new IllegalStateException("Invalid refresh token");
+//        }
+//
+//        String username = jwtTokenUtil.getUsernameFromJwtToken(refreshToken);
+//
+//        User user = userRepository.findByEmail(username)
+//                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + username));
+//
+//        boolean faceEnabled;
+//        try {
+//            faceEnabled = faceAuthClient.isEnrolled(user.getId());
+//        } catch (Exception e) {
+//            log.warn("FaceAuth unavailable, faceEnabled=false: {}", e.getMessage());
+//            faceEnabled = false;
+//        }
+//
+//        String newAccessToken = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
+//        String newRefreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());
+//
+//        log.info("Token refreshed successfully for user: {}", username);
+//
+//        return JwtResponse.builder()
+//                .token(newAccessToken)
+//                .refreshToken(newRefreshToken)
+//                .type("Bearer")
+//                .faceEnabled(faceEnabled)
+//                .username(user.getEmail())
+//                .build();
+//    }
+//
+//    @Override
+//    @Transactional
+//    public String forgotPassword(ForgotPasswordRequest request) {
+//        User user = userRepository.findByEmail(request.getEmail())
+//                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
+//
+//        String token = UUID.randomUUID().toString();
+//        user.setResetToken(token);
+//        user.setResetTokenExpiry(LocalDateTime.now().plusHours(1));
+//        userRepository.save(user);
+//
+//        String origin = request.getOrigin() != null ? request.getOrigin() : frontendUrl;
+//        String resetLink = origin + "/reset-password?token=" + token;
+//        emailService.sendResetPasswordEmail(request.getEmail(), resetLink);
+//
+//        return "Письмо отправлено на " + request.getEmail();
+//    }
+//
+//    @Override
+//    @Transactional
+//    public String resetPassword(ResetPasswordRequest request) {
+//        User user = userRepository.findByResetToken(request.getToken())
+//                .orElseThrow(() -> new IllegalStateException("Неверный токен"));
+//
+//        if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
+//            throw new IllegalStateException("Срок действия ссылки истёк");
+//        }
+//
+//        String rawPassword = decryptAndValidatePassword(request.getNewPassword());
+//
+//        log.info("Saving new password for user: {}", user.getEmail());
+//        user.setPassword(passwordEncoder.encode(rawPassword));
+//        user.setResetToken(null);
+//        user.setResetTokenExpiry(null);
+//        userRepository.save(user);
+//        log.info("Password saved successfully for user: {}", user.getEmail());
+//
+//        return "Пароль успешно изменён";
+//    }
+//}
 package org.di.digital.service.impl.auth;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.client.FaceAuthClient;
 import org.di.digital.dto.request.auth.*;
 import org.di.digital.dto.response.auth.JwtResponse;
 import org.di.digital.model.enums.*;
@@ -10,7 +407,6 @@ import org.di.digital.model.user.*;
 import org.di.digital.repository.user.*;
 import org.di.digital.security.crypto.RsaDecryptor;
 import org.di.digital.security.jwt.JwtTokenUtil;
-import org.di.digital.security.jwt.PreAuthTokenUtil;
 import org.di.digital.service.auth.AuthService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.impl.core.EmailService;
@@ -50,8 +446,7 @@ public class AuthServiceImpl implements AuthService {
     private final RsaDecryptor rsaDecryptor;
     private final NotificationService notificationService;
     private final EmailService emailService;
-    private final FaceAuthClient faceAuthClient;
-    private final PreAuthTokenUtil preAuthTokenUtil;
+
     private String decryptAndValidatePassword(String encryptedPassword) {
         String raw = rsaDecryptor.decrypt(encryptedPassword);
         if (!PASSWORD_PATTERN.matcher(raw).matches()) {
@@ -91,6 +486,7 @@ public class AuthServiceImpl implements AuthService {
                     add(userRole);
                 }})
                 .active(true)
+                .is_deleted(false)
                 .build();
 
         UserSettings userSettings = UserSettings.builder()
@@ -163,6 +559,7 @@ public class AuthServiceImpl implements AuthService {
                     add(userRole);
                 }})
                 .active(false)
+                .is_deleted(false)
                 .build();
 
         UserSettings userSettings = UserSettings.builder()
@@ -175,17 +572,7 @@ public class AuthServiceImpl implements AuthService {
         user.setSettings(userSettings);
         User savedUser = userRepository.save(user);
         log.info("User created successfully with ID: {}", savedUser.getId());
-        if (request.getFaceReferenceJobId() != null) {
-            try {
-                faceAuthClient.adopt(request.getFaceReferenceJobId(),
-                        request.getJobToken(), savedUser.getId());
-                savedUser.setFaceEnabled(true);
-                userRepository.save(savedUser);
-            } catch (Exception e) {
-                log.error("Face adopt failed: {}", e.getMessage());
-                throw new IllegalStateException("Не удалось привязать Face ID к регистрации");
-            }
-        }
+
         Appeal appeal = Appeal.builder()
                 .user(savedUser)
                 .region(region)
@@ -259,6 +646,7 @@ public class AuthServiceImpl implements AuthService {
                     add(userRole);
                 }})
                 .active(false)
+                .is_deleted(false)
                 .build();
 
         if (region != null) {
@@ -284,38 +672,35 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByIin(request.getIin())
                 .orElseThrow(() -> new IllegalStateException("Пользователь с таким ИИН не найден: " + request.getIin()));
 
-        if (user.getIs_deleted()) throw new IllegalStateException("Данный аккаунт удален");
-        if (!user.isActive()) throw new IllegalStateException("Пользователь еще не был подтвержден админом");
-
+        if (user.getIs_deleted()){
+            throw new IllegalStateException("Данный аккаунт удален");
+        }
+        if (!user.isActive()) {
+            throw new IllegalStateException("Пользователь еще не был подтвержден админом");
+        }
         String rawPassword = rsaDecryptor.decrypt(request.getPassword());
+
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new IllegalStateException("Вы ввели неправильный пароль");
         }
 
-        logService.log(String.format("User logged in %s user", request.getIin()),
-                LogLevel.INFO, LogAction.LOGIN, null, user.getEmail());
+        String token = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
+        String refreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());
 
-        // Сценарий 2: лицо ещё НЕ поставлено -> pre-auth в режиме ENROLLMENT,
-        // фронт обязан провести reference-set/enroll, потом face-complete.
-        if (!user.isFaceEnabled()) {
-            String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), true); // enrollment=true, TTL 10 мин
-            return JwtResponse.builder()
-                    .type("Bearer").username(user.getEmail())
-                    .faceEnabled(false)
-                    .requiresFaceId(true)
-                    .faceEnrollmentRequired(true)   // <-- фронту: надо ПОСТАВИТЬ лицо
-                    .preAuthToken(preAuth)
-                    .build();
-        }
+        logService.log(
+                String.format("User logged in %s user", request.getIin()),
+                LogLevel.INFO,
+                LogAction.LOGIN,
+                null,
+                user.getEmail()
+        );
 
-        // Сценарий 3: лицо есть -> pre-auth в режиме AUTH, фронт проводит verify.
-        String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), false); // TTL 5 мин
         return JwtResponse.builder()
-                .type("Bearer").username(user.getEmail())
-                .faceEnabled(true)
-                .requiresFaceId(true)
-                .faceEnrollmentRequired(false)  // <-- фронту: надо ПРОВЕРИТЬ лицо
-                .preAuthToken(preAuth)
+                .token(token)
+                .refreshToken(refreshToken)
+                .type("Bearer")
+                .username(user.getEmail())
+                .faceEnabled(false)
                 .build();
     }
 
@@ -334,14 +719,6 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + username));
 
-        boolean faceEnabled;
-        try {
-            faceEnabled = faceAuthClient.isEnrolled(user.getId());
-        } catch (Exception e) {
-            log.warn("FaceAuth unavailable, faceEnabled=false: {}", e.getMessage());
-            faceEnabled = false;
-        }
-
         String newAccessToken = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
         String newRefreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());
 
@@ -351,7 +728,7 @@ public class AuthServiceImpl implements AuthService {
                 .token(newAccessToken)
                 .refreshToken(newRefreshToken)
                 .type("Bearer")
-                .faceEnabled(faceEnabled)
+                .faceEnabled(false)
                 .username(user.getEmail())
                 .build();
     }

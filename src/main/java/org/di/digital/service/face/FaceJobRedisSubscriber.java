@@ -31,11 +31,12 @@ public class FaceJobRedisSubscriber implements MessageListener {
     @Override
     public void onMessage(Message message, byte[] pattern) {
         try {
-            FaceJobEvent event = objectMapper.readValue(message.getBody(), FaceJobEvent.class);
+            String json = new String(message.getBody(), java.nio.charset.StandardCharsets.UTF_8);
+            FaceJobEvent event = objectMapper.readValue(json, FaceJobEvent.class);
 
             if (event.userId() == null) {
                 // anonymous registration job -> client polls with jobToken, no WS mapping
-                log.debug("Anonymous face job event, skipping WS push");
+                log.info("Anonymous face job event, skipping WS push");
                 return;
             }
 
@@ -47,7 +48,7 @@ public class FaceJobRedisSubscriber implements MessageListener {
 
             messagingTemplate.convertAndSendToUser(
                     user.getEmail(), "/queue/face-jobs", event.job());
-            log.debug("Forwarded face job to WS user {}", user.getEmail());
+            log.info("Forwarded face job to WS user {}", user.getEmail());
 
         } catch (Exception e) {
             log.error("Failed to handle face job event: {}", e.getMessage(), e);

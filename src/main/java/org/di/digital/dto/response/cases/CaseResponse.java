@@ -41,5 +41,5 @@ public class CaseResponse {
     private LocalDateTime qualificationGeneratedAt;
     private LocalDateTime indictmentGeneratedAt;
 
-    private String ownerEmail;
+    private String ownerFio;
 }

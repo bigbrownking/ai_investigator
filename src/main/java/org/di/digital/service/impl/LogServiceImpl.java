@@ -47,7 +47,7 @@ public class LogServiceImpl implements LogService {
                     .ipAddress(ipAddress)
                     .build();
             logRepository.save(logEntry);
-            log.debug("Created {} log: {} - {}", level, action, description);
+            log.info("Created {} log: {} - {}", level, action, description);
         } catch (Exception e) {
             log.error("Failed to create log entry: {}", e.getMessage(), e);
         }

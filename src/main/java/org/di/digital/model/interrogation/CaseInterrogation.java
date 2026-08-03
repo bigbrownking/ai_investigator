@@ -6,6 +6,7 @@ import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseInterrogationStatusEnum;
 import org.di.digital.model.enums.InterrogationLimitProfile;
 import org.di.digital.model.enums.InterrogationSpecialGround;
+import org.di.digital.model.user.User;
 import org.springframework.data.annotation.CreatedDate;
 
 import java.time.Duration;
@@ -41,6 +42,10 @@ public class CaseInterrogation {
     private String lawyer;
     private String state;
     private String involved;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "user_id", nullable = false)
+    private User userEntity;
 
     @Builder.Default
     @OneToMany(mappedBy = "interrogation", cascade = CascadeType.ALL, orphanRemoval = true)

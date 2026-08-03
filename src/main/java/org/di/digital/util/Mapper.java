@@ -64,6 +64,7 @@ public class Mapper {
                 .status(interrogation.getStatus().name())
                 .isDop(interrogation.getIsDop())
                 .audioUsed(interrogation.isAudioUsed())
+                .ownerFio(interrogation.getUserEntity().getFio())
                 .build();
     }
 
@@ -223,7 +224,7 @@ public class Mapper {
                         .map(user -> mapToCaseUserResponse(user, caseEntity))
                         .collect(Collectors.toList()))
                 .createdDate(caseEntity.getCreatedDate())
-                .ownerEmail(caseEntity.getOwner() != null ? caseEntity.getOwner().getEmail() : null)
+                .ownerFio(caseEntity.getOwner().getFio())
                 .lastActivityDate(caseEntity.getLastActivityDate())
                 .lastActivityType(caseEntity.getLastActivityType())
                 .qualificationGeneratedAt(caseEntity.getQualificationGeneratedAt())
@@ -241,7 +242,7 @@ public class Mapper {
                 .language(caseEntity.getLanguage())
                 .createdDate(caseEntity.getCreatedDate())
                 .updatedDate(caseEntity.getUpdatedDate())
-                .ownerEmail(caseEntity.getOwner().getEmail())
+                .ownerFio(caseEntity.getOwner().getFio())
                 .build();
 
     }
@@ -431,7 +432,7 @@ public class Mapper {
         }
         String investigator = interrogation.getInvestigator() != null
                 ? interrogation.getInvestigator()
-                : user.getSurname() + " " + user.getName() + " " + user.getFathername();
+                : user.getFio();
 
         String caseNumber = interrogation.getCaseEntity().getNumber();
         return CaseInterrogationFullResponse.builder()
@@ -507,6 +508,7 @@ public class Mapper {
                 .endPage(f.getEndPage())
                 .assessmentSummary(f.getAssessmentSummary())
                 .scorePercent(f.getScorePercent())
+                .ownerFio(f.getUserEntity().getFio())
                 .build();
     }
 
@@ -656,7 +658,7 @@ public class Mapper {
         User user = ticket.getUser();
         return SupportTicketDto.builder()
                 .id(ticket.getId())
-                .fio(user.getSurname() + " " + user.getName() + " " + user.getFathername())
+                .fio(user.getFio())
                 .region(user.getRegion().getRuName())
                 .profession(user.getProfession().getRuName())
                 .message(ticket.getMessage())
@@ -717,7 +719,7 @@ public class Mapper {
                 .fromStatus(h.getFromStatus())
                 .toStatus(h.getToStatus())
                 .reviewerName(reviewer != null
-                        ? reviewer.getSurname() + " " + reviewer.getName().charAt(0) + "."
+                        ? reviewer.getFio()
                         : null)
                 .reviewerProfession(reviewer != null && reviewer.getProfession() != null
                         ? reviewer.getProfession().getRuName()
@@ -731,7 +733,7 @@ public class Mapper {
         Case c = p.getCaseEntity();
         User author = c.getOwner();
         return ManagementPendingPlanDto.builder()
-                .author(author.getSurname() + " " + author.getName().charAt(0))
+                .author(author.getFio())
                 .caseNumber(c.getNumber())
                 .caseTitle(c.getTitle())
                 .planStatus(p.getStatus())
@@ -743,7 +745,7 @@ public class Mapper {
         User editor = h.getEditor();
         return PlanEditHistoryDto.builder()
                 .id(h.getId())
-                .editorName(editor.getSurname() + " " + editor.getName().charAt(0) + ".")
+                .editorName(editor.getFio())
                 .actionNumber(h.getActionNumber())
                 .fieldKey(h.getFieldKey())
                 .oldValue(h.getOldValue())

@@ -25,7 +25,7 @@ public class CaseInterrogationContradictionWriter {
                                                      String indication,
                                                      List<ContradictionResponse.ContradictionItem> items) {
         if (items == null || items.isEmpty()) {
-            log.debug("Nothing to save: empty contradictions for chatId={}, sourceMessageId={}",
+            log.info("Nothing to save: empty contradictions for chatId={}, sourceMessageId={}",
                     chatId, sourceMessageId);
             return List.of();
         }
@@ -33,12 +33,12 @@ public class CaseInterrogationContradictionWriter {
         CaseInterrogationChat chat = chatRepository.findById(chatId)
                 .orElseThrow(() -> new IllegalStateException("Чат не найден: " + chatId));
 
-        log.debug("Saving {} contradictions for chatId={}, sourceMessageId={}, indication='{}'",
+        log.info("Saving {} contradictions for chatId={}, sourceMessageId={}, indication='{}'",
                 items.size(), chatId, sourceMessageId, truncate(indication, 100));
 
         List<CaseInterrogationContradiction> entities = items.stream()
                 .map(i -> {
-                    log.debug("  contradiction: confidence={}%, refs={}, text='{}'",
+                    log.info("  contradiction: confidence={}%, refs={}, text='{}'",
                             i.getConfidencePercent(),
                             i.getReferences() == null ? 0 : i.getReferences().size(),
                             truncate(i.getText(), 120));

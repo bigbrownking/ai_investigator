@@ -26,4 +26,5 @@ public class CaseFileResponse {
 
     private Double scorePercent;
     private String assessmentSummary;
+    private String ownerFio;
 }

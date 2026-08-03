@@ -29,9 +29,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
     private final UserDetailsService userDetailsService;
     private final UserRepository userRepository;
 
-    @Value("${last.seen.ttl}")
-    private int ttl;
-
     @Override
     protected void doFilterInternal(HttpServletRequest request, HttpServletResponse response, FilterChain filterChain)
             throws ServletException, IOException {
@@ -55,7 +52,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
 
                 userRepository.updateLastSeen(username, LocalDateTime.now());
 
-                log.debug("Set authentication for user: {}", username);
+                log.info("Set authentication for user: {}", username);
             }
         } catch (Exception e) {
             log.error("Cannot set user authentication: {}", e.getMessage());
