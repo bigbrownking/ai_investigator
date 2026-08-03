@@ -141,4 +141,15 @@ public class DictionaryController {
                         .map(r -> mapper.toRankDto(r, l))
                         .collect(Collectors.toList()));
     }
+
+
+    
+    @GetMapping("/rejection-reason")
+    public ResponseEntity<List<String>> getRejectionReason(){
+        return ResponseEntity.ok(
+            Arrays.stream(CaseRejectionReason.values())
+            .map(x -> x.getLabel())
+                    .collect(Collectors.toList())
+    );
+}
 }
