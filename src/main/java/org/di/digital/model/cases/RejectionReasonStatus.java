@@ -6,6 +6,7 @@ import java.util.Optional;
 
 import org.di.digital.model.enums.CaseRejectionReason;
 import org.springframework.data.annotation.CreatedDate;
+import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -17,12 +18,13 @@ import lombok.*;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
+@EntityListeners(AuditingEntityListener.class)
 public class RejectionReasonStatus{
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-     @Column(name = "user_id")
+    @Column(name = "user_id")
     private Long userId;
 
     @Column(name = "case_id")
@@ -35,7 +37,6 @@ public class RejectionReasonStatus{
     private boolean status;
 
     @Enumerated(EnumType.STRING)
-    @Column(nullable = false)
     private CaseRejectionReason rejectionReason;
 
     @CreatedDate

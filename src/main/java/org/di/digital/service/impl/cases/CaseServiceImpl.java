@@ -43,6 +43,7 @@ import org.springframework.web.reactive.function.client.WebClient;
 import reactor.core.publisher.Mono;
 
 import java.io.InputStream;
+import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
 
@@ -359,17 +360,19 @@ public class CaseServiceImpl implements CaseService {
         log.info("Updating status for case: {} to {} by user: {} with reason: {}", caseId, status, email, reason);
 
         String caseNumber = caseWriter.updateStatus(caseId, status, email);
+        
+        
+        User user = userRepository.findByEmail(email).orElse(null);
+        RejectionReasonStatus rejection = RejectionReasonStatus.builder()
+                .caseId(caseId)
+                .userId(user.getId())
+                .status(status)
+                .performedByFio(user.getFio())
+                .rejectionReason(reason)
+                .timestamp(LocalDateTime.now())
+                .build();
+        rejectionReasonStatusRepository.save(rejection);
 
-        if (!status && reason != null) {
-            User user = userRepository.findByEmail(email).orElse(null);
-            RejectionReasonStatus rejection = RejectionReasonStatus.builder()
-                    .caseId(caseId)
-                    .status(false)
-                    .performedByFio(user.getFio())
-                    .rejectionReason(reason)
-                    .build();
-            rejectionReasonStatusRepository.save(rejection);
-        }
 
         devService.setCasePriority(caseNumber, status ? 0 : -1);
 
