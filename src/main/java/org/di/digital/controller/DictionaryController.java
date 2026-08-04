@@ -144,12 +144,12 @@ public class DictionaryController {
 
 
     
-    @GetMapping("/rejection-reason")
-    public ResponseEntity<List<String>> getRejectionReason(){
+    @GetMapping("/rejection-reasons")
+    public ResponseEntity<List<String>> getRejectionReasons() {
+        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
-            Arrays.stream(CaseRejectionReason.values())
-            .map(x -> x.getLabel())
-                    .collect(Collectors.toList())
-    );
-}
+                Arrays.stream(CaseRejectionReason.values())
+                        .map(v -> v.localized(l))
+                        .collect(Collectors.toList()));
+    }
 }
