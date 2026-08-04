@@ -143,6 +143,7 @@ public class DictionaryController {
     }
 
 
+<<<<<<< Updated upstream
     
     @GetMapping("/rejection-reasons")
     public ResponseEntity<List<String>> getRejectionReasons() {
@@ -151,5 +152,14 @@ public class DictionaryController {
                 Arrays.stream(CaseRejectionReason.values())
                         .map(v -> v.localized(l))
                         .collect(Collectors.toList()));
+=======
+    @GetMapping("/rejection-reason")
+    public ResponseEntity<List<String>> getRejectionReason(){
+        return ResponseEntity.ok(
+                Arrays.stream(CaseRejectionReason.values())
+                        .map(x -> x.getLabel())
+                        .collect(Collectors.toList())
+        );
+>>>>>>> Stashed changes
     }
 }

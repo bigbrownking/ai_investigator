@@ -55,6 +55,17 @@ public class FaceAuthClient {
                 .retrieve()
                 .body(Map.class);
     }
+    // ---- pose-check (превью позы, без job) ----
+    public Map<String, Object> poseCheck(String requestedAction, MultipartFile frame) throws IOException {
+        MultiValueMap<String, Object> body = new LinkedMultiValueMap<>();
+        body.add("frame", resourcePart(frame));
+        return restClient.post()
+                .uri("/face-id/test/pose-check?requestedAction={action}", requestedAction)
+                .contentType(MediaType.MULTIPART_FORM_DATA)
+                .body(body)
+                .retrieve()
+                .body(Map.class);
+    }
 
     // ---- verify (authenticated or pre-auth userId) ----
     public Map<String, Object> verify(Long userId, String metadata,

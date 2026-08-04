@@ -3,6 +3,7 @@ package org.di.digital.config.websocket;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.security.jwt.JwtTokenUtil;
+import org.di.digital.security.jwt.PreAuthTokenUtil;
 import org.springframework.http.server.ServerHttpRequest;
 import org.springframework.http.server.ServerHttpResponse;
 import org.springframework.http.server.ServletServerHttpRequest;
@@ -19,6 +20,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class WebSocketAuthInterceptor implements HandshakeInterceptor {
     private final JwtTokenUtil jwtTokenUtil;
+    private final PreAuthTokenUtil preAuthTokenUtil;
 
     @Override
     public boolean beforeHandshake(
@@ -66,8 +68,13 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
 
     private String extractToken(ServletServerHttpRequest servletRequest) {
         String authHeader = servletRequest.getServletRequest().getHeader("Authorization");
-        if (authHeader != null && authHeader.startsWith("Bearer ")) {
-            return authHeader.substring(7);
+        if (authHeader != null) {
+            if (authHeader.startsWith("Bearer ")) {
+                return authHeader.substring(7);
+            }
+            if (authHeader.startsWith("Bearer_")) {
+                return authHeader.substring("Bearer_".length());
+            }
         }
 
         String query = servletRequest.getServletRequest().getQueryString();
@@ -84,11 +91,17 @@ public class WebSocketAuthInterceptor implements HandshakeInterceptor {
                 if (jwtTokenUtil.validateJwtToken(token)) {
                     String email = jwtTokenUtil.getUsernameFromJwtToken(token);
                     if (email != null) {
-                        log.info("WS email extracted from JWT: {}", email);
+                        log.info("WS email from JWT: {}", email);
                         return email;
                     }
                 }
-            } catch (Exception e) {
+            } catch (Exception ignored) {
+            }
+
+            String preEmail = preAuthTokenUtil.validateAndGetEmail(token);
+            if (preEmail != null) {
+                log.info("WS email from preAuthToken: {}", preEmail);
+                return preEmail;
             }
         }
 

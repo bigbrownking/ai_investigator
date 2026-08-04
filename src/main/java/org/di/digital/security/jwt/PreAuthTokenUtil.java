@@ -46,4 +46,17 @@ public class PreAuthTokenUtil {
     public Long userId(Claims c) {
         return c.get("userId", Long.class);
     }
+    public String email(Claims c) {
+        return c.getSubject();
+    }
+
+    public String validateAndGetEmail(String token) {
+        try {
+            Claims c = parse(token);
+            if (!isPreAuth(c)) return null;
+            return c.getSubject();
+        } catch (Exception e) {
+            return null;
+        }
+    }
 }

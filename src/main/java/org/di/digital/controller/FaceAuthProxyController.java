@@ -70,4 +70,10 @@ public class FaceAuthProxyController {
         Long uid = (auth != null) ? userId(auth) : null;
         return ResponseEntity.ok(faceAuth.getJob(uid, jobId, jobToken));
     }
+    @PostMapping(value = "/test/pose-check", consumes = "multipart/form-data")
+    public ResponseEntity<Map> poseCheck(
+            @RequestParam("requestedAction") String requestedAction,
+            @RequestPart("frame") MultipartFile frame) throws Exception {
+        return ResponseEntity.ok(faceAuth.poseCheck(requestedAction, frame));
+    }
 }
