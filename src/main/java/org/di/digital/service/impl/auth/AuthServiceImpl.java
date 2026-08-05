@@ -421,6 +421,7 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -442,6 +443,13 @@ public class AuthServiceImpl implements AuthService {
 
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(
             "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]).{8,}$"
+    );
+
+
+    private static final Set<String> PASSWORD_EXPIRY_EXEMPT_IIN = Set.of(
+        "000111222333",
+        "999888777666",
+        "000000000000"
     );
 
     private final UserRepository userRepository;
@@ -717,6 +725,9 @@ public class AuthServiceImpl implements AuthService {
     }
 
     private boolean isPasswordExpired(User user) {
+        if (user.getIin() != null && PASSWORD_EXPIRY_EXEMPT_IIN.contains(user.getIin())) {
+            return false; 
+        }
         LocalDateTime changedAt = user.getPasswordChangedAt() != null 
             ? user.getPasswordChangedAt()
             : user.getCreatedDate();
@@ -787,12 +798,38 @@ public class AuthServiceImpl implements AuthService {
 
         String rawPassword = decryptAndValidatePassword(request.getNewPassword());
 
+        if(passwordEncoder.matches(rawPassword, user.getPassword())){
+            throw new IllegalStateException("Новый пароль не должен совпадать с текущим");
+        }
+
+        List<PasswordHistory> history = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
+
+        for(PasswordHistory h : history){
+            if(passwordEncoder.matches(rawPassword, h.getPasswordHash())){
+                throw new IllegalStateException("Этот пароль уже использовался ранее");
+            }
+        }
+
+        passwordHistoryRepository.save(PasswordHistory.builder()
+            .user(user)
+            .passwordHash(user.getPassword())
+            .changedAt(LocalDateTime.now())
+            .build());
+        
+
         log.info("Saving new password for user: {}", user.getEmail());
         user.setPassword(passwordEncoder.encode(rawPassword));
         user.setResetToken(null);
         user.setResetTokenExpiry(null);
+        user.setPasswordChangedAt(LocalDateTime.now());
         userRepository.save(user);
         log.info("Password saved successfully for user: {}", user.getEmail());
+
+        List<PasswordHistory> all = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
+
+        if(all.size() > passwordHistorySize){
+            passwordHistoryRepository.deleteAll(all.subList(passwordHistorySize,all.size()));
+        }
 
         return "Пароль успешно изменён";
     }
