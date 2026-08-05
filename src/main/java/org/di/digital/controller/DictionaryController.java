@@ -34,9 +34,9 @@ public class DictionaryController {
     private UserSettingsLanguage currentLang() {
         try {
             UserSettingsLanguage l = getCurrentUser().getSettings().getLanguage();
-            return l != null ? l : UserSettingsLanguage.RU;
+            return l != null ? l : UserSettingsLanguage.KZ;
         } catch (Exception e) {
-            return UserSettingsLanguage.RU;
+            return UserSettingsLanguage.KZ;
         }
     }
 
@@ -141,9 +141,6 @@ public class DictionaryController {
                         .map(r -> mapper.toRankDto(r, l))
                         .collect(Collectors.toList()));
     }
-
-
-<<<<<<< Updated upstream
     
     @GetMapping("/rejection-reasons")
     public ResponseEntity<List<String>> getRejectionReasons() {
@@ -152,14 +149,5 @@ public class DictionaryController {
                 Arrays.stream(CaseRejectionReason.values())
                         .map(v -> v.localized(l))
                         .collect(Collectors.toList()));
-=======
-    @GetMapping("/rejection-reason")
-    public ResponseEntity<List<String>> getRejectionReason(){
-        return ResponseEntity.ok(
-                Arrays.stream(CaseRejectionReason.values())
-                        .map(x -> x.getLabel())
-                        .collect(Collectors.toList())
-        );
->>>>>>> Stashed changes
     }
 }
