@@ -15,4 +15,5 @@ public class JwtResponse {
     private boolean faceEnabled;
     private boolean requiresFaceId;
     private String preAuthToken;
+    private boolean passwordExpired;
 }

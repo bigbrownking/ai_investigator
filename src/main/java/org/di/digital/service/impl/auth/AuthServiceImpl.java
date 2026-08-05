@@ -11,8 +11,8 @@ import org.di.digital.repository.user.*;
 import org.di.digital.security.crypto.RsaDecryptor;
 import org.di.digital.security.jwt.JwtTokenUtil;
 import org.di.digital.security.jwt.PreAuthTokenUtil;
-import org.di.digital.service.auth.AuthService;
 import org.di.digital.service.LogService;
+import org.di.digital.service.auth.AuthService;
 import org.di.digital.service.impl.core.EmailService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.springframework.beans.factory.annotation.Value;
@@ -21,9 +21,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.UUID;
+import java.util.*;
 import java.util.regex.Pattern;
 
 @Slf4j
@@ -34,8 +32,23 @@ public class AuthServiceImpl implements AuthService {
     @Value("${app.frontend.url}")
     private String frontendUrl;
 
+    @Value("${app.password.expiry-days}")
+    private int passwordExpiryDays;
+
+    @Value("${app.password.history-size}")
+    private int passwordHistorySize;
+
+    private final PasswordHistoryRepository passwordHistoryRepository;
+
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(
             "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]).{8,}$"
+    );
+
+
+    private static final Set<String> PASSWORD_EXPIRY_EXCEPT_IIN = Set.of(
+        "000111222333",
+        "999888777666",
+        "000000000000"
     );
 
     private final UserRepository userRepository;
@@ -160,6 +173,7 @@ public class AuthServiceImpl implements AuthService {
                 .rank(rank)
                 .administration(administration)
                 .password(passwordEncoder.encode(rawPassword))
+                .passwordChangedAt(LocalDateTime.now())
                 .roles(new HashSet<>() {{
                     add(userRole);
                 }})
@@ -313,9 +327,25 @@ public class AuthServiceImpl implements AuthService {
                 .type("Bearer").username(user.getEmail())
                 .faceEnabled(true)
                 .requiresFaceId(true)
-                .faceEnrollmentRequired(false)  // <-- фронту: надо ПРОВЕРИТЬ лицо
+                .faceEnrollmentRequired(false)  // фронту: надо ПРОВЕРИТЬ лицо
                 .preAuthToken(preAuth)
+                .passwordExpired(isPasswordExpired(user))
                 .build();
+    }
+
+    private boolean isPasswordExpired(User user) {
+        if (user.getIin() != null && PASSWORD_EXPIRY_EXCEPT_IIN.contains(user.getIin())) {
+            return false; 
+        }
+        LocalDateTime changedAt = user.getPasswordChangedAt() != null 
+            ? user.getPasswordChangedAt()
+            : user.getCreatedDate();
+
+        if (changedAt == null){
+            return false;
+        }
+
+        return changedAt.isBefore(LocalDateTime.now().minusDays(passwordExpiryDays));
     }
 
     @Override
@@ -333,14 +363,6 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByEmail(username)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + username));
 
-        boolean faceEnabled;
-        try {
-            faceEnabled = faceAuthClient.isEnrolled(user.getId());
-        } catch (Exception e) {
-            log.warn("FaceAuth unavailable, faceEnabled=false: {}", e.getMessage());
-            faceEnabled = false;
-        }
-
         String newAccessToken = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
         String newRefreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());
 
@@ -350,7 +372,7 @@ public class AuthServiceImpl implements AuthService {
                 .token(newAccessToken)
                 .refreshToken(newRefreshToken)
                 .type("Bearer")
-                .faceEnabled(faceEnabled)
+                .faceEnabled(user.isFaceEnabled())
                 .username(user.getEmail())
                 .build();
     }
@@ -385,13 +407,80 @@ public class AuthServiceImpl implements AuthService {
 
         String rawPassword = decryptAndValidatePassword(request.getNewPassword());
 
+        if(passwordEncoder.matches(rawPassword, user.getPassword())){
+            throw new IllegalStateException("Новый пароль не должен совпадать с текущим");
+        }
+
+        List<PasswordHistory> history = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
+
+        for(PasswordHistory h : history){
+            if(passwordEncoder.matches(rawPassword, h.getPasswordHash())){
+                throw new IllegalStateException("Этот пароль уже использовался ранее");
+            }
+        }
+
+        passwordHistoryRepository.save(PasswordHistory.builder()
+            .user(user)
+            .passwordHash(user.getPassword())
+            .changedAt(LocalDateTime.now())
+            .build());
+        
+
         log.info("Saving new password for user: {}", user.getEmail());
         user.setPassword(passwordEncoder.encode(rawPassword));
         user.setResetToken(null);
         user.setResetTokenExpiry(null);
+        user.setPasswordChangedAt(LocalDateTime.now());
         userRepository.save(user);
         log.info("Password saved successfully for user: {}", user.getEmail());
 
+        List<PasswordHistory> all = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
+
+        if(all.size() > passwordHistorySize){
+            passwordHistoryRepository.deleteAll(all.subList(passwordHistorySize,all.size()));
+        }
+
+        return "Пароль успешно изменён";
+    }
+
+    @Override
+    @Transactional
+    public String changePassword(ChangePasswordRequest request, User currentUser) {
+        User user = userRepository.findById(currentUser.getId())
+                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
+
+        String rawCurrent = rsaDecryptor.decrypt(request.getCurrentPassword());
+        if (!passwordEncoder.matches(rawCurrent, user.getPassword())) {
+            throw new IllegalStateException("Текущий пароль введен неправильно");
+        }
+
+        String rawNew = rsaDecryptor.decrypt(request.getNewPassword());
+        if (passwordEncoder.matches(rawNew, user.getPassword())) {
+            throw new IllegalStateException("Новый пароль не должен совпадать с текущим");
+        }
+
+        List<PasswordHistory> history = passwordHistoryRepository
+                .findTop5ByUserOrderByChangedAtDesc(user);
+
+        for (PasswordHistory h : history) {
+            if (passwordEncoder.matches(rawNew, h.getPasswordHash())) {
+                throw new IllegalStateException("Этот пароль уже использовался ранее");
+            }
+        }
+
+        passwordHistoryRepository.save(PasswordHistory.builder()
+                .user(user)
+                .passwordHash(user.getPassword())
+                .changedAt(LocalDateTime.now())
+                .build());
+
+        user.setPassword(passwordEncoder.encode(rawNew));
+        user.setPasswordChangedAt(LocalDateTime.now());
+
+        List<PasswordHistory> all = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
+        if (all.size() > passwordHistorySize) {
+            passwordHistoryRepository.deleteAll(all.subList(passwordHistorySize, all.size()));
+        }
         return "Пароль успешно изменён";
     }
 }
