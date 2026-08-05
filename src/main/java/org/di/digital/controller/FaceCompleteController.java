@@ -97,7 +97,7 @@ public class FaceCompleteController {
         String access = jwtTokenUtil.generateTokenFromUsername(email);
         String refresh = jwtTokenUtil.generateRefreshToken(email);
         return ResponseEntity.ok(JwtResponse.builder()
-                .token(access).accessToken(access).refreshToken(refresh)
+                .token(access).refreshToken(refresh)
                 .type("Bearer").username(email)
                 .faceEnabled(true)
                 .build());
