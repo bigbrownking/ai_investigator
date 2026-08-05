@@ -412,12 +412,15 @@ import org.di.digital.service.LogService;
 import org.di.digital.service.impl.core.EmailService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.springframework.beans.factory.annotation.Value;
+
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.HashSet;
+import java.util.List;
 import java.util.UUID;
 import java.util.regex.Pattern;
 
@@ -428,6 +431,14 @@ public class AuthServiceImpl implements AuthService {
 
     @Value("${app.frontend.url}")
     private String frontendUrl;
+
+    @Value("${app.password.expiry-days}")
+    private int passwordExpiryDays;
+
+    @Value("${app.password.history-size}")
+    private int passwordHistorySize;
+
+    private final PasswordHistoryRepository passwordHistoryRepository;
 
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(
             "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]).{8,}$"
@@ -701,7 +712,20 @@ public class AuthServiceImpl implements AuthService {
                 .type("Bearer")
                 .username(user.getEmail())
                 .faceEnabled(false)
+                .passwordExpired(isPasswordExpired(user))
                 .build();
+    }
+
+    private boolean isPasswordExpired(User user) {
+        LocalDateTime changedAt = user.getPasswordChangedAt() != null 
+            ? user.getPasswordChangedAt()
+            : user.getCreatedDate();
+
+        if (changedAt == null){
+            return false;
+        }
+
+        return changedAt.isBefore(LocalDateTime.now().minusDays(passwordExpiryDays));
     }
 
     @Override
@@ -772,4 +796,55 @@ public class AuthServiceImpl implements AuthService {
 
         return "Пароль успешно изменён";
     }
+
+
+
+    @Override
+    @Transactional
+    public String changePassword(ChangePasswordRequest request, User currentUser) {
+        User user = userRepository.findById(currentUser.getId())
+            .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
+
+        String rawCurrent = rsaDecryptor.decrypt(request.getCurrentPassword());
+        if(!passwordEncoder.matches(rawCurrent, user.getPassword())){
+            throw new IllegalStateException("Текущий пароль введен неправильно");
+        }
+
+        String rawNew = rsaDecryptor.decrypt(request.getNewPassword());
+        if(passwordEncoder.matches(rawNew, user.getPassword())){
+            throw new IllegalStateException("Новый пароль не должен совпадать с текущим");
+        }
+
+        List<PasswordHistory> history = passwordHistoryRepository
+            .findTop5ByUserOrderByChangedAtDesc(user);
+        
+            for(PasswordHistory h : history){
+                if(passwordEncoder.matches(rawNew, h.getPasswordHash())){
+                    throw new IllegalStateException("Этот пароль уже использовался ранее");
+                }
+            }
+        
+            passwordHistoryRepository.save(PasswordHistory.builder()
+                .user(user)
+                .passwordHash(user.getPassword())
+                .changedAt(LocalDateTime.now())
+                .build());   
+                
+            user.setPassword(passwordEncoder.encode(rawNew));
+            user.setPasswordChangedAt(LocalDateTime.now());
+
+            List<PasswordHistory> all = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
+            if (all.size() > passwordHistorySize) {
+                passwordHistoryRepository.deleteAll(all.subList(passwordHistorySize, all.size()));
+            }
+        return "Пароль успешно изменён";
+    }
+
+    
+
+
+  
+
+
+
 }

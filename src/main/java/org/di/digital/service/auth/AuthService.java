@@ -1,5 +1,6 @@
 package org.di.digital.service.auth;
 
+import org.di.digital.model.user.User;
 import org.di.digital.dto.request.auth.*;
 import org.di.digital.dto.response.auth.JwtResponse;
 
@@ -11,4 +12,5 @@ public interface AuthService {
     String forgotPassword(ForgotPasswordRequest request);
     String resetPassword(ResetPasswordRequest request);
     JwtResponse refreshToken(RefreshTokenRequest request);
+    String changePassword(ChangePasswordRequest request, User user);
 }

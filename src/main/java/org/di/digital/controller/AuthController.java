@@ -7,6 +7,7 @@ import org.di.digital.dto.response.auth.JwtResponse;
 import org.di.digital.service.auth.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 @RestController
 @Slf4j
@@ -44,4 +45,13 @@ public class AuthController {
     public ResponseEntity<JwtResponse> refresh(@RequestBody RefreshTokenRequest refreshTokenRequest){
         return ResponseEntity.ok(authService.refreshToken(refreshTokenRequest));
     }
+
+
+    @PostMapping("change-password")
+    public ResponseEntity<String> changePassword(@RequestBody ChangePasswordRequest request){
+        return ResponseEntity.ok(authService.changePassword(request, getCurrentUser()));
+    }
+
+
+
 }
