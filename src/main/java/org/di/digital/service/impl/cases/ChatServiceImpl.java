@@ -6,6 +6,7 @@ import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.response.cases.QueryResponse;
 import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.dto.response.chat.CaseChatMessageDto;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChat;
 import org.di.digital.model.cases.CaseChatMessage;
@@ -106,9 +107,9 @@ public class ChatServiceImpl implements ChatService {
     public void streamCaseChatResponseWithHistory(String caseNumber, ChatRequest request,
                                                   String userEmail, SseEmitter emitter) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
@@ -183,9 +184,9 @@ public class ChatServiceImpl implements ChatService {
     public CaseChatHistoryResponse getChatHistoryByCaseNumber(String caseNumber, String userEmail,
                                                               int page, int size) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
         return getChatHistory(caseEntity.getId(), user.getId(), page, size);
     }
@@ -216,9 +217,9 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public void clearChatHistoryByCaseNumber(String caseNumber, String userEmail) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         chatMessageWriter.clearChatHistory(caseEntity.getId(), user.getId());

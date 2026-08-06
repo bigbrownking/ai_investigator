@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.client.FaceAuthClient;
 import org.di.digital.dto.request.auth.*;
 import org.di.digital.dto.response.auth.JwtResponse;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.enums.*;
 import org.di.digital.model.user.*;
 import org.di.digital.repository.user.*;
@@ -43,13 +44,8 @@ public class AuthServiceImpl implements AuthService {
     private static final Pattern PASSWORD_PATTERN = Pattern.compile(
             "^(?=.*[a-z])(?=.*[A-Z])(?=.*\\d)(?=.*[!@#$%^&*()_+\\-=\\[\\]{};':\"\\\\|,.<>/?]).{8,}$"
     );
-
-
-    private static final Set<String> PASSWORD_EXPIRY_EXCEPT_IIN = Set.of(
-        "000111222333",
-        "999888777666",
-        "000000000000"
-    );
+    @Value("${app.whitelist-iins:}")
+    private Set<String> whitelistIins;
 
     private final UserRepository userRepository;
     private final RoleRepository roleRepository;
@@ -66,6 +62,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final FaceAuthClient faceAuthClient;
     private final PreAuthTokenUtil preAuthTokenUtil;
+
     private String decryptAndValidatePassword(String encryptedPassword) {
         String raw = rsaDecryptor.decrypt(encryptedPassword);
         if (!PASSWORD_PATTERN.matcher(raw).matches()) {
@@ -89,7 +86,7 @@ public class AuthServiceImpl implements AuthService {
         String rawPassword = request.getPassword();
 
         Role userRole = roleRepository.findByName("ADMIN")
-                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
 
         User user = User.builder()
                 .email(request.getEmail())
@@ -132,14 +129,14 @@ public class AuthServiceImpl implements AuthService {
         String rawPassword = decryptAndValidatePassword(request.getPassword());
 
         Role userRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
 
         boolean isZamDep = false;
         Profession profession = null;
         if (request.getProfessionId() != null) {
             profession = professionRepository.findById(request.getProfessionId())
-                    .orElseThrow(() -> new IllegalStateException("Профессия не найдена"));
-            if(profession.getId() == 7){
+                    .orElseThrow(() -> new NotFoundException("Профессия не найдена"));
+            if (profession.getId() == 7) {
                 isZamDep = true;
             }
         }
@@ -147,19 +144,19 @@ public class AuthServiceImpl implements AuthService {
         Region region = null;
         if (request.getRegionId() != null) {
             region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new IllegalStateException("Регион не найден"));
+                    .orElseThrow(() -> new NotFoundException("Регион не найден"));
         }
 
         Rank rank = null;
         if (request.getRankId() != null) {
             rank = rankRepository.findById(request.getRankId())
-                    .orElseThrow(() -> new IllegalStateException("Звание не найдено"));
+                    .orElseThrow(() -> new NotFoundException("Звание не найдено"));
         }
 
         Administration administration = null;
         if (request.getAdministrationId() != null && !isZamDep) {
             administration = administrationRepository.findById(request.getAdministrationId())
-                    .orElseThrow(() -> new IllegalStateException("Управление не найдено"));
+                    .orElseThrow(() -> new NotFoundException("Управление не найдено"));
         }
 
         User user = User.builder()
@@ -191,7 +188,7 @@ public class AuthServiceImpl implements AuthService {
         User savedUser = userRepository.save(user);
         log.info("User created successfully with ID: {}", savedUser.getId());
         if (request.getFaceReferenceJobId() != null) {
-            Map<String,Object> res = faceAuthClient.adopt(
+            Map<String, Object> res = faceAuthClient.adopt(
                     request.getFaceReferenceJobId(), request.getJobToken(), savedUser.getId());
             if (!Boolean.TRUE.equals(res.get("adopted"))) {
                 throw new IllegalStateException("Не удалось привязать Face ID к регистрации");
@@ -238,24 +235,24 @@ public class AuthServiceImpl implements AuthService {
         String rawPassword = decryptAndValidatePassword(request.getPassword());
 
         Role userRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
 
         Region region = null;
         if (request.getRegionId() != null) {
             region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new IllegalStateException("Регион не найден"));
+                    .orElseThrow(() -> new NotFoundException("Регион не найден"));
         }
 
         Profession profession = null;
         if (request.getProfessionId() != null) {
             profession = professionRepository.findById(request.getProfessionId())
-                    .orElseThrow(() -> new IllegalStateException("Профессия не найдена"));
+                    .orElseThrow(() -> new NotFoundException("Профессия не найдена"));
         }
 
         Administration administration = null;
         if (request.getAdministrationId() != null) {
             administration = administrationRepository.findById(request.getAdministrationId())
-                    .orElseThrow(() -> new IllegalStateException("Управление не найдено"));
+                    .orElseThrow(() -> new NotFoundException("Управление не найдено"));
         }
 
         User user = User.builder()
@@ -295,7 +292,7 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public JwtResponse login(LoginRequest request) {
         User user = userRepository.findByIin(request.getIin())
-                .orElseThrow(() -> new IllegalStateException("Пользователь с таким ИИН не найден: " + request.getIin()));
+                .orElseThrow(() -> new NotFoundException("Пользователь с таким ИИН не найден: " + request.getIin()));
 
         if (user.getIs_deleted()) throw new IllegalStateException("Данный аккаунт удален");
         if (!user.isActive()) throw new IllegalStateException("Пользователь еще не был подтвержден админом");
@@ -308,40 +305,53 @@ public class AuthServiceImpl implements AuthService {
         logService.log(String.format("User logged in %s user", request.getIin()),
                 LogLevel.INFO, LogAction.LOGIN, null, user.getEmail());
 
-        // Сценарий 2: лицо ещё НЕ поставлено -> pre-auth в режиме ENROLLMENT,
-        // фронт обязан провести reference-set/enroll, потом face-complete.
+        if (user.getIin() != null && whitelistIins.contains(user.getIin())) {
+            String access = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
+            String refresh = jwtTokenUtil.generateRefreshToken(user.getEmail());
+            return JwtResponse.builder()
+                    .token(access).refreshToken(refresh)
+                    .type("Bearer").username(user.getEmail())
+                    .faceEnabled(user.isFaceEnabled())
+                    .requiresFaceId(false)
+                    .faceEnrollmentRequired(false)
+                    .passwordExpired(isPasswordExpired(user))
+                    .build();
+        }
+
+        // Сценарий 2: лицо ещё НЕ поставлено -> pre-auth ENROLLMENT.
         if (!user.isFaceEnabled()) {
-            String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), true); // enrollment=true, TTL 10 мин
+            String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), true);
             return JwtResponse.builder()
                     .type("Bearer").username(user.getEmail())
                     .faceEnabled(false)
                     .requiresFaceId(true)
-                    .faceEnrollmentRequired(true)   // <-- фронту: надо ПОСТАВИТЬ лицо
+                    .faceEnrollmentRequired(true)
                     .preAuthToken(preAuth)
+                    .passwordExpired(isPasswordExpired(user))
                     .build();
         }
 
-        // Сценарий 3: лицо есть -> pre-auth в режиме AUTH, фронт проводит verify.
-        String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), false); // TTL 5 мин
+        // Сценарий 3: лицо есть -> pre-auth AUTH, фронт проводит verify.
+        String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), false);
         return JwtResponse.builder()
                 .type("Bearer").username(user.getEmail())
                 .faceEnabled(true)
                 .requiresFaceId(true)
-                .faceEnrollmentRequired(false)  // фронту: надо ПРОВЕРИТЬ лицо
+                .faceEnrollmentRequired(false)
                 .preAuthToken(preAuth)
                 .passwordExpired(isPasswordExpired(user))
                 .build();
     }
 
     private boolean isPasswordExpired(User user) {
-        if (user.getIin() != null && PASSWORD_EXPIRY_EXCEPT_IIN.contains(user.getIin())) {
-            return false; 
+        if (user.getIin() != null && whitelistIins.contains(user.getIin())) {
+            return false;
         }
-        LocalDateTime changedAt = user.getPasswordChangedAt() != null 
-            ? user.getPasswordChangedAt()
-            : user.getCreatedDate();
+        LocalDateTime changedAt = user.getPasswordChangedAt() != null
+                ? user.getPasswordChangedAt()
+                : user.getCreatedDate();
 
-        if (changedAt == null){
+        if (changedAt == null) {
             return false;
         }
 
@@ -361,7 +371,7 @@ public class AuthServiceImpl implements AuthService {
         String username = jwtTokenUtil.getUsernameFromJwtToken(refreshToken);
 
         User user = userRepository.findByEmail(username)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + username));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + username));
 
         String newAccessToken = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
         String newRefreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());
@@ -381,7 +391,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public String forgotPassword(ForgotPasswordRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         String token = UUID.randomUUID().toString();
         user.setResetToken(token);
@@ -407,24 +417,24 @@ public class AuthServiceImpl implements AuthService {
 
         String rawPassword = decryptAndValidatePassword(request.getNewPassword());
 
-        if(passwordEncoder.matches(rawPassword, user.getPassword())){
+        if (passwordEncoder.matches(rawPassword, user.getPassword())) {
             throw new IllegalStateException("Новый пароль не должен совпадать с текущим");
         }
 
         List<PasswordHistory> history = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
 
-        for(PasswordHistory h : history){
-            if(passwordEncoder.matches(rawPassword, h.getPasswordHash())){
+        for (PasswordHistory h : history) {
+            if (passwordEncoder.matches(rawPassword, h.getPasswordHash())) {
                 throw new IllegalStateException("Этот пароль уже использовался ранее");
             }
         }
 
         passwordHistoryRepository.save(PasswordHistory.builder()
-            .user(user)
-            .passwordHash(user.getPassword())
-            .changedAt(LocalDateTime.now())
-            .build());
-        
+                .user(user)
+                .passwordHash(user.getPassword())
+                .changedAt(LocalDateTime.now())
+                .build());
+
 
         log.info("Saving new password for user: {}", user.getEmail());
         user.setPassword(passwordEncoder.encode(rawPassword));
@@ -436,8 +446,8 @@ public class AuthServiceImpl implements AuthService {
 
         List<PasswordHistory> all = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
 
-        if(all.size() > passwordHistorySize){
-            passwordHistoryRepository.deleteAll(all.subList(passwordHistorySize,all.size()));
+        if (all.size() > passwordHistorySize) {
+            passwordHistoryRepository.deleteAll(all.subList(passwordHistorySize, all.size()));
         }
 
         return "Пароль успешно изменён";
@@ -447,7 +457,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public String changePassword(ChangePasswordRequest request, User currentUser) {
         User user = userRepository.findById(currentUser.getId())
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         String rawCurrent = rsaDecryptor.decrypt(request.getCurrentPassword());
         if (!passwordEncoder.matches(rawCurrent, user.getPassword())) {

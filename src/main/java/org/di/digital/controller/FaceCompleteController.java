@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.client.FaceAuthClient;
 import org.di.digital.dto.response.auth.JwtResponse;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.security.jwt.JwtTokenUtil;
@@ -76,7 +77,7 @@ public class FaceCompleteController {
             ok = result != null && result.get("referenceSetId") != null;
             if (ok) {
                 User user = userRepository.findById(userId)
-                        .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
+                        .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
                 user.setFaceEnabled(true);
                 userRepository.save(user);
             }

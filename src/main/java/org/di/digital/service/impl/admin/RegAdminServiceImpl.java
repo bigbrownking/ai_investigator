@@ -15,6 +15,7 @@ import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.user.Appeal;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.user.Region;
@@ -67,7 +68,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Override
     public Page<AppealDto> getMyRegionAppeals(Long adminId, int page, int size, AppealSearchRequest req) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         List<Region> adminRegions = getAdminRegions(admin, regionRepository);
 
@@ -81,7 +82,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Override
     public Page<UserProfile> getMyRegionUsers(Long adminId, int page, int size, UserSearchRequest req) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         List<Region> adminRegions = getAdminRegions(admin, regionRepository);
 
@@ -95,10 +96,10 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Override
     public CasePageResponse getUserCases(Long adminId, Long userId, int page, int size, CaseSearchRequest req) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalStateException("User not found"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         validateUserRegionAccess(admin, user, regionRepository);
 
@@ -123,10 +124,10 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Transactional
     public void approveAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         Appeal appeal = appealRepository.findById(appealId)
-                .orElseThrow(() -> new IllegalStateException("Appeal not found"));
+                .orElseThrow(() -> new NotFoundException("Заявка не найдена"));
 
         validateAppealRegionAccess(admin, appeal, regionRepository);
 
@@ -146,10 +147,10 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Transactional
     public void rejectAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         Appeal appeal = appealRepository.findById(appealId)
-                .orElseThrow(() -> new IllegalStateException("Appeal not found"));
+                .orElseThrow(() -> new NotFoundException("Заявка не найдена"));
 
         validateAppealRegionAccess(admin, appeal, regionRepository);
 
@@ -165,7 +166,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Transactional(readOnly = true)
     public CasePageResponse getMyRegionCases(Long adminId, int page, int size, CaseSearchRequest req) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         List<Region> adminRegions = getAdminRegions(admin, regionRepository);
 
@@ -193,10 +194,10 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Transactional(readOnly = true)
     public CaseResponse getMyRegionCaseDetail(Long adminId, Long caseId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found"));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено"));
 
         validateRegionAccess(admin, caseEntity, regionRepository);
 
@@ -207,10 +208,10 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Transactional(readOnly = true)
     public Page<LogDto> getMyRegionUserLogs(Long adminId, String email, int page, int size) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         validateUserRegionAccess(admin, user, regionRepository);
 
@@ -221,10 +222,10 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Transactional(readOnly = true)
     public CaseInterrogationFullResponse getMyRegionInterrogationDetail(Long adminId, Long interrogationId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException("Допрос не найден: " + interrogationId));
 
         validateRegionAccess(admin, interrogation.getCaseEntity(), regionRepository);
 
@@ -236,10 +237,10 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Transactional(readOnly = true)
     public byte[] downloadMyRegionInterrogation(Long adminId, Long interrogationId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException("Допрос не найден: " + interrogationId));
 
         validateRegionAccess(admin, interrogation.getCaseEntity(), regionRepository);
 
@@ -251,7 +252,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Transactional(readOnly = true)
     public RegionStatsDto getMyRegionStats(Long adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         List<Region> adminRegions = getAdminRegions(admin, regionRepository);
 
@@ -269,15 +270,15 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Transactional
     public void changeOwner(Long adminId, Long caseId, Long id) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found"));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено"));
 
         validateRegionAccess(admin, caseEntity, regionRepository);
 
         User newOwner = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         if (!newOwner.isActive()) {
             throw new IllegalStateException("Нельзя назначить неактивного пользователя владельцем");
@@ -305,7 +306,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Override
     public List<UserSuggestionResponse> searchUsers(Long adminId, String query) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         List<Region> adminRegions = getAdminRegions(admin, regionRepository);
         List<Long> regionIds = adminRegions.stream().map(Region::getId).toList();
@@ -331,10 +332,10 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Override
     public String getMyRegionIndictment(Long adminId, Long caseId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found"));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено"));
 
         validateRegionAccess(admin, caseEntity, regionRepository);
 
@@ -344,10 +345,10 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Override
     public String getMyRegionQualification(Long adminId, Long caseId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Admin not found"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found"));
+                .orElseThrow(() -> new NotFoundException("Дело не найден"));
 
         validateRegionAccess(admin, caseEntity, regionRepository);
 
@@ -357,10 +358,10 @@ public class RegAdminServiceImpl implements RegAdminService {
     @Override
     public Map<String, Object> getMyRegionPlan(Long adminId, Long caseId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Региональный админ не найден"));
+                .orElseThrow(() -> new NotFoundException("Региональный админ не найден"));
 
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено"));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено"));
 
         validateRegionAccess(admin, caseEntity, regionRepository);
 
@@ -371,7 +372,7 @@ public class RegAdminServiceImpl implements RegAdminService {
         @Transactional(readOnly = true)
         public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId, Long adminId,String email) {
                 User admin = userRepository.findById(adminId)
-                        .orElseThrow(() -> new IllegalStateException("Региональный админ не найден"));
+                        .orElseThrow(() -> new NotFoundException("Региональный админ не найден"));
 
                 List<Region> adminRegions = getAdminRegions(admin, regionRepository);
                 List<Long> regionIds = adminRegions.stream().map(Region::getId).toList();

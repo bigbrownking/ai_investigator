@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.qualification.QualificationRephraseApplyRequest;
 import org.di.digital.dto.request.qualification.QualificationSectionUpdateRequest;
 import org.di.digital.dto.response.qualification.QualificationSectionDto;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseActivityType;
 import org.di.digital.model.enums.LogAction;
@@ -128,10 +129,10 @@ public class QualificationServiceImpl implements QualificationService {
 
     private void streamQualification(String caseNumber, SseEmitter emitter, String email) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new UsernameNotFoundException("User not found with email: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         if (!entity.isAtLeastOneFileProcessed()) {
             String message = MessageConstant.NO_FILE_PROCESSED.format(caseNumber);
@@ -181,10 +182,10 @@ public class QualificationServiceImpl implements QualificationService {
     private void streamQualificationSection(String caseNumber, SseEmitter emitter, String email,
                                             int sectionId, String mode) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
         String language = entity.getLanguage();
 
         if (entity.getQualificationSections() == null && entity.getQualification() != null) {
@@ -246,11 +247,11 @@ public class QualificationServiceImpl implements QualificationService {
                                            int startSectionId, int startOffset,
                                            int endSectionId, int endOffset, String prompt) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         List<Map<String, Object>> sections = entity.getQualificationSections();
         if (sections == null || sections.isEmpty()) {
-            emitter.completeWithError(new IllegalStateException(
+            emitter.completeWithError(new NotFoundException(
                     "Секции квалификации не найдены: " + caseNumber));
             return;
         }
@@ -310,7 +311,7 @@ public class QualificationServiceImpl implements QualificationService {
     public List<QualificationSectionDto> applyRephrase(String caseNumber,
                                                        QualificationRephraseApplyRequest request) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         if (entity.getQualificationSections() == null && entity.getQualification() != null) {
             throw new IllegalStateException("Ваша квалификация старого образца, сгенерируйте заново");
@@ -327,8 +328,8 @@ public class QualificationServiceImpl implements QualificationService {
 
         int startIdx = indexOfSection(sections, startSectionId);
         int endIdx = indexOfSection(sections, endSectionId);
-        if (startIdx < 0) throw new IllegalStateException("Секция id=" + startSectionId + " не найдена");
-        if (endIdx < 0) throw new IllegalStateException("Секция id=" + endSectionId + " не найдена");
+        if (startIdx < 0) throw new NotFoundException("Секция id=" + startSectionId + " не найдена");
+        if (endIdx < 0) throw new NotFoundException("Секция id=" + endSectionId + " не найдена");
         if (startIdx > endIdx) throw new IllegalStateException(
                 "Начальная секция идёт позже конечной: start=" + startSectionId + ", end=" + endSectionId);
 
@@ -366,7 +367,7 @@ public class QualificationServiceImpl implements QualificationService {
     public QualificationSectionDto updateSection(String caseNumber,
                                                  QualificationSectionUpdateRequest request) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         if (entity.getQualificationSections() == null && entity.getQualification() != null) {
             throw new IllegalStateException("Ваша квалификация старого образца, сгенерируйте заново");
@@ -378,7 +379,7 @@ public class QualificationServiceImpl implements QualificationService {
         Map<String, Object> target = sections.stream()
                 .filter(s -> request.getId().equals(s.get("id")))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new NotFoundException(
                         "Секция с id=" + request.getId() + " не найдена"));
 
         target.put("text", request.getText());
@@ -400,7 +401,7 @@ public class QualificationServiceImpl implements QualificationService {
     @Override
     public List<QualificationSectionDto> getQualificationSections(String caseNumber) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         if (entity.getQualificationSections() != null) {
             return toDtoList(entity.getQualificationSections());
@@ -425,7 +426,7 @@ public class QualificationServiceImpl implements QualificationService {
                     LogLevel.INFO, LogAction.QUALIFICATION_DOWNLOAD, caseNumber, userEmail);
 
             Case entity = caseRepository.findByNumber(caseNumber)
-                    .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                    .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
             List<Map<String, Object>> sections = entity.getQualificationSections();
 
@@ -460,8 +461,8 @@ public class QualificationServiceImpl implements QualificationService {
                                   int endSectionId, int endOffset) {
         int startIdx = indexOfSection(sections, startSectionId);
         int endIdx = indexOfSection(sections, endSectionId);
-        if (startIdx < 0) throw new IllegalStateException("Секция id=" + startSectionId + " не найдена");
-        if (endIdx < 0) throw new IllegalStateException("Секция id=" + endSectionId + " не найдена");
+        if (startIdx < 0) throw new NotFoundException("Секция id=" + startSectionId + " не найдена");
+        if (endIdx < 0) throw new NotFoundException("Секция id=" + endSectionId + " не найдена");
         if (startIdx > endIdx) throw new IllegalStateException(
                 "Начальная секция идёт позже конечной: start=" + startSectionId + ", end=" + endSectionId);
 

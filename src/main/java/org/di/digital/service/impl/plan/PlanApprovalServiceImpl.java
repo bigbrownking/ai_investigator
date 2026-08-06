@@ -3,6 +3,7 @@ package org.di.digital.service.impl.plan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.plan.PlanApprovalHistoryDto;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.plan.PlanApprovalHistory;
 import org.di.digital.model.enums.ApprovalLevel;
@@ -203,12 +204,12 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
 
     private User loadUser(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
     }
 
     private Case loadCase(String caseNumber) {
         return caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
     }
 
     private ApprovalLevel resolveLevel(User approver) {

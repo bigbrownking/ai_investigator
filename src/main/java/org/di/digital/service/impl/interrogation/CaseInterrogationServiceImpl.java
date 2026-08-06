@@ -3,6 +3,7 @@ package org.di.digital.service.impl.interrogation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.interrogation.*;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.dto.request.interrogation.AddInterrogationRequest;
 import org.di.digital.dto.request.interrogation.EditAudioTranscribedTextRequest;
@@ -78,10 +79,10 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     @Transactional(readOnly = true)
     public List<CaseInterrogationResponse> searchInterrogations(Long caseId, String role, String fio, Boolean isDop, LocalDate date, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -138,10 +139,10 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     @Transactional
     public QAResponse createQA(Long caseId, Long interrogationId, String question, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -187,10 +188,10 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     @Transactional
     public void deleteInterrogation(Long caseId, Long interrogationId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -198,7 +199,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException("Допрос не найден: " + interrogationId));
         caseEntity.removeInterrogation(interrogation);
         caseRepository.save(caseEntity);
         log.info("Interrogation removed from case: {}", caseId);
@@ -216,7 +217,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     public void updateProtocolField(Long caseId, Long interrogationId,
                                     UpdateProtocolFieldRequest request, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException("Допрос не найден: " + interrogationId));
 
 
         CaseInterrogationProtocol protocol = interrogation.getProtocol();
@@ -236,7 +237,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Long eduId = request.getId();
                 if (eduId != null) {
                     education = caseInterrogationEducationRepository.findById(eduId)
-                            .orElseThrow(() -> new IllegalStateException("Образование не найдено: " + eduId));
+                            .orElseThrow(() -> new NotFoundException("Образование не найдено: " + eduId));
                     education.setAbout(request.getAbout());
                     education.setType(request.getType());
                 } else {
@@ -259,7 +260,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Long militaryId = request.getId();
                 if (militaryId != null) {
                     militaryRecord = caseInterrogationMilitaryRepository.findById(militaryId)
-                            .orElseThrow(() -> new IllegalStateException("Воинский учет не найден: " + militaryId));
+                            .orElseThrow(() -> new NotFoundException("Воинский учет не найден: " + militaryId));
                     militaryRecord.setAbout(request.getAbout());
                     militaryRecord.setType(request.getType());
                 } else {
@@ -276,7 +277,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Long criminalId = request.getId();
                 if (criminalId != null) {
                     criminalRecord = caseInterrogationCriminalRepository.findById(criminalId)
-                            .orElseThrow(() -> new IllegalStateException("Судимость не найдена: " + criminalId));
+                            .orElseThrow(() -> new NotFoundException("Судимость не найдена: " + criminalId));
                     criminalRecord.setAbout(request.getAbout());
                     criminalRecord.setType(request.getType());
                 } else {
@@ -295,7 +296,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Long relationId = request.getId();
                 if (relationId != null) {
                     relationRecord = caseInterrogationRelationRepository.findById(relationId)
-                            .orElseThrow(() -> new IllegalStateException("Отношение не найдено: " + relationId));
+                            .orElseThrow(() -> new NotFoundException("Отношение не найдено: " + relationId));
                     relationRecord.setAbout(request.getAbout());
                     relationRecord.setType(request.getType());
                 } else {
@@ -316,7 +317,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     public void updateOtherField(Long caseId, Long interrogationId,
                                  UpdateProtocolFieldRequest request, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException("Допрос не найден: " + interrogationId));
 
         switch (request.getField()) {
             case "city" -> interrogation.setCity(request.getValue());
@@ -341,7 +342,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Long involvedPersonsId = request.getId();
                 if (involvedPersonsId != null) {
                     involvedPersons = caseInterrogationInvolvedPersonsRepository.findById(involvedPersonsId)
-                            .orElseThrow(() -> new IllegalStateException("Вовлеченные люди не найдены: " + involvedPersonsId));
+                            .orElseThrow(() -> new NotFoundException("Вовлеченные люди не найдены: " + involvedPersonsId));
                     involvedPersons.setAbout(request.getAbout());
                     involvedPersons.setType(request.getType());
                 } else {
@@ -646,7 +647,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             CaseInterrogationTimerSession lastSession = interrogation.getTimerSessions().stream()
                     .filter(s -> s.getPausedAt() == null)
                     .max(Comparator.comparing(CaseInterrogationTimerSession::getStartedAt))
-                    .orElseThrow(() -> new IllegalStateException("Нет активной сессии таймера для паузы"));
+                    .orElseThrow(() -> new NotFoundException("Нет активной сессии таймера для паузы"));
 
             lastSession.setPausedAt(now);
 

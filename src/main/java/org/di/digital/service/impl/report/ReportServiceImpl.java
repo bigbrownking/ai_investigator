@@ -3,6 +3,7 @@ package org.di.digital.service.impl.report;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.ReportResultMessage;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.model.enums.LogAction;
@@ -130,7 +131,7 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public CaseReport getByCaseNumber(String caseNumber) {
         return caseReportRepository.findByCaseEntityNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new NotFoundException(
                         "Отчёт не найден для дела: " + caseNumber));
     }
 
@@ -141,7 +142,7 @@ public class ReportServiceImpl implements ReportService {
 
     private CaseReport buildNew(ReportResultMessage message) {
         Case caseEntity = caseRepository.findByNumber(message.getCaseNumber())
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new NotFoundException(
                         "Дело не найдено: " + message.getCaseNumber()));
         return CaseReport.builder()
                 .caseEntity(caseEntity)
@@ -155,7 +156,7 @@ public class ReportServiceImpl implements ReportService {
     @Transactional(readOnly = true)
     public Resource downloadReport(String caseNumber, String userEmail) {
         CaseReport review = caseReportRepository.findByCaseEntityNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new NotFoundException(
                         "Отчёт не найден для дела: " + caseNumber));
 
         if (review.getStatus() != CaseFileStatusEnum.COMPLETED) {
@@ -163,7 +164,7 @@ public class ReportServiceImpl implements ReportService {
                     "Отчёт ещё не готов, текущий статус: " + review.getStatus());
         }
         if (review.getReportFileUrl() == null || review.getReportFileUrl().isBlank()) {
-            throw new IllegalStateException("Файл отчёта отсутствует для дела: " + caseNumber);
+            throw new NotFoundException("Файл отчёта отсутствует для дела: " + caseNumber);
         }
 
         logService.log(

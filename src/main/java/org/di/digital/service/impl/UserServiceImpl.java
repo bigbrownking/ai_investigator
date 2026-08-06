@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.user.UpdateProfileRequest;
 import org.di.digital.dto.request.user.UserSettingsRequest;
 import org.di.digital.dto.response.user.UserProfile;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.enums.*;
 import org.di.digital.model.user.*;
 import org.di.digital.repository.user.*;
@@ -32,7 +33,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public UserProfile getUserProfile(String email) {
         User user = userRepository.findByEmailWithSettings(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         return mapper.mapToUserProfileResponse(user);
     }
@@ -41,7 +42,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserProfile updateUserSettings(String email, UserSettingsRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         UserSettings settings = user.getSettings();
         if (settings == null) {
@@ -74,7 +75,7 @@ public class UserServiceImpl implements UserService {
     @Transactional
     public UserProfile updateUserProfile(String email, UpdateProfileRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         StringBuilder changes = new StringBuilder();
 
@@ -95,7 +96,7 @@ public class UserServiceImpl implements UserService {
 
         if (request.getProfessionId() != null) {
             Profession profession = professionRepository.findById(request.getProfessionId())
-                    .orElseThrow(() -> new IllegalStateException("Profession not found"));
+                    .orElseThrow(() -> new NotFoundException("Профессия не найдена"));
             changes.append(String.format("profession: [%s -> %s], ",
                     user.getProfession() != null ? user.getProfession().getRuName() : "null",
                     profession.getRuName()));
@@ -104,7 +105,7 @@ public class UserServiceImpl implements UserService {
 
         if (request.getRankId() != null) {
             Rank rank = rankRepository.findById(request.getRankId())
-                    .orElseThrow(() -> new IllegalStateException("Rank not found"));
+                    .orElseThrow(() -> new NotFoundException("Звание не найдено"));
             changes.append(String.format("rank: [%s -> %s], ",
                     user.getRank() != null ? user.getRank().getRuName() : "null",
                     rank.getRuName()));
@@ -113,7 +114,7 @@ public class UserServiceImpl implements UserService {
 
         if (request.getAdministrationId() != null) {
             Administration administration = administrationRepository.findById(request.getAdministrationId())
-                    .orElseThrow(() -> new IllegalStateException("Administration not found"));
+                    .orElseThrow(() -> new NotFoundException("Управление не найдено"));
             changes.append(String.format("administration: [%s -> %s], ",
                     user.getAdministration() != null ? user.getAdministration().getRuName() : "null",
                     administration.getRuName()));
@@ -122,7 +123,7 @@ public class UserServiceImpl implements UserService {
 
         if (request.getRegionId() != null) {
             Region region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new IllegalStateException("Region not found"));
+                    .orElseThrow(() -> new NotFoundException("Регион не найден"));
             changes.append(String.format("region: [%s -> %s], ",
                     user.getRegion() != null ? user.getRegion().getRuName() : "null",
                     region.getRuName()));
@@ -150,7 +151,7 @@ public class UserServiceImpl implements UserService {
     @Override
     public List<User> getMyBoss(String email) {
         User user = userRepository.findByEmailWithSettings(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         if (user.getRegion() == null) {
             throw new IllegalStateException("Пользователь не привязан к региону, невозможно определить начальство");

@@ -20,6 +20,7 @@ import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.AppealStatus;
 import org.di.digital.model.enums.LogAction;
@@ -96,7 +97,7 @@ public class AdminServiceImpl implements AdminService {
     private final SupportTicketRepository supportTicketRepository;
     private final ReviewRepository reviewRepository;
     private final InterrogationExportService interrogationExportService;
-    private final CaseService  caseService;
+    private final CaseService caseService;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
 
     @Override
@@ -131,7 +132,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public CasePageResponse getUserCases(Long userId, int page, int size, CaseSearchRequest req) {
         userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userId));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userId));
 
         Specification<Case> spec = CaseSpecifications.build(req)
                 .and(hasOwner(userId));
@@ -230,7 +231,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public CaseInterrogationFullResponse getInterrogationDetail(Long interrogationId) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException("Допрос не найден: " + interrogationId));
 
         User user = interrogation.getCaseEntity().getOwner();
 
@@ -241,7 +242,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public byte[] downloadInterrogation(Long interrogationId) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException("Допрос не найден: " + interrogationId));
         CaseInterrogationFullResponse data = mapper.mapToInterrogationFullResponse(interrogation, interrogation.getCaseEntity().getOwner());
         return interrogationExportService.exportToDocx(data, interrogation.getCaseEntity().getOwner());
     }
@@ -336,7 +337,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public void activateUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userId));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userId));
         user.setActive(true);
         userRepository.save(user);
         log.info("User {} activated by admin", userId);
@@ -345,7 +346,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public void deactivateUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userId));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userId));
         user.setActive(false);
         userRepository.save(user);
         log.info("User {} deactivated by admin", userId);
@@ -356,7 +357,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void deleteUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userId));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userId));
 
         if (user.isActive()) {
             throw new IllegalStateException("Пользователь активен, сперва деактивируйте его");
@@ -408,12 +409,13 @@ public class AdminServiceImpl implements AdminService {
                         .build()
                 ).toList();
     }
+
     @Override
     public RegionSummaryDto getRegionSummary(Long regionId, int page, int size) {
         Pageable pageable = PageRequest.of(page, size);
 
         Region region = regionRepository.findById(regionId)
-                .orElseThrow(() -> new IllegalStateException("Регион не найден: " + regionId));
+                .orElseThrow(() -> new NotFoundException("Регион не найден: " + regionId));
 
         RegionStatsDto stats = RegionStatsDto.builder()
                 .regionId(region.getId())
@@ -441,22 +443,23 @@ public class AdminServiceImpl implements AdminService {
                 .appeals(appeals)
                 .build();
     }
+
     @Override
     @Transactional(readOnly = true)
     public CaseResponse getCaseDetail(Long caseId) {
         return caseRepository.findById(caseId)
                 .map(mapper::mapToCaseResponse)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
     }
 
     @Override
     @Transactional
     public void approveAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Админ не найден"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         Appeal appeal = appealRepository.findById(appealId)
-                .orElseThrow(() -> new IllegalStateException("Обращение не найдено"));
+                .orElseThrow(() -> new NotFoundException("Обращение не найдено"));
 
         appeal.setStatus(AppealStatus.APPROVED);
         appeal.setReviewedBy(admin);
@@ -474,10 +477,10 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void rejectAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new IllegalStateException("Админ не найден"));
+                .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
         Appeal appeal = appealRepository.findById(appealId)
-                .orElseThrow(() -> new IllegalStateException("Обращение не найдено"));
+                .orElseThrow(() -> new NotFoundException("Обращение не найдено"));
 
         appeal.setStatus(AppealStatus.REJECTED);
         appeal.setReviewedBy(admin);
@@ -491,7 +494,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public Page<LogDto> getUserLogs(String email, int page, int size) {
         userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
         return logRepository.findByEmail(email, PageRequest.of(page, size))
                 .map(mapper::toLogDto);
     }
@@ -508,7 +511,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public SupportTicketDto getSupportTicketDetail(Long id) {
         SupportTicket ticket = supportTicketRepository.findById(id)
-                .orElseThrow(() -> new IllegalStateException("Тикет не найден: " + id));
+                .orElseThrow(() -> new NotFoundException("Тикет не найден: " + id));
         return mapper.mapToSupportTicketDto(ticket);
     }
 
@@ -524,7 +527,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public ReviewDto getReviewDetail(Long id) {
         Review review = reviewRepository.findById(id)
-                .orElseThrow(() -> new IllegalStateException("Рецензия не найдена: " + id));
+                .orElseThrow(() -> new NotFoundException("Рецензия не найдена: " + id));
         return mapper.mapToReviewDto(review);
     }
 
@@ -532,10 +535,10 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void assignAdvancedUserRole(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         Role role = roleRepository.findByName("ADVANCED_USER")
-                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
 
         user.getRoles().add(role);
 
@@ -552,16 +555,16 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void assignRegAdminRole(String email, List<String> regions) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         Role regAdminRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
 
         user.getRoles().add(regAdminRole);
 
         for (String regionName : regions) {
             Region reg = regionRepository.findByRuName(regionName)
-                    .orElseThrow(() -> new IllegalStateException("Регион не найден: " + regionName));
+                    .orElseThrow(() -> new NotFoundException("Регион не найден: " + regionName));
 
             if (!reg.getAdmins().contains(user)) {
                 reg.getAdmins().add(user);
@@ -577,14 +580,14 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void removeRegAdminRole(String email, List<String> regions) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         Role regAdminRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new IllegalStateException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
 
         for (String regionName : regions) {
             Region reg = regionRepository.findByRuName(regionName)
-                    .orElseThrow(() -> new IllegalStateException("Регион не найден: " + regionName));
+                    .orElseThrow(() -> new NotFoundException("Регион не найден: " + regionName));
 
             if (!reg.getAdmins().contains(user)) {
                 throw new IllegalStateException(
@@ -609,10 +612,10 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void changeOwner(Long caseId, Long id) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found"));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено"));
 
         User newOwner = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
         if (!newOwner.isActive()) {
             throw new IllegalStateException("Нельзя назначить неактивного пользователя владельцем");
         }
@@ -638,7 +641,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public UserProfile updateUserProfile(Long id, UpdateProfileRequest request) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + id));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + id));
 
         if (request.getName() != null) {
             user.setName(request.getName());
@@ -654,25 +657,25 @@ public class AdminServiceImpl implements AdminService {
 
         if (request.getProfessionId() != null) {
             Profession profession = professionRepository.findById(request.getProfessionId())
-                    .orElseThrow(() -> new IllegalStateException("Profession not found"));
+                    .orElseThrow(() -> new NotFoundException("Профессия не найдена"));
             user.setProfession(profession);
         }
 
         if (request.getRankId() != null) {
             Rank rank = rankRepository.findById(request.getRankId())
-                    .orElseThrow(() -> new IllegalStateException("Rank not found"));
+                    .orElseThrow(() -> new NotFoundException("Звание на найдено"));
             user.setRank(rank);
         }
 
         if (request.getAdministrationId() != null) {
             Administration administration = administrationRepository.findById(request.getAdministrationId())
-                    .orElseThrow(() -> new IllegalStateException("Administration not found"));
+                    .orElseThrow(() -> new NotFoundException("Управление не найдено"));
             user.setAdministration(administration);
         }
 
         if (request.getRegionId() != null) {
             Region region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new IllegalStateException("Region not found"));
+                    .orElseThrow(() -> new NotFoundException("Регион не найден"));
             user.setRegion(region);
         }
 
@@ -684,7 +687,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public String getIndictment(Long caseId) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         return caseEntity.getIndictment();
     }
@@ -692,7 +695,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public String getQualification(Long caseId) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         return caseEntity.getQualification();
     }
@@ -700,7 +703,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public CasePlanResponse getPlan(Long caseId) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         return CasePlanResponse.builder()
                 .planStatus(caseEntity.getPlanStatus())
@@ -711,23 +714,14 @@ public class AdminServiceImpl implements AdminService {
                 .build();
     }
 
-        @Override
-        @Transactional(readOnly = true)
-        public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId) {
-                
-
-             
-
-                List<RejectionReasonResponse> result = rejectionReasonStatusRepository
-                                .findAllByCaseIdOrderByTimestampDesc(caseId)
-                                .stream()
-                                .map(mapper::toRejectionReasonResponse)
-                                .toList();
-
-
-                return result;
-        }
-
-
+    @Override
+    @Transactional(readOnly = true)
+    public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId) {
+        return rejectionReasonStatusRepository
+                .findAllByCaseIdOrderByTimestampDesc(caseId)
+                .stream()
+                .map(mapper::toRejectionReasonResponse)
+                .toList();
+    }
 }
 

@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.tree.TreeDataResponse;
 import org.di.digital.dto.response.tree.TreeModuleResponse;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.TreeData;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.TreeModuleType;
@@ -113,7 +114,7 @@ public class TreeServiceImpl implements TreeService {
         Case caseEntity = validateAndGetCase(caseNumber, userEmail);
         TreeData treeData = treeDataRepository
                 .findFirstByCaseEntityAndModuleTypeOrderByVersionDesc(caseEntity, moduleType)
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new NotFoundException(
                         String.format("Module %s not found for case %s", moduleType, caseNumber)));
 
         return mapToModuleResponse(treeData);

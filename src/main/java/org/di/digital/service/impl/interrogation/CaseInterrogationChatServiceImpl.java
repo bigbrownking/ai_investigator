@@ -9,6 +9,7 @@ import org.di.digital.dto.response.chat.CaseChatMessageDto;
 import org.di.digital.dto.response.interrogation.ContradictionDto;
 import org.di.digital.dto.response.interrogation.ContradictionResponse;
 import org.di.digital.dto.response.interrogation.InterrogationQuestionsResponse;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChatMessage;
 import org.di.digital.model.enums.LogAction;
@@ -197,9 +198,9 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     public CaseChatHistoryResponse getChatHistory(Long caseId, Long interrogationId,
                                                   String userEmail, int page, int size) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         CaseInterrogationChat chat = caseInterrogationChatRepository
@@ -238,14 +239,14 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     @Transactional
     public void clearChatHistory(Long caseId, Long interrogationId, String userEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
         CaseInterrogationChat chat = caseInterrogationChatRepository.findByInterrogationId(interrogationId)
-                .orElseThrow(() -> new IllegalStateException("Чат для допроса не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException("Чат для допроса не найден: " + interrogationId));
 
         contradictionRepository.deleteAllByInterrogationChatId(chat.getId());
         chatMessageRepository.deleteAllByInterrogationChatId(chat.getId());
@@ -263,13 +264,13 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     public void toggleMessageSelected(Long caseId, Long interrogationId, Long messageId,
                                       boolean selected, String userEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         CaseChatMessage message = chatMessageRepository.findById(messageId)
-                .orElseThrow(() -> new IllegalStateException("Сообщение не найдено: " + messageId));
+                .orElseThrow(() -> new NotFoundException("Сообщение не найдено: " + messageId));
 
         if (Boolean.valueOf(selected).equals(message.getIsSelected())) {
             return;
@@ -399,9 +400,9 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     public CaseChatHistoryResponse getCaseInterrogationChatHistory(Long caseId, Long interrogationId,
                                                                    String userEmail, int page, int size) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         CaseInterrogationCaseChat chat = caseInterrogationCaseChatRepository
@@ -435,14 +436,14 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     @Transactional
     public void clearCaseInterrogationChatHistory(Long caseId, Long interrogationId, String userEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
         validateUserAccess(caseEntity, user);
 
         CaseInterrogationCaseChat chat = caseInterrogationCaseChatRepository
                 .findByInterrogationIdAndUserId(interrogationId, user.getId())
-                .orElseThrow(() -> new IllegalStateException("Чат не найден для допроса: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException("Чат не найден для допроса: " + interrogationId));
 
         chatMessageRepository.deleteAllByCaseInterrogationCaseChatId(chat.getId());
         chat.getMessages().clear();

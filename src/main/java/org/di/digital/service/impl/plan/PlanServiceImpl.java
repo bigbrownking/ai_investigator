@@ -81,7 +81,7 @@ public class PlanServiceImpl implements PlanService {
     @Override
     public CasePlanResponse generatePlan(String caseNumber, String mode, String email) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
             String message = MessageConstant.NO_FILE_PROCESSED.format(caseNumber);
@@ -290,7 +290,7 @@ public class PlanServiceImpl implements PlanService {
         validateUserAccess(caseEntity, user);
 
         if (caseEntity.getPlan() == null) {
-            throw new IllegalStateException("План отсутствует");
+            throw new NotFoundException("План отсутствует");
         }
 
         Long regionId = caseEntity.getOwner().getRegion().getId();
@@ -403,12 +403,12 @@ public class PlanServiceImpl implements PlanService {
 
         Map<String, Object> plan = caseEntity.getPlan();
         if (plan == null) {
-            throw new IllegalStateException("План отсутствует");
+            throw new NotFoundException("План отсутствует");
         }
 
         List<Map<String, Object>> actions = (List<Map<String, Object>>) plan.get("actions");
         if (actions == null) {
-            throw new IllegalStateException("Список действий отсутствует");
+            throw new NotFoundException("Список действий отсутствует");
         }
 
         Map<String, Object> action = actions.stream()

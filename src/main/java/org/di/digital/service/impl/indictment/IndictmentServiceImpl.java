@@ -6,6 +6,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.indictment.IndictmentRephraseApplyRequest;
 import org.di.digital.dto.request.indictment.IndictmentSectionUpdateRequest;
 import org.di.digital.dto.response.indictment.IndictmentSectionDto;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.CaseActivityType;
 import org.di.digital.model.enums.CaseFileStatusEnum;
@@ -150,10 +151,10 @@ public class IndictmentServiceImpl implements IndictmentService {
 
     private void streamIndictment(String caseNumber, SseEmitter emitter, String email) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         String language = entity.getLanguage();
 
@@ -212,10 +213,10 @@ public class IndictmentServiceImpl implements IndictmentService {
     private void completeIndictment(String caseNumber, SseEmitter emitter,
                                     String email, RequestAttributes attrs) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         String language = entity.getLanguage();
 
@@ -274,7 +275,7 @@ public class IndictmentServiceImpl implements IndictmentService {
     private void streamIndictmentSection(String caseNumber, SseEmitter emitter,
                                          String email, int sectionId) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         if (entity.getIndictmentSections() == null && entity.getIndictment() != null) {
             emitter.completeWithError(new IllegalStateException(
@@ -283,7 +284,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         }
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(caseNumber);
@@ -326,7 +327,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                                         int startSectionId, int startOffset,
                                         int endSectionId, int endOffset, String prompt) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(caseNumber);
@@ -339,7 +340,7 @@ public class IndictmentServiceImpl implements IndictmentService {
 
         List<Map<String, Object>> sections = entity.getIndictmentSections();
         if (sections == null || sections.isEmpty()) {
-            emitter.completeWithError(new IllegalStateException("Секции акта не найдены: " + caseNumber));
+            emitter.completeWithError(new NotFoundException("Секции акта не найдены: " + caseNumber));
             return;
         }
 
@@ -392,13 +393,13 @@ public class IndictmentServiceImpl implements IndictmentService {
     public List<IndictmentSectionDto> applyRephrase(String caseNumber,
                                                     IndictmentRephraseApplyRequest request) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         if (entity.getIndictmentSections() == null && entity.getIndictment() != null) {
             throw new IllegalStateException("Ваш обвинительный акт старого образца, сгенерируйте заново");
         }
         if (entity.getIndictmentSections() == null) {
-            throw new IllegalStateException("Обвинительный акт не найден для дела: " + caseNumber);
+            throw new NotFoundException("Обвинительный акт не найден для дела: " + caseNumber);
         }
 
         CaseIndictment indictment = getOrCreateIndictment(entity);
@@ -412,8 +413,8 @@ public class IndictmentServiceImpl implements IndictmentService {
 
         int startIdx = indexOfSection(sections, startSectionId);
         int endIdx = indexOfSection(sections, endSectionId);
-        if (startIdx < 0) throw new IllegalStateException("Секция id=" + startSectionId + " не найдена");
-        if (endIdx < 0) throw new IllegalStateException("Секция id=" + endSectionId + " не найдена");
+        if (startIdx < 0) throw new NotFoundException("Секция id=" + startSectionId + " не найдена");
+        if (endIdx < 0) throw new NotFoundException("Секция id=" + endSectionId + " не найдена");
         if (startIdx > endIdx) throw new IllegalStateException(
                 "Начальная секция идёт позже конечной: start=" + startSectionId + ", end=" + endSectionId);
 
@@ -451,13 +452,13 @@ public class IndictmentServiceImpl implements IndictmentService {
     public IndictmentSectionDto updateSection(String caseNumber,
                                               IndictmentSectionUpdateRequest request) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         if (entity.getIndictmentSections() == null && entity.getIndictment() != null) {
             throw new IllegalStateException("Ваш обвинительный акт старого образца, сгенерируйте заново");
         }
         if (entity.getIndictmentSections() == null) {
-            throw new IllegalStateException("Обвинительный акт не найден для дела: " + caseNumber);
+            throw new NotFoundException("Обвинительный акт не найден для дела: " + caseNumber);
         }
 
         CaseIndictment indictment = getOrCreateIndictment(entity);
@@ -466,7 +467,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         Map<String, Object> target = sections.stream()
                 .filter(s -> request.getId().equals(s.get("id")))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException(
+                .orElseThrow(() -> new NotFoundException(
                         "Секция с id=" + request.getId() + " не найдена"));
 
         target.put("text", request.getText());
@@ -488,7 +489,7 @@ public class IndictmentServiceImpl implements IndictmentService {
     @Override
     public List<IndictmentSectionDto> getIndictmentSections(String caseNumber) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
         if (entity.getIndictmentSections() != null) {
             return toDtoList(entity.getIndictmentSections());
@@ -513,13 +514,13 @@ public class IndictmentServiceImpl implements IndictmentService {
                     LogLevel.INFO, LogAction.INDICTMENT_DOWNLOAD, caseNumber, userEmail);
 
             Case entity = caseRepository.findByNumber(caseNumber)
-                    .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                    .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
 
             List<Map<String, Object>> sections = entity.getIndictmentSections();
 
             if (sections == null) {
                 if (entity.getIndictment() == null) {
-                    throw new IllegalStateException("Обвинительный акт не найден для дела: " + caseNumber);
+                    throw new NotFoundException("Обвинительный акт не найден для дела: " + caseNumber);
                 }
                 sections = List.of(Map.of("id", 0, "category", "legacy", "text", entity.getIndictment()));
             }
@@ -556,8 +557,8 @@ public class IndictmentServiceImpl implements IndictmentService {
                                   int endSectionId, int endOffset) {
         int startIdx = indexOfSection(sections, startSectionId);
         int endIdx = indexOfSection(sections, endSectionId);
-        if (startIdx < 0) throw new IllegalStateException("Секция id=" + startSectionId + " не найдена");
-        if (endIdx < 0) throw new IllegalStateException("Секция id=" + endSectionId + " не найдена");
+        if (startIdx < 0) throw new NotFoundException("Секция id=" + startSectionId + " не найдена");
+        if (endIdx < 0) throw new NotFoundException("Секция id=" + endSectionId + " не найдена");
         if (startIdx > endIdx) throw new IllegalStateException(
                 "Начальная секция идёт позже конечной: start=" + startSectionId + ", end=" + endSectionId);
 

@@ -10,6 +10,7 @@ import org.di.digital.dto.response.osmotr.OsmotrDataItemDto;
 import org.di.digital.dto.response.osmotr.OsmotrResultDto;
 import org.di.digital.dto.response.osmotr.OsmotrResultSegmentDto;
 import org.di.digital.dto.response.osmotr.OsmotrSubmitDecisionsResponse;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.OsmotrProcessingStatus;
 import org.di.digital.model.osmotr.OsmotrResult;
@@ -62,7 +63,7 @@ public class OsmotrServiceImpl implements OsmotrService {
     @Transactional
     public OsmotrResultDto submitDocument(String caseNumber, String userEmail, MultipartFile file) throws Exception {
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         String originalFileName = file.getOriginalFilename();
         byte[] fileBytes = file.getBytes();
@@ -138,9 +139,9 @@ public class OsmotrServiceImpl implements OsmotrService {
     @Transactional(readOnly = true)
     public List<OsmotrResultDto> getResultsByCaseNumber(String caseNumber, String email) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
         validateUserAccess(caseEntity, user);
 
         return osmotrResultRepository.findByCaseNumber(caseNumber).stream()
@@ -155,9 +156,9 @@ public class OsmotrServiceImpl implements OsmotrService {
     @Transactional(readOnly = true)
     public Optional<OsmotrResultDto> getResult(String caseNumber, Long resultId, String email) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
         validateUserAccess(caseEntity, user);
 
         return osmotrResultRepository.findById(resultId)
@@ -181,13 +182,13 @@ public class OsmotrServiceImpl implements OsmotrService {
     public OsmotrResultDto updateDistribution(String caseNumber, Long resultId,
                                               DistributionRequest request, String email) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
         validateUserAccess(caseEntity, user);
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
-                .orElseThrow(() -> new IllegalStateException("OsmotrResult не найден: " + resultId));
+                .orElseThrow(() -> new NotFoundException("OsmotrResult не найден: " + resultId));
 
         Set<Long> evidenceIds = request.getEvidenceSegmentIds() != null
                 ? new HashSet<>(request.getEvidenceSegmentIds()) : Set.of();
@@ -264,18 +265,18 @@ public class OsmotrServiceImpl implements OsmotrService {
 
     public byte[] downloadSegment(String caseNumber, Long resultId, Long segmentId, String email) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
         validateUserAccess(caseEntity, user);
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
-                .orElseThrow(() -> new IllegalStateException("OsmotrResult не найден: " + resultId));
+                .orElseThrow(() -> new NotFoundException("OsmotrResult не найден: " + resultId));
 
         OsmotrResultSegment segment = result.getSegments().stream()
                 .filter(s -> s.getId().equals(segmentId))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Сегмент не найден: " + segmentId));
+                .orElseThrow(() -> new NotFoundException("Сегмент не найден: " + segmentId));
 
         try (InputStream is = minioService.downloadFile(segment.getFileUrl())) {
             return is.readAllBytes();
@@ -286,13 +287,13 @@ public class OsmotrServiceImpl implements OsmotrService {
 
     public byte[] mergeSegments(String caseNumber, Long resultId, String type, String email) throws Exception {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
         validateUserAccess(caseEntity, user);
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
-                .orElseThrow(() -> new IllegalStateException("OsmotrResult не найден: " + resultId));
+                .orElseThrow(() -> new NotFoundException("OsmotrResult не найден: " + resultId));
 
         List<OsmotrResultSegment> segments = result.getSegments().stream()
                 .filter(s -> "EVIDENCE".equals(type)
@@ -302,7 +303,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .toList();
 
         if (segments.isEmpty()) {
-            throw new IllegalStateException("Нет сегментов с type=" + type);
+            throw new NotFoundException("Нет сегментов с type=" + type);
         }
 
         return pdfSplitter.mergeSegments(segments.stream()
@@ -317,13 +318,13 @@ public class OsmotrServiceImpl implements OsmotrService {
 
     public byte[] downloadGeneratedFile(String caseNumber, Long resultId, String fileType, String email) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
         validateUserAccess(caseEntity, user);
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
-                .orElseThrow(() -> new IllegalStateException("Осмотр не найден: " + resultId));
+                .orElseThrow(() -> new NotFoundException("Осмотр не найден: " + resultId));
 
         if (result.getSessionId() == null) {
             throw new IllegalStateException("Осмотр ещё не обработан: " + resultId);
@@ -349,9 +350,9 @@ public class OsmotrServiceImpl implements OsmotrService {
     @Transactional(readOnly = true)
     public List<OsmotrResultDto> searchSegments(String caseNumber, String query, String email) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
         validateUserAccess(caseEntity, user);
 
         if (query == null || query.isBlank()) {

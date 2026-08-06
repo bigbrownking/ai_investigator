@@ -7,6 +7,7 @@ import org.di.digital.dto.request.cases.ReorderCaseFilesRequest;
 import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.FigurantResponse;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
+import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.cases.CaseMemberHistory;
@@ -85,10 +86,10 @@ public class CaseServiceImpl implements CaseService {
     @Transactional(readOnly = true)
     public Case getCaseEntityById(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -157,10 +158,10 @@ public class CaseServiceImpl implements CaseService {
     @Override
     public CaseResponse changeCaseLanguage(Long caseId, ChangeCaseLanguageRequest request, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -221,10 +222,10 @@ public class CaseServiceImpl implements CaseService {
     @Transactional(readOnly = true)
     public CaseResponse getCaseById(Long id, String email) {
         Case caseEntity = caseRepository.findById(id)
-                .orElseThrow(() -> new IllegalStateException("Case not found with id: " + id));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + id));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -234,10 +235,10 @@ public class CaseServiceImpl implements CaseService {
     @Transactional
     public GroupedCaseFileResponse recalculateToms(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -269,10 +270,10 @@ public class CaseServiceImpl implements CaseService {
     public GroupedCaseFileResponse getGroupedCaseFilesById(Long id, String email) {
 
         Case caseEntity = caseRepository.findById(id)
-                .orElseThrow(() -> new IllegalStateException("Case not found"));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено"));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found"));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
         validateUserAccess(caseEntity, user);
 
@@ -412,10 +413,10 @@ public class CaseServiceImpl implements CaseService {
     public GroupedCaseFileResponse reorderCaseFiles(Long caseId, ReorderCaseFilesRequest request,
                                                     String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
@@ -652,7 +653,7 @@ public class CaseServiceImpl implements CaseService {
                     LogAction.FIGURANT_ADDED,
                     caseEntity.getNumber(),
                     currentUserEmail);
-            throw new IllegalStateException("Figurant already exists in this case");
+            throw new IllegalStateException("Фигурант уже есть в деле");
         }
 
         CaseFigurant figurant = CaseFigurant.builder()
@@ -704,7 +705,7 @@ public class CaseServiceImpl implements CaseService {
                     LogAction.USER_DELETE,
                     caseEntity.getNumber(),
                     currentUserEmail);
-            throw new IllegalStateException("Cannot remove the case owner");
+            throw new IllegalStateException("Нельзя удалить владельца");
         }
 
         if (!caseEntity.hasUser(userToRemove)) {
@@ -715,7 +716,7 @@ public class CaseServiceImpl implements CaseService {
                     LogAction.USER_DELETE,
                     caseEntity.getNumber(),
                     currentUserEmail);
-            throw new IllegalStateException("User is not a member of this case");
+            throw new IllegalStateException("Пользователь не участник в деле");
         }
         String caseNumber = caseEntity.getNumber();
 
@@ -968,16 +969,16 @@ public class CaseServiceImpl implements CaseService {
     @Transactional(readOnly = true)
     public CaseFileResponse getFileByName(Long caseId, String fileName, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
         CaseFile caseFile = caseFileRepository
                 .findByOriginalFileNameAndCaseEntityId(fileName, caseId)
-                .orElseThrow(() -> new IllegalStateException("Файл не найден: " + fileName));
+                .orElseThrow(() -> new NotFoundException("Файл не найден: " + fileName));
 
         return mapper.mapToCaseFileResponse(caseFile);
     }
@@ -986,10 +987,10 @@ public class CaseServiceImpl implements CaseService {
     @Transactional(readOnly = true)
     public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
         validateUserAccess(caseEntity, user);
 
