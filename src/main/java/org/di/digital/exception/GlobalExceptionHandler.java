@@ -54,7 +54,7 @@ public class GlobalExceptionHandler {
             if (message == null) message = (String) body.get("detail");
         } catch (Exception ignore) { }
 
-        String userMessage = mapFaceCode(code, message);
+        String userMessage = FaceErrorMessages.map(code, message);
 
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.UNPROCESSABLE_ENTITY, userMessage);
@@ -69,19 +69,5 @@ public class GlobalExceptionHandler {
                 HttpStatus.INTERNAL_SERVER_ERROR, "Внутренняя ошибка сервера");
         problem.setTitle("Internal Server Error");
         return problem;
-    }
-
-    private String mapFaceCode(String code, String fallback) {
-        if (code == null) return fallback != null ? fallback : "Ошибка проверки лица";
-        return switch (code) {
-            case "IU011"              -> "Требуется эталонное фото лица. Пройдите регистрацию Face ID заново.";
-            case "LIVENESS_FAILED"    -> "Обнаружено фото или экран. Используйте живое лицо.";
-            case "MATCH_FAILED"       -> "Лицо не совпадает с сохранённым эталоном.";
-            case "POSE_NOT_CONFIRMED" -> "Поза не распознана. Следуйте инструкциям на экране.";
-            case "NO_FACE"            -> "Лицо не обнаружено. Убедитесь, что лицо в кадре.";
-            case "INCONSISTENT_FACES" -> "На кадрах разные лица. Повторите попытку.";
-            case "INTERNAL"           -> "Внутренняя ошибка обработки лица. Повторите попытку.";
-            default                   -> fallback != null ? fallback : "Ошибка проверки лица";
-        };
     }
 }

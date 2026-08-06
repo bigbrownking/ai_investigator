@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.client.FaceAuthClient;
 import org.di.digital.dto.response.auth.JwtResponse;
+import org.di.digital.exception.FaceErrorMessages;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.user.UserRepository;
@@ -46,7 +47,7 @@ public class FaceCompleteController {
 
         Long userId = preAuthTokenUtil.userId(claims);
         String email = claims.getSubject();
-        String scope = claims.get("scope", String.class);   // "AUTH" | "ENROLL"
+        String scope = claims.get("scope", String.class);
 
         String jobId = body.get("jobId");
         if (jobId == null || jobId.isBlank()) {
@@ -59,7 +60,16 @@ public class FaceCompleteController {
         @SuppressWarnings("unchecked")
         Map<String, Object> result = (Map<String, Object>) job.get("result");
 
-        // job ещё не завершён -> не 401 (это гонка на фронте), а 409, чтобы фронт до-поллил
+        if ("FAILED".equals(status) || "REJECTED".equals(status)) {
+            @SuppressWarnings("unchecked")
+            Map<String, Object> error = (Map<String, Object>) job.get("error");
+            String code = error != null ? (String) error.get("code") : null;
+            log.warn("face-complete: job {} failed, code={}", jobId, code);
+            return ResponseEntity.status(422).body(Map.of(
+                    "error", FaceErrorMessages.map(code),
+                    "code", code != null ? code : "UNKNOWN"));
+        }
+
         if (!"SUCCEEDED".equals(status)) {
             log.warn("face-complete: job {} not finished, status={}", jobId, status);
             return ResponseEntity.status(409).body(Map.of(
@@ -68,7 +78,6 @@ public class FaceCompleteController {
 
         boolean ok;
         if ("ENROLL".equals(scope)) {
-            // тип job должен соответствовать enroll-флоу
             if (!"ENROLL_REFERENCE_SET".equals(type) && !"PREPARE_REFERENCE_SET".equals(type)) {
                 log.warn("face-complete ENROLL scope but job type={} (jobId={})", type, jobId);
                 return ResponseEntity.badRequest().body(Map.of(
@@ -82,7 +91,6 @@ public class FaceCompleteController {
                 userRepository.save(user);
             }
         } else {
-            // AUTH scope -> job должен быть verify
             if (!"VERIFY".equals(type)) {
                 log.warn("face-complete AUTH scope but job type={} (jobId={})", type, jobId);
                 return ResponseEntity.badRequest().body(Map.of(
@@ -92,7 +100,8 @@ public class FaceCompleteController {
         }
 
         if (!ok) {
-            return ResponseEntity.status(401).body(Map.of("error", "Face check not passed"));
+            return ResponseEntity.status(401).body(Map.of(
+                    "error", "Face check not passed", "code", "MATCH_FAILED"));
         }
 
         String access = jwtTokenUtil.generateTokenFromUsername(email);
