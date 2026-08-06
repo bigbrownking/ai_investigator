@@ -1,219 +1,119 @@
 package org.di.digital.service.impl.core;
-
-import io.minio.*;
-import io.minio.errors.ErrorResponseException;
-import io.minio.http.Method;
-import io.minio.messages.DeleteError;
-import io.minio.messages.DeleteObject;
-import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.cases.CaseFile;
-import org.di.digital.model.interrogation.CaseInterrogationApplicationFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.interrogation.CaseInterrogationApplicationFile;
+import org.di.digital.service.core.MinioObjectStorage;
 import org.di.digital.service.core.MinioService;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.io.ByteArrayInputStream;
 import java.io.InputStream;
 import java.time.LocalDateTime;
-import java.util.*;
-import java.util.concurrent.TimeUnit;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import java.util.UUID;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class MinioServiceImpl implements MinioService {
 
-    private final MinioClient minioClient;
+    private final MinioObjectStorage storage;
 
-    @Value("${minio.bucket.name:cases}")
-    private String bucketName;
-
-    @Value("${minio.url}")
-    private String minioUrl;
-
-    @Value("${minio.public.url}")
-    private String minioPublicUrl;
-
-    @Value("${minio.presigned.url.expiry.hours:24}")
-    private int presignedUrlExpiryHours;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "doc", "docx", "xls", "xlsx");
-
 
     @Override
     public CaseFile uploadFile(MultipartFile file, String folder) {
         return uploadFile(file, folder, true);
     }
+
     @Override
     public CaseFile uploadFile(MultipartFile file, String folder, boolean validateType) {
         if (validateType) {
             validateFileType(file.getOriginalFilename());
         }
 
-        try {
-            ensureBucketExists();
+        String storedFileName = generateFileName(file.getOriginalFilename());
+        String objectName = folder + "/" + storedFileName;
 
-            String storedFileName = generateFileName(file.getOriginalFilename());
-            String objectName = folder + "/" + storedFileName;
-
-            try (InputStream inputStream = file.getInputStream()) {
-                minioClient.putObject(
-                        PutObjectArgs.builder()
-                                .bucket(bucketName)
-                                .object(objectName)
-                                .stream(inputStream, file.getSize(), -1)
-                                .contentType(file.getContentType())
-                                .build()
-                );
-            }
-
-            String objectPath = bucketName + "/" + objectName;
-
-            return CaseFile.builder()
-                    .originalFileName(file.getOriginalFilename())
-                    .storedFileName(storedFileName)
-                    .fileUrl(objectPath)
-                    .contentType(file.getContentType())
-                    .fileSize(file.getSize())
-                    .uploadedAt(LocalDateTime.now())
-                    .status(CaseFileStatusEnum.UPLOADED)
-                    .build();
-
+        String objectPath;
+        try (InputStream inputStream = file.getInputStream()) {
+            objectPath = storage.putObject(objectName, inputStream, file.getSize(), file.getContentType());
         } catch (Exception e) {
             log.error("Error uploading file: {}", e.getMessage(), e);
             throw new IllegalStateException("Failed to upload file", e);
         }
+
+        return CaseFile.builder()
+                .originalFileName(file.getOriginalFilename())
+                .storedFileName(storedFileName)
+                .fileUrl(objectPath)
+                .contentType(file.getContentType())
+                .fileSize(file.getSize())
+                .uploadedAt(LocalDateTime.now())
+                .status(CaseFileStatusEnum.UPLOADED)
+                .build();
     }
+
+    @Override
     public CaseInterrogationApplicationFile uploadApplicationFile(MultipartFile file, String folder, String fio) {
-        try {
-            ensureBucketExists();
+        String storedFileName = generateFileName(file.getOriginalFilename());
+        String objectName = folder + "/application/" + fio + "/" + storedFileName;
 
-            String storedFileName = generateFileName(file.getOriginalFilename());
-            String objectName = folder + "/application/" + fio + "/" + storedFileName;
-
-            try (InputStream inputStream = file.getInputStream()) {
-                minioClient.putObject(
-                        PutObjectArgs.builder()
-                                .bucket(bucketName)
-                                .object(objectName)
-                                .stream(inputStream, file.getSize(), -1)
-                                .contentType(file.getContentType())
-                                .build()
-                );
-            }
-
-            // Store the object path instead of direct URL
-            String objectPath = bucketName + "/" + objectName;
-
-            return CaseInterrogationApplicationFile.builder()
-                    .originalFileName(file.getOriginalFilename())
-                    .storedFileName(storedFileName)
-                    .fileUrl(objectPath)
-                    .contentType(file.getContentType())
-                    .fileSize(file.getSize())
-                    .uploadedAt(LocalDateTime.now())
-                    .build();
-
+        String objectPath;
+        try (InputStream inputStream = file.getInputStream()) {
+            objectPath = storage.putObject(objectName, inputStream, file.getSize(), file.getContentType());
         } catch (Exception e) {
             log.error("Error uploading file: {}", e.getMessage(), e);
             throw new IllegalStateException("Failed to upload file", e);
         }
+
+        return CaseInterrogationApplicationFile.builder()
+                .originalFileName(file.getOriginalFilename())
+                .storedFileName(storedFileName)
+                .fileUrl(objectPath)
+                .contentType(file.getContentType())
+                .fileSize(file.getSize())
+                .uploadedAt(LocalDateTime.now())
+                .build();
     }
+
+    @Override
     public String uploadAudio(MultipartFile file, String folder, String fio) {
-        try {
-            ensureBucketExists();
+        String storedFileName = generateFileName(file.getOriginalFilename());
+        String objectName = folder + "/audio/" + fio + "/" + storedFileName;
 
-            String storedFileName = generateFileName(file.getOriginalFilename());
-
-            String objectName = folder + "/audio/" + fio + "/" + storedFileName;
-
-            try (InputStream inputStream = file.getInputStream()) {
-                minioClient.putObject(
-                        PutObjectArgs.builder()
-                                .bucket(bucketName)
-                                .object(objectName)
-                                .stream(inputStream, file.getSize(), -1)
-                                .contentType(file.getContentType())
-                                .build()
-                );
-            }
-
-            String objectPath = bucketName + "/" + objectName;
-
-            log.info("Audio uploaded successfully for interrogation: {}, path: {}",
-                    folder, objectPath);
-
-            return objectPath;
-
+        String objectPath;
+        try (InputStream inputStream = file.getInputStream()) {
+            objectPath = storage.putObject(objectName, inputStream, file.getSize(), file.getContentType());
         } catch (Exception e) {
             log.error("Error uploading audio file: {}", e.getMessage(), e);
             throw new IllegalStateException("Failed to upload audio file", e);
         }
+
+        log.info("Audio uploaded successfully for interrogation: {}, path: {}", folder, objectPath);
+        return objectPath;
     }
 
+    @Override
     public String generatePresignedUrlForPreview(String objectPath) {
-        try {
-            String objectName = extractObjectNameFromPath(objectPath);
-
-            Map<String, String> responseHeaders = new HashMap<>();
-            responseHeaders.put("response-content-disposition", "inline");
-
-            String presignedUrl = minioClient.getPresignedObjectUrl(
-                    GetPresignedObjectUrlArgs.builder()
-                            .method(Method.GET)
-                            .bucket(bucketName)
-                            .object(objectName)
-                            .expiry(presignedUrlExpiryHours, TimeUnit.HOURS)
-                            .extraQueryParams(responseHeaders)
-                            .build()
-            );
-
-            log.info("Generated presigned preview URL for: {}", objectName);
-            return toPublicUrl(presignedUrl);
-
-        } catch (Exception e) {
-            log.error("Error generating presigned preview URL for: {}", objectPath, e);
-            throw new IllegalStateException("Failed to generate presigned preview URL", e);
-        }
+        String objectName = storage.extractObjectNameFromPath(objectPath);
+        Map<String, String> headers = new HashMap<>();
+        headers.put("response-content-disposition", "inline");
+        return storage.presignedGetUrl(objectName, headers);
     }
 
+    @Override
     public String generatePresignedUrlForDownload(String objectPath, String fileName) {
-        try {
-            String objectName = extractObjectNameFromPath(objectPath);
-
-            Map<String, String> responseHeaders = new HashMap<>();
-            responseHeaders.put("response-content-disposition", "attachment; filename=\"" + fileName + "\"");
-
-            return toPublicUrl(minioClient.getPresignedObjectUrl(
-                    GetPresignedObjectUrlArgs.builder()
-                            .method(Method.GET)
-                            .bucket(bucketName)
-                            .object(objectName)
-                            .expiry(presignedUrlExpiryHours, TimeUnit.HOURS)
-                            .extraQueryParams(responseHeaders)
-                            .build())
-            );
-
-        } catch (Exception e) {
-            log.error("Error generating presigned download URL for: {}", objectPath, e);
-            throw new IllegalStateException("Failed to generate presigned download URL", e);
-        }
-    }
-
-    private void ensureBucketExists() throws Exception {
-        boolean exists = minioClient.bucketExists(
-                BucketExistsArgs.builder().bucket(bucketName).build()
-        );
-
-        if (!exists) {
-            minioClient.makeBucket(
-                    MakeBucketArgs.builder().bucket(bucketName).build()
-            );
-            log.info("Created bucket: {}", bucketName);
-        }
+        String objectName = storage.extractObjectNameFromPath(objectPath);
+        Map<String, String> headers = new HashMap<>();
+        headers.put("response-content-disposition", "attachment; filename=\"" + fileName + "\"");
+        return storage.presignedGetUrl(objectName, headers);
     }
 
     private String generateFileName(String originalFilename) {
@@ -224,157 +124,42 @@ public class MinioServiceImpl implements MinioService {
         return UUID.randomUUID() + extension;
     }
 
+    @Override
     public void deleteFile(String objectPath) {
-        try {
-            String objectName = extractObjectNameFromPath(objectPath);
-            minioClient.removeObject(
-                    RemoveObjectArgs.builder()
-                            .bucket(bucketName)
-                            .object(objectName)
-                            .build()
-            );
-            log.info("File deleted successfully: {}", objectPath);
-        } catch (Exception e) {
-            log.error("Error deleting file from Minio: {}", e.getMessage(), e);
-        }
+        storage.removeObject(storage.extractObjectNameFromPath(objectPath));
     }
+
+    @Override
     public void deleteAllFilesFromCase(String caseNumber) {
-        try {
-            String basePrefix = caseNumber + "/";
-
-            Iterable<Result<Item>> results = minioClient.listObjects(
-                    ListObjectsArgs.builder()
-                            .bucket(bucketName)
-                            .prefix(basePrefix)
-                            .recursive(true)
-                            .build()
-            );
-
-            List<DeleteObject> objectsToDelete = new ArrayList<>();
-
-            for (Result<Item> result : results) {
-                Item item = result.get();
-                String objectName = item.objectName();
-
-                objectsToDelete.add(new DeleteObject(objectName));
-            }
-
-            if (!objectsToDelete.isEmpty()) {
-                Iterable<Result<DeleteError>> errors = minioClient.removeObjects(
-                        RemoveObjectsArgs.builder()
-                                .bucket(bucketName)
-                                .objects(objectsToDelete)
-                                .build()
-                );
-
-                for (Result<DeleteError> error : errors) {
-                    log.warn("Delete error: {}", error.get().message());
-                }
-            }
-
-            log.info("✅ Deleted ALL {} files for case: {}", objectsToDelete.size(), caseNumber);
-        } catch (Exception e) {
-            log.error("❌ Error deleting files for case: {}", caseNumber, e);
-            throw new IllegalStateException("Failed to delete files", e);
-        }
+        List<String> names = storage.listObjectNames(caseNumber + "/");
+        storage.removeObjects(names);
+        log.info("Deleted ALL {} files for case: {}", names.size(), caseNumber);
     }
 
-    private String extractObjectNameFromPath(String objectPath) {
-        if (objectPath == null || objectPath.isEmpty()) {
-            throw new IllegalArgumentException("Object path cannot be null or empty");
-        }
-
-        if (objectPath.startsWith("http://") || objectPath.startsWith("https://")) {
-            try {
-                int bucketIndex = objectPath.indexOf("/" + bucketName + "/");
-                if (bucketIndex != -1) {
-                    return objectPath.substring(bucketIndex + bucketName.length() + 2);
-                }
-            } catch (Exception e) {
-                log.error("Failed to extract object name from URL: {}", objectPath, e);
-            }
-        }
-
-        if (objectPath.startsWith(bucketName + "/")) {
-            return objectPath.substring(bucketName.length() + 1);
-        }
-
-        return objectPath;
-    }
+    @Override
     public InputStream downloadFile(String objectPath) {
-        try {
-            String objectName = extractObjectNameFromPath(objectPath);
-            return minioClient.getObject(
-                    GetObjectArgs.builder()
-                            .bucket(bucketName)
-                            .object(objectName)
-                            .build()
-            );
-        } catch (Exception e) {
-            log.error("Error downloading file from Minio: {}", e.getMessage(), e);
-            throw new IllegalStateException("Failed to download file", e);
-        }
+        return storage.getObject(storage.extractObjectNameFromPath(objectPath));
     }
+
+    @Override
     public String uploadOsmotrFile(byte[] bytes, String caseNumber, String fileName, String subfolder) {
         validatePdfOnly(fileName);
-
         String objectName = String.format("%s/osmotr/%s/%s", caseNumber, subfolder, fileName);
-        try {
-            minioClient.putObject(PutObjectArgs.builder()
-                    .bucket(bucketName)
-                    .object(objectName)
-                    .stream(new ByteArrayInputStream(bytes), bytes.length, -1)
-                    .contentType("application/pdf")
-                    .build());
-            return bucketName + "/" + objectName;
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to upload osmotr file: " + objectName, e);
-        }
+        return storage.putObject(objectName, new ByteArrayInputStream(bytes), bytes.length, "application/pdf");
     }
+
     @Override
     public String uploadOsmotrGeneratedFile(byte[] bytes, String caseNumber, String fileName, String subfolder) {
         String objectName = String.format("%s/osmotr/%s/%s", caseNumber, subfolder, fileName);
-        try {
-            minioClient.putObject(PutObjectArgs.builder()
-                    .bucket(bucketName)
-                    .object(objectName)
-                    .stream(new ByteArrayInputStream(bytes), bytes.length, -1)
-                    .contentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
-                    .build());
-            return bucketName + "/" + objectName;
-        } catch (Exception e) {
-            throw new IllegalStateException("Failed to upload osmotr generated file: " + objectName, e);
-        }
-    }
-    @Override
-    public boolean fileExists(String objectPath) {
-        try {
-            String objectName = extractObjectNameFromPath(objectPath);
-            minioClient.statObject(
-                    StatObjectArgs.builder()
-                            .bucket(bucketName)
-                            .object(objectName)
-                            .build()
-            );
-            return true;
-        } catch (ErrorResponseException e) {
-            if ("NoSuchKey".equals(e.errorResponse().code())) {
-                return false;
-            }
-            log.error("Error checking file existence: {}", objectPath, e);
-            return false;
-        } catch (Exception e) {
-            log.error("Error checking file existence: {}", objectPath, e);
-            return false;
-        }
+        return storage.putObject(objectName, new ByteArrayInputStream(bytes), bytes.length,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     }
 
-    private String toPublicUrl(String presignedUrl) {
-        if (minioPublicUrl != null && !minioPublicUrl.isBlank()) {
-            return presignedUrl.replace(minioUrl, minioPublicUrl);
-        }
-        return presignedUrl;
+    @Override
+    public boolean fileExists(String objectPath) {
+        return storage.exists(storage.extractObjectNameFromPath(objectPath));
     }
+
     private void validateFileType(String fileName) {
         if (fileName == null || !fileName.contains(".")) {
             throw new IllegalStateException("Файл должен иметь расширение: " + fileName);
