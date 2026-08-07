@@ -3,6 +3,7 @@ package org.di.digital.service.impl.face;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.client.FaceAuthClient;
+import org.di.digital.dto.response.face.FaceResetResponse;
 import org.di.digital.exception.FaceAuthUnavailableException;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.user.User;
@@ -24,7 +25,7 @@ public class FaceManagementServiceImpl implements FaceManagementService {
 
     @Override
     @Transactional
-    public Map<String, Object> resetOwnFace(String email) {
+    public FaceResetResponse resetOwnFace(String email) {
         User caller = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
         return doReset(caller);
@@ -32,7 +33,7 @@ public class FaceManagementServiceImpl implements FaceManagementService {
 
     @Override
     @Transactional
-    public Map<String, Object> resetUserFace(String email, Long targetUserId) {
+    public FaceResetResponse resetUserFace(String email, Long targetUserId) {
         User caller = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
@@ -48,7 +49,7 @@ public class FaceManagementServiceImpl implements FaceManagementService {
         return doReset(target);
     }
 
-    private Map<String, Object> doReset(User user) {
+    private FaceResetResponse doReset(User user) {
         Map<String, Object> res;
         try {
             res = faceAuthClient.deleteFace(user.getId());
@@ -61,10 +62,11 @@ public class FaceManagementServiceImpl implements FaceManagementService {
         userRepository.save(user);
 
         log.info("Face ID reset for user {} ({})", user.getId(), user.getEmail());
-        return Map.of(
-                "deleted", true,
-                "userId", user.getId(),
-                "faceEnabled", false,
-                "faceAuth", res == null ? Map.of() : res);
+        return FaceResetResponse.builder()
+                .deleted(true)
+                .userId(user.getId())
+                .faceEnabled(false)
+                .faceAuth(res == null ? Map.of() : res)
+                .build();
     }
 }
