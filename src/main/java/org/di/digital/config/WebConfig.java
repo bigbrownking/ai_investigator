@@ -7,6 +7,7 @@ import org.di.digital.security.jwt.DetailedAuthEntryPoint;
 import org.di.digital.security.jwt.JwtRequestFilter;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import reactor.netty.http.client.HttpClient;
 import org.springframework.http.client.reactive.ReactorClientHttpConnector;
 import org.springframework.security.authentication.AuthenticationProvider;
@@ -57,7 +58,11 @@ public class WebConfig {
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
-                        .requestMatchers("/face-id/**").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/face-id/jobs/reference-set").permitAll()
+                        .requestMatchers(HttpMethod.POST, "/face-id/face-complete", "/face-id/challenges").permitAll()
+                        .requestMatchers(HttpMethod.DELETE, "/face-id/user/*").hasAnyAuthority("ADMIN")
+                        .requestMatchers("/face-id/**").authenticated()
+
                         .requestMatchers("/actuator/**").permitAll()
 
                         .requestMatchers("/ws/**").permitAll()

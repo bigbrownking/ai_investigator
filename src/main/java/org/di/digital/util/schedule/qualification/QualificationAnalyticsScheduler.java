@@ -19,7 +19,7 @@ public class QualificationAnalyticsScheduler {
 
     @Scheduled(cron = "${scheduler.qualification.analytics}", zone = "Asia/Almaty")
     public void recalculateAllQualificationAnalytics() {
-        log.info("Starting scheduled qualification analytics recalculation");
+        log.info("Starting scheduled qualification analytics.txt recalculation");
 
         List<Long> caseIds = caseQualificationRepository.findAllCaseIdsWithBothQualifications();
         log.info("Found {} cases with both qualifications", caseIds.size());
@@ -32,11 +32,11 @@ public class QualificationAnalyticsScheduler {
                 caseAnalyticsService.recalculateQualification(caseId);
                 success++;
             } catch (Exception e) {
-                log.error("Failed to recalculate analytics for case id {}", caseId, e);
+                log.error("Failed to recalculate analytics.txt for case id {}", caseId, e);
                 failed++;
             }
         }
 
-        log.info("Qualification analytics recalculation finished: success={}, failed={}", success, failed);
+        log.info("Qualification analytics.txt recalculation finished: success={}, failed={}", success, failed);
     }
 }

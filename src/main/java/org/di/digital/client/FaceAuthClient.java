@@ -131,4 +131,13 @@ public class FaceAuthClient {
                 .retrieve()
                 .body(Map.class);
     }
+
+    // ---- reset / delete Face ID (wipes reference sets, embeddings, REFERENCE captures) ----
+    public Map<String, Object> deleteFace(Long userId) {
+        return restClient.method(org.springframework.http.HttpMethod.DELETE)
+                .uri("/face-id/enrolled/{userId}", userId)
+                .header("X-User-Id", String.valueOf(userId))
+                .retrieve()
+                .body(Map.class);
+    }
 }

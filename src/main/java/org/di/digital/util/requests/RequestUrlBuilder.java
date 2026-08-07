@@ -85,7 +85,7 @@ public class RequestUrlBuilder {
         return buildUrl(host, port, "/interrogation/transcript/clean");
     }
     public static String analyticsQualification(String host, String port, String caseNumber, String language){
-        return buildUrl(host, port, String.format("/qualification/%s/analytics?language=%s", caseNumber, language));
+        return buildUrl(host, port, String.format("/qualification/%s/analytics.txt?language=%s", caseNumber, language));
     }
 
     public static String planUpdateUrl(String host, String port, String caseNumber) {

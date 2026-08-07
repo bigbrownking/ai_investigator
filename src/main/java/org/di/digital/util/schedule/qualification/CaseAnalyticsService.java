@@ -37,22 +37,22 @@ public class CaseAnalyticsService {
         try {
             response = fetchAnalytics(ref.number(), ref.language());
         } catch (Exception e) {
-            log.error("Failed to fetch qualification analytics for case {}: {}",
+            log.error("Failed to fetch qualification analytics.txt for case {}: {}",
                     ref.number(), e.getMessage(), e);
             return;
         }
 
         if (response == null) {
-            log.warn("Empty analytics response for case {}", ref.number());
+            log.warn("Empty analytics.txt response for case {}", ref.number());
             return;
         }
 
         try {
             persistenceService.saveAnalytics(caseId, response);
-            log.info("Qualification analytics saved for case {}: score={}",
+            log.info("Qualification analytics.txt saved for case {}: score={}",
                     ref.number(), response.getScorePercent());
         } catch (Exception e) {
-            log.error("Failed to save qualification analytics for case {}: {}",
+            log.error("Failed to save qualification analytics.txt for case {}: {}",
                     ref.number(), e.getMessage(), e);
         }
     }
