@@ -31,6 +31,7 @@ import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
 import org.di.digital.util.PageCounter;
 import org.di.digital.util.requests.RequestUrlBuilder;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
@@ -50,8 +51,6 @@ import java.util.stream.Collectors;
 
 import static org.di.digital.util.requests.RequestUrlBuilder.deleteAllDocumentsUrl;
 import static org.di.digital.util.requests.RequestUrlBuilder.deleteDocumentUrl;
-import static org.di.digital.util.requests.UserUtil.validateOwnerAccess;
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -70,6 +69,7 @@ public class CaseServiceImpl implements CaseService {
     private final DevService devService;
     private final CaseFileWriter caseFileWriter;
     private final CaseWriter caseWriter;
+    private final UserUtil userUtil;
     private final CaseMemberHistoryRepository caseMemberHistoryRepository;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
 
@@ -91,7 +91,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         return caseEntity;
     }
@@ -163,7 +163,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         if (!caseEntity.isOwner(user)) {
             throw new AccessDeniedException("Только создатель дела может редактировать его");
@@ -227,7 +227,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         return mapper.mapToCaseResponse(caseEntity);
     }
@@ -240,7 +240,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         List<CaseFile> orderedFiles = caseEntity.getFiles().stream()
                 .sorted(Comparator.comparing(CaseFile::getOrderIndex,
@@ -275,7 +275,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         Map<Integer, List<CaseFile>> grouped = caseEntity.getFiles().stream()
                 .sorted(Comparator
@@ -418,7 +418,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         List<Long> fileIds = request.getFileIds();
 
@@ -520,7 +520,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
         CaseFile caseFile = caseEntity.getFiles().stream()
@@ -547,7 +547,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        validateOwnerAccess(caseEntity, currentUser);
+        userUtil.validateOwnerAccess(caseEntity, currentUser);
 
         User userToAdd = userRepository.findById(id)
                 .orElseThrow(() -> new RuntimeException("User not found: " + id));
@@ -591,7 +591,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        validateOwnerAccess(caseEntity, currentUser);
+        userUtil.validateOwnerAccess(caseEntity, currentUser);
 
         return caseMemberHistoryRepository
                 .findByCaseNumberOrderByTimestampDesc(caseEntity.getNumber())
@@ -639,7 +639,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        validateUserAccess(caseEntity, currentUser);
+        userUtil.validateUserAccess(caseEntity, currentUser);
 
         boolean alreadyExists = caseEntity.getFigurants().stream()
                 .anyMatch(f -> f.getFio().equals(request.getFio())
@@ -692,7 +692,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        validateOwnerAccess(caseEntity, currentUser);
+        userUtil.validateOwnerAccess(caseEntity, currentUser);
 
         User userToRemove = userRepository.findById(userId)
                 .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
@@ -744,7 +744,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        validateUserAccess(caseEntity, currentUser);
+        userUtil.validateUserAccess(caseEntity, currentUser);
 
         CaseFigurant figurant = caseEntity.getFigurants().stream()
                 .filter(f -> f.getId().equals(figurantId))
@@ -773,7 +773,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        validateUserAccess(caseEntity, currentUser);
+        userUtil.validateUserAccess(caseEntity, currentUser);
 
         return caseEntity.getUsers().stream()
                 .map(user -> mapper.mapToCaseUserResponse(user, caseEntity))
@@ -788,7 +788,7 @@ public class CaseServiceImpl implements CaseService {
         User currentUser = userRepository.findByEmail(currentUserEmail)
                 .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
 
-        validateUserAccess(caseEntity, currentUser);
+        userUtil.validateUserAccess(caseEntity, currentUser);
 
         return caseEntity.getFigurants().stream()
                 .map(mapper::mapToFigurantResponse)
@@ -837,7 +837,6 @@ public class CaseServiceImpl implements CaseService {
 
     @Override
     public void deleteAllFiles(Long caseId, String currentUserEmail) {
-        // 1) короткая tx: валидация + caseNumber
         String caseNumber = caseWriter.authorizeForFileWipe(caseId, currentUserEmail);
 
         try {
@@ -974,7 +973,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseFile caseFile = caseFileRepository
                 .findByOriginalFileNameAndCaseEntityId(fileName, caseId)
@@ -992,7 +991,7 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         List<RejectionReasonResponse> result = rejectionReasonStatusRepository
                 .findAllByCaseIdOrderByTimestampDesc(caseId)

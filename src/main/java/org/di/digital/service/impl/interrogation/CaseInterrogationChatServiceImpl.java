@@ -26,6 +26,7 @@ import org.di.digital.repository.interrogation.CaseInterrogationContradictionRep
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.service.interrogation.CaseInterrogationChatService;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
@@ -43,7 +44,6 @@ import java.util.concurrent.CompletableFuture;
 import static org.di.digital.util.requests.RequestBodyBuilder.generalChatBody;
 import static org.di.digital.util.requests.RequestBodyBuilder.interrogationContradictionBody;
 import static org.di.digital.util.requests.RequestUrlBuilder.*;
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -62,6 +62,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     private final CaseInterrogationContradictionWriter contradictionWriter;
     private final CaseInterrogationContradictionRepository contradictionRepository;
     private final WebClient.Builder webClientBuilder;
+    private final UserUtil userUtil;
 
     @Value("${model.host}")
     private String pythonHost;
@@ -201,7 +202,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseInterrogationChat chat = caseInterrogationChatRepository
                 .findByInterrogationId(interrogationId).orElse(null);
@@ -242,7 +243,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
         CaseInterrogationChat chat = caseInterrogationChatRepository.findByInterrogationId(interrogationId)
@@ -267,7 +268,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseChatMessage message = chatMessageRepository.findById(messageId)
                 .orElseThrow(() -> new NotFoundException("Сообщение не найдено: " + messageId));
@@ -403,7 +404,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseInterrogationCaseChat chat = caseInterrogationCaseChatRepository
                 .findByInterrogationIdAndUserId(interrogationId, user.getId())
@@ -439,7 +440,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseInterrogationCaseChat chat = caseInterrogationCaseChatRepository
                 .findByInterrogationIdAndUserId(interrogationId, user.getId())

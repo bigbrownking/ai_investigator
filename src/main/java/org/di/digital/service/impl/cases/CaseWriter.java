@@ -14,11 +14,10 @@ import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.util.Mapper;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import static org.di.digital.util.requests.UserUtil.validateOwnerAccess;
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -29,6 +28,7 @@ public class CaseWriter {
     private final UserRepository userRepository;
     private final LogService logService;
     private final Mapper mapper;
+    private final UserUtil userUtil;
 
     @Transactional(readOnly = true)
     public String authorizeForFileWipe(Long caseId, String email) {
@@ -36,7 +36,7 @@ public class CaseWriter {
                 .orElseThrow(() -> new IllegalStateException("Case not found with id: " + caseId));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("User not found: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
         return caseEntity.getNumber();
     }
 
@@ -46,7 +46,7 @@ public class CaseWriter {
                 .orElseThrow(() -> new IllegalStateException("Case not found"));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("User not found"));
-        validateOwnerAccess(caseEntity, user);
+        userUtil.validateOwnerAccess(caseEntity, user);
         return caseEntity.getNumber();
     }
 
@@ -72,7 +72,7 @@ public class CaseWriter {
                 .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
         if (!caseEntity.isOwner(user)) {
             throw new org.springframework.security.access.AccessDeniedException(
                     "Только создатель дела может редактировать его");
@@ -134,7 +134,7 @@ public class CaseWriter {
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("User not found: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseFile file = caseEntity.getFiles().stream()
                 .filter(f -> f.getOriginalFileName().equals(fileName))

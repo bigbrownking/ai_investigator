@@ -24,6 +24,7 @@ import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.DocumentFormatterService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.di.digital.util.Mapper;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
 import org.springframework.core.io.ByteArrayResource;
@@ -68,6 +69,7 @@ public class PlanServiceImpl implements PlanService {
     private final PlanEditHistoryRepository planEditHistoryRepository;
     private final PlanNotificationRepository planNotificationRepository;
     private final PlanActionWriter planActionWriter;
+    private final UserUtil userUtil;
     private final PlanResponseAssembler assembler;
 
     private final Mapper mapper;
@@ -264,7 +266,7 @@ public class PlanServiceImpl implements PlanService {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
 
-        if (isRegAdmin(user) && caseEntity.getPlanStatus() == PlanStatus.PENDING) {
+        if (userUtil.isRegAdmin(user) && caseEntity.getPlanStatus() == PlanStatus.PENDING) {
             throw new AccessDeniedException("План ещё не согласован и недоступен для просмотра");
         }
 
@@ -287,7 +289,7 @@ public class PlanServiceImpl implements PlanService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         if (caseEntity.getPlan() == null) {
             throw new NotFoundException("План отсутствует");

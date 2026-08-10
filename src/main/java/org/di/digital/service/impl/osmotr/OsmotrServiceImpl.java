@@ -24,6 +24,7 @@ import org.di.digital.service.osmotr.OsmotrService;
 import org.di.digital.service.impl.queue.OsmotrQueueService;
 import org.di.digital.util.Mapper;
 import org.di.digital.util.PdfSplitter;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
 import org.springframework.stereotype.Service;
@@ -38,7 +39,6 @@ import java.util.*;
 import static java.util.Base64.getDecoder;
 import static java.util.Base64.getEncoder;
 import static org.di.digital.util.requests.RequestUrlBuilder.osmotrDecisionUrl;
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -53,6 +53,7 @@ public class OsmotrServiceImpl implements OsmotrService {
     private final OsmotrQueueService osmotrQueueService;
     private final PdfSplitter pdfSplitter;
     private final Mapper mapper;
+    private final UserUtil userUtil;
 
     @Value("${model.host}")
     private String osmotrHost;
@@ -142,7 +143,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         return osmotrResultRepository.findByCaseNumber(caseNumber).stream()
                 .map(result -> {
@@ -159,7 +160,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         return osmotrResultRepository.findById(resultId)
                 .map(result -> {
@@ -185,7 +186,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
                 .orElseThrow(() -> new NotFoundException("OsmotrResult не найден: " + resultId));
@@ -268,7 +269,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
                 .orElseThrow(() -> new NotFoundException("OsmotrResult не найден: " + resultId));
@@ -290,7 +291,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
                 .orElseThrow(() -> new NotFoundException("OsmotrResult не найден: " + resultId));
@@ -321,7 +322,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
                 .orElseThrow(() -> new NotFoundException("Осмотр не найден: " + resultId));
@@ -353,7 +354,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         if (query == null || query.isBlank()) {
             return List.of();

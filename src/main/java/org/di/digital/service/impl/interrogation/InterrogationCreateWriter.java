@@ -17,6 +17,7 @@ import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.util.LocalizationHelper;
 import org.di.digital.util.Mapper;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -25,8 +26,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -37,6 +36,7 @@ public class InterrogationCreateWriter {
     private final UserRepository userRepository;
     private final LogService logService;
     private final Mapper mapper;
+    private final UserUtil userUtil;
     private final LocalizationHelper localizationHelper;
     private final InterrogationCategoryResolver categoryResolver;
     private final CaseInterrogationRepository caseInterrogationRepository;
@@ -59,7 +59,7 @@ public class InterrogationCreateWriter {
                 .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
             throw new IllegalStateException(MessageConstant.NO_FILE_PROCESSED.format(caseEntity.getNumber()));

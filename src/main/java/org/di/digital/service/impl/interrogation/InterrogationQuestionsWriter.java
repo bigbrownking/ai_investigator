@@ -12,11 +12,11 @@ import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationChatRepository;
 import org.di.digital.repository.user.UserRepository;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import static org.di.digital.util.requests.RequestBodyBuilder.interrogationBody;
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -27,6 +27,7 @@ public class InterrogationQuestionsWriter {
     private final UserRepository userRepository;
     private final CaseInterrogationChatRepository caseInterrogationChatRepository;
     private final CaseChatMessageRepository chatMessageRepository;
+    private final UserUtil userUtil;
 
     @Transactional
     public PreparedInterrogation prepare(Long caseId, Long interrogationId,
@@ -35,7 +36,7 @@ public class InterrogationQuestionsWriter {
                 .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))

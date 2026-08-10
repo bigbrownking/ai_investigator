@@ -12,7 +12,6 @@ import org.di.digital.model.enums.LogLevel;
 import org.di.digital.repository.user.RegionRepository;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.LogService;
-import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -28,38 +27,34 @@ import java.util.StringTokenizer;
 @RequiredArgsConstructor
 public class UserUtil {
     private static final String ROLE_REG_ADMIN = "REG_ADMIN";
-    private static LogService logService;
-    @Autowired
-    public void setLogService(LogService logService) {
-        UserUtil.logService = logService;
-    }
+    private final LogService logService;
+    private final RegionRepository regionRepository;
+
     public static String getClientIpAddress(HttpServletRequest request) {
-        String forwardHeader= request.getHeader("X-Forwarded-For");
+        String forwardHeader = request.getHeader("X-Forwarded-For");
         if (forwardHeader == null) {
             return request.getRemoteAddr();
-        } else {
-            return new StringTokenizer(forwardHeader, ",").nextToken().trim();
         }
+        return new StringTokenizer(forwardHeader, ",").nextToken().trim();
     }
+
     public static User getCurrentUser() {
         Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
-
         if (authentication == null || !authentication.isAuthenticated()) {
             return null;
         }
-
         Object principal = authentication.getPrincipal();
-
         if (principal instanceof UserDetailsImpl userDetails) {
             return userDetails.getUser();
         }
-
         return null;
     }
-    public static HttpServletRequest getCurrentHttpRequest(){
+
+    public static HttpServletRequest getCurrentHttpRequest() {
         return ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getRequest();
     }
-    public static void validateUserAccess(Case caseEntity, User user) {
+
+    public void validateUserAccess(Case caseEntity, User user) {
         if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
             logService.log(
                     String.format("No access for case %s", caseEntity.getNumber()),
@@ -71,7 +66,8 @@ public class UserUtil {
             throw new AccessDeniedException("У вас нет доступа к этому делу");
         }
     }
-    public static void validateOwnerAccess(Case caseEntity, User user) {
+
+    public void validateOwnerAccess(Case caseEntity, User user) {
         if (!caseEntity.isOwner(user)) {
             logService.log(
                     String.format("Non-owner user %s attempted to manage members of case %s",
@@ -84,58 +80,53 @@ public class UserUtil {
             throw new AccessDeniedException("Только владелец дела может управлять участниками");
         }
     }
-    public static void validateRegionAccess(User admin, Case caseEntity, RegionRepository regionRepository) {
+
+    public void validateRegionAccess(User admin, Case caseEntity) {
         if (admin.getRegion() == null) {
             throw new AccessDeniedException("У администратора нет региона");
         }
-
         User owner = caseEntity.getOwner();
         if (owner == null || owner.getRegion() == null) {
             throw new AccessDeniedException("Дело не принадлежит вашему региону");
         }
-
-        List<Region> adminRegions = regionRepository.findByAdminsContaining(admin);
-        boolean hasAccess = adminRegions.stream()
-                .anyMatch(r -> r.getId().equals(owner.getRegion().getId()));
-
+        boolean hasAccess = getAdminRegionIds(admin).contains(owner.getRegion().getId());
         if (!hasAccess) {
             throw new AccessDeniedException("Дело не принадлежит вашему региону");
         }
     }
-    public static void validateUserRegionAccess(User admin, User user, RegionRepository regionRepository) {
-        List<Region> adminRegions = regionRepository.findByAdminsContaining(admin);
 
-        if (adminRegions.isEmpty()) {
+    public void validateUserRegionAccess(User admin, User user) {
+        List<Long> regionIds = getAdminRegionIds(admin);
+        if (regionIds.isEmpty()) {
             throw new AccessDeniedException("У администратора нет регионов");
         }
-
-        List<Long> regionIds = adminRegions.stream().map(Region::getId).toList();
-
         if (user.getRegion() == null || !regionIds.contains(user.getRegion().getId())) {
             throw new AccessDeniedException("Этот пользователь не принадлежит вашему региону");
         }
     }
-    public static List<Long> getAdminRegionIds(User admin, RegionRepository regionRepository) {
-        return regionRepository.findByAdminsContaining(admin)
-                .stream().map(Region::getId).toList();
-    }
 
-    public static void validateAppealRegionAccess(User admin, Appeal appeal, RegionRepository regionRepository) {
-        List<Long> regionIds = getAdminRegionIds(admin, regionRepository);
-
+    public void validateAppealRegionAccess(User admin, Appeal appeal) {
+        List<Long> regionIds = getAdminRegionIds(admin);
         if (appeal.getRegion() == null || !regionIds.contains(appeal.getRegion().getId())) {
             throw new AccessDeniedException("Это обращение не принадлежит вашему региону");
         }
     }
-    public static boolean isRegAdmin(User user) {
-        return user.getRoles().stream()
-                .anyMatch(r -> r.getName().equals(ROLE_REG_ADMIN));
+
+    public List<Long> getAdminRegionIds(User admin) {
+        return regionRepository.findByAdminsContaining(admin)
+                .stream().map(Region::getId).toList();
     }
-    public static List<Region> getAdminRegions(User admin, RegionRepository regionRepository) {
+
+    public List<Region> getAdminRegions(User admin) {
         List<Region> regions = regionRepository.findByAdminsContaining(admin);
         if (regions.isEmpty()) {
             throw new IllegalStateException("У админа нет ответственных регионов");
         }
         return regions;
+    }
+
+    public boolean isRegAdmin(User user) {
+        return user.getRoles().stream()
+                .anyMatch(r -> r.getName().equals(ROLE_REG_ADMIN));
     }
 }

@@ -24,7 +24,6 @@ import static org.di.digital.util.requests.UserUtil.*;
 public class LogServiceImpl implements LogService {
     private final LogRepository logRepository;
 
-    // LogServiceImpl
     @Override
     @Transactional(propagation = Propagation.REQUIRES_NEW)
     public void log(String description, LogLevel level, LogAction action,

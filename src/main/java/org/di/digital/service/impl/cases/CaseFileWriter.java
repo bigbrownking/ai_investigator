@@ -14,14 +14,13 @@ import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -36,6 +35,7 @@ public class CaseFileWriter {
     private final TaskQueueService taskQueueService;
     private final LogService logService;
     private final Mapper mapper;
+    private final UserUtil userUtil;
 
 
     @Transactional
@@ -96,7 +96,7 @@ public class CaseFileWriter {
                 .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("user not found: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         if (Boolean.TRUE.equals(caseEntity.getIsFinalIndictmentDone())) {
             logService.log(String.format("Cannot upload files by %s user in case %s",

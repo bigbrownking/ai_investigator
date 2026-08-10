@@ -15,12 +15,11 @@ import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.cases.CaseFileService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.di.digital.service.impl.queue.TaskQueueService;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
-
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -31,6 +30,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     private final UserRepository userRepository;
     private final TaskQueueService taskQueueService;
     private final NotificationService notificationService;
+    private final UserUtil userUtil;
 
     @Override
     @Transactional
@@ -124,7 +124,7 @@ public class CaseFileServiceImpl implements CaseFileService {
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseFile file = caseEntity.getFiles().stream()
                 .filter(f -> f.getId().equals(fileId))

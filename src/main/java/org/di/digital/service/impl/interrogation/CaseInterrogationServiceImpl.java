@@ -23,6 +23,7 @@ import org.di.digital.service.LogService;
 import org.di.digital.service.core.MinioService;
 import org.di.digital.util.Mapper;
 import org.di.digital.util.PageCounter;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.stereotype.Service;
@@ -40,7 +41,6 @@ import java.util.stream.Collectors;
 
 
 import static org.di.digital.util.requests.RequestUrlBuilder.caseInfoUrl;
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -62,6 +62,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final Mapper mapper;
     private final WebClient.Builder webClientBuilder;
     private final PageCounter pageCounter;
+    private final UserUtil userUtil;
     private final InterrogationTimeGuard timeGuard;
     private final InterrogationCreateWriter interrogationWriter;
     private final AudioUploadWriter audioUploadWriter;
@@ -84,7 +85,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         return caseEntity.getInterrogations().stream()
                 .filter(i -> role.equals("Все") || (i.getRole() != null && i.getRole().equalsIgnoreCase(role)))
@@ -144,7 +145,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
@@ -193,7 +194,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         String caseNumber = caseEntity.getNumber();
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
@@ -404,7 +405,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
-        validateUserAccess(interrogation.getCaseEntity(), user);
+        userUtil.validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new RuntimeException("Допрос не принадлежит делу: " + caseId);
@@ -464,7 +465,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
-        validateUserAccess(interrogation.getCaseEntity(), user);
+        userUtil.validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new RuntimeException("Допрос не принадлежит делу: " + caseId);
@@ -491,7 +492,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
@@ -512,7 +513,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
-        validateUserAccess(interrogation.getCaseEntity(), user);
+        userUtil.validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new RuntimeException("Допрос не принадлежит делу: " + caseId);
@@ -531,7 +532,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
-        validateUserAccess(interrogation.getCaseEntity(), user);
+        userUtil.validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new RuntimeException("Допрос не принадлежит делу: " + caseId);
@@ -554,9 +555,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     }
     @Transactional
     public void completeInterrogationByScheduler(CaseInterrogation interrogation) {
-
         finishInterrogation(interrogation, LocalDateTime.now());
-
         log.info(
                 "Interrogation {} automatically completed due to time limit",
                 interrogation.getId()
@@ -581,7 +580,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
 
-        validateUserAccess(interrogation.getCaseEntity(), user);
+        userUtil.validateUserAccess(interrogation.getCaseEntity(), user);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new RuntimeException("Допрос не принадлежит делу: " + caseId);
@@ -742,7 +741,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("User not found: " + email));
 
-        validateUserAccess(interrogation.getCaseEntity(), user);
+        userUtil.validateUserAccess(interrogation.getCaseEntity(), user);
 
         CaseInterrogationApplicationFile file = interrogation.getApplicationFiles().stream()
                 .filter(f -> f.getId().equals(fileId))
@@ -889,7 +888,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
-        validateUserAccess(interrogation.getCaseEntity(), user);
+        userUtil.validateUserAccess(interrogation.getCaseEntity(), user);
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new RuntimeException("Допрос не принадлежит делу: " + caseId);
         }

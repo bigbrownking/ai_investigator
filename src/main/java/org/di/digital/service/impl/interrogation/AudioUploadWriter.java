@@ -18,13 +18,12 @@ import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.service.impl.queue.AudioQueueService;
 import org.di.digital.util.Mapper;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;
-
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -38,6 +37,7 @@ public class AudioUploadWriter {
     private final AudioQueueService audioQueueService;
     private final LogService logService;
     private final Mapper mapper;
+    private final UserUtil userUtil;
 
     // ---- Фаза 1: валидация + timeGuard + получить fio/caseNumber для MinIO-пути ----
     @Transactional(readOnly = true)
@@ -47,7 +47,7 @@ public class AudioUploadWriter {
                 .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
@@ -73,7 +73,7 @@ public class AudioUploadWriter {
                 .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))

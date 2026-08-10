@@ -20,6 +20,7 @@ import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.cases.ChatService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.impl.core.sse.SseTypingEmitter;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.http.MediaType;
@@ -37,8 +38,6 @@ import java.util.concurrent.CompletableFuture;
 import static org.di.digital.util.requests.RequestBodyBuilder.generalChatBody;
 import static org.di.digital.util.requests.RequestUrlBuilder.generalChatUrl;
 import static org.di.digital.util.requests.RequestUrlBuilder.qualificationChatUrl;
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
-
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -53,6 +52,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatMessageWriter chatMessageWriter;
     private final WebClient.Builder webClientBuilder;
     private final SseTypingEmitter sseTypingEmitter;
+    private final UserUtil userUtil;
 
     @Value("${model.host}")
     private String pythonHost;
@@ -110,7 +110,7 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
             String message = MessageConstant.NO_FILE_PROCESSED.format(caseNumber);
@@ -187,7 +187,7 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
         return getChatHistory(caseEntity.getId(), user.getId(), page, size);
     }
 
@@ -220,7 +220,7 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         chatMessageWriter.clearChatHistory(caseEntity.getId(), user.getId());
 

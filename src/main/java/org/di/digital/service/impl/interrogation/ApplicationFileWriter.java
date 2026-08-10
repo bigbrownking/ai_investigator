@@ -16,13 +16,12 @@ import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.Mapper;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.*;
 import java.util.stream.Collectors;
-
-import static org.di.digital.util.requests.UserUtil.validateUserAccess;
 
 @Slf4j
 @Service
@@ -34,6 +33,7 @@ public class ApplicationFileWriter {
     private final TaskQueueService taskQueueService;
     private final LogService logService;
     private final Mapper mapper;
+    private final UserUtil userUtil;
 
     // ---- Фаза 1: валидация + собрать контекст для загрузки ----
     @Transactional(readOnly = true)
@@ -44,7 +44,7 @@ public class ApplicationFileWriter {
                 .orElseThrow(() -> new IllegalStateException("User not found: " + email));
 
         Case caseEntity = interrogation.getCaseEntity();
-        validateUserAccess(caseEntity, user);
+        userUtil.validateUserAccess(caseEntity, user);
 
         if (!caseEntity.getId().equals(caseId)) {
             throw new IllegalStateException("Допрос не принадлежит делу: " + caseId);
