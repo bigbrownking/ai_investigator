@@ -4,6 +4,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.model.interrogation.CaseInterrogationApplicationFile;
+import org.di.digital.security.crypto.FileCipher;
 import org.di.digital.service.core.MinioObjectStorage;
 import org.di.digital.service.core.MinioService;
 import org.springframework.stereotype.Service;
@@ -24,8 +25,16 @@ import java.util.UUID;
 public class MinioServiceImpl implements MinioService {
 
     private final MinioObjectStorage storage;
-
+    private final FileCipher fileCipher;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "doc", "docx", "xls", "xlsx");
+
+    private byte[] encryptBytes(byte[] bytes) {
+        return fileCipher.isEnabled() ? fileCipher.encrypt(bytes) : bytes;
+    }
+
+    private String storedObjectName(String objectName) {
+        return fileCipher.isEnabled() ? objectName + ".enc" : objectName;
+    }
 
     @Override
     public CaseFile uploadFile(MultipartFile file, String folder) {
@@ -43,7 +52,10 @@ public class MinioServiceImpl implements MinioService {
 
         String objectPath;
         try (InputStream inputStream = file.getInputStream()) {
-            objectPath = storage.putObject(objectName, inputStream, file.getSize(), file.getContentType());
+            byte[] bytes = inputStream.readAllBytes();
+            byte[] storedbytes = encryptBytes(bytes);
+            String storedObjectName = storedObjectName(objectName);
+            objectPath = storage.putObject(storedObjectName, new ByteArrayInputStream(storedbytes), storedbytes.length, file.getContentType());
         } catch (Exception e) {
             log.error("Error uploading file: {}", e.getMessage(), e);
             throw new IllegalStateException("Failed to upload file", e);
@@ -67,7 +79,10 @@ public class MinioServiceImpl implements MinioService {
 
         String objectPath;
         try (InputStream inputStream = file.getInputStream()) {
-            objectPath = storage.putObject(objectName, inputStream, file.getSize(), file.getContentType());
+            byte[] bytes = inputStream.readAllBytes();
+            byte[] storedBytes = encryptBytes(bytes);
+            String storedObjectName = storedObjectName(objectName);
+            objectPath = storage.putObject(storedObjectName, new ByteArrayInputStream(storedBytes), storedBytes.length, file.getContentType());
         } catch (Exception e) {
             log.error("Error uploading file: {}", e.getMessage(), e);
             throw new IllegalStateException("Failed to upload file", e);
@@ -90,7 +105,10 @@ public class MinioServiceImpl implements MinioService {
 
         String objectPath;
         try (InputStream inputStream = file.getInputStream()) {
-            objectPath = storage.putObject(objectName, inputStream, file.getSize(), file.getContentType());
+            byte[] bytes = inputStream.readAllBytes();
+            byte[] storedBytes = encryptBytes(bytes);
+            String storedObjectName = storedObjectName(objectName);
+            objectPath = storage.putObject(storedObjectName, new ByteArrayInputStream(storedBytes), storedBytes.length, file.getContentType());
         } catch (Exception e) {
             log.error("Error uploading audio file: {}", e.getMessage(), e);
             throw new IllegalStateException("Failed to upload audio file", e);
@@ -138,20 +156,37 @@ public class MinioServiceImpl implements MinioService {
 
     @Override
     public InputStream downloadFile(String objectPath) {
-        return storage.getObject(storage.extractObjectNameFromPath(objectPath));
+        try {
+            String objectName = storage.extractObjectNameFromPath(objectPath);
+            InputStream in = storage.getObject(objectName);
+
+            if (fileCipher.isEnabled() && fileCipher.isEncryptedName(objectName)) {
+                try (in) {
+                    return new ByteArrayInputStream(fileCipher.decrypt(in.readAllBytes()));
+                }
+            }
+            return in;
+        } catch (Exception e) {
+            log.error("Error downloading file: {}", e.getMessage(), e);
+            throw new IllegalStateException("Failed to download file", e);
+        }
     }
 
     @Override
     public String uploadOsmotrFile(byte[] bytes, String caseNumber, String fileName, String subfolder) {
         validatePdfOnly(fileName);
         String objectName = String.format("%s/osmotr/%s/%s", caseNumber, subfolder, fileName);
-        return storage.putObject(objectName, new ByteArrayInputStream(bytes), bytes.length, "application/pdf");
+        byte[] storedbytes = encryptBytes(bytes);
+        String storedObjectName =storedObjectName(objectName);
+        return storage.putObject(storedObjectName, new ByteArrayInputStream(storedbytes), storedbytes.length, "application/pdf");
     }
 
     @Override
     public String uploadOsmotrGeneratedFile(byte[] bytes, String caseNumber, String fileName, String subfolder) {
         String objectName = String.format("%s/osmotr/%s/%s", caseNumber, subfolder, fileName);
-        return storage.putObject(objectName, new ByteArrayInputStream(bytes), bytes.length,
+        byte[] storedBytes = encryptBytes(bytes);
+        String storedObjectName = storedObjectName(objectName);
+        return storage.putObject(storedObjectName, new ByteArrayInputStream(storedBytes), storedBytes.length,
                 "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
     }
 
