@@ -10,6 +10,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.interrogation.CaseInterrogationApplicationFile;
+import org.di.digital.security.crypto.FileCipher;
 import org.di.digital.model.enums.CaseFileStatusEnum;
 import org.di.digital.service.core.MinioService;
 import org.springframework.beans.factory.annotation.Value;
@@ -28,6 +29,7 @@ import java.util.concurrent.TimeUnit;
 public class MinioServiceImpl implements MinioService {
 
     private final MinioClient minioClient;
+    private final FileCipher fileCipher;
 
     @Value("${minio.bucket.name:cases}")
     private String bucketName;
@@ -42,6 +44,13 @@ public class MinioServiceImpl implements MinioService {
     private int presignedUrlExpiryHours;
     private static final Set<String> ALLOWED_EXTENSIONS = Set.of("pdf", "doc", "docx", "xls", "xlsx");
 
+    private byte[] encryptBytes(byte[] bytes) {
+        return fileCipher.isEnabled() ? fileCipher.encrypt(bytes) : bytes;
+    }
+
+    private String storedObjectName(String objectName) {
+        return fileCipher.isEnabled() ? objectName + ".enc" : objectName;
+    }
 
     @Override
     public CaseFile uploadFile(MultipartFile file, String folder) {
@@ -59,18 +68,25 @@ public class MinioServiceImpl implements MinioService {
             String storedFileName = generateFileName(file.getOriginalFilename());
             String objectName = folder + "/" + storedFileName;
 
-            try (InputStream inputStream = file.getInputStream()) {
-                minioClient.putObject(
+            byte[] bytes;
+
+            try(InputStream inputStream = file.getInputStream()){
+                bytes = inputStream.readAllBytes();
+            }
+            byte[] storedBytes = encryptBytes(bytes);
+            String storedObjectName = storedObjectName(objectName);
+
+            minioClient.putObject(
                         PutObjectArgs.builder()
                                 .bucket(bucketName)
-                                .object(objectName)
-                                .stream(inputStream, file.getSize(), -1)
+                                .object(storedObjectName)
+                                .stream(new ByteArrayInputStream(storedBytes), storedBytes.length, -1)
                                 .contentType(file.getContentType())
                                 .build()
-                );
-            }
+            );
+           
 
-            String objectPath = bucketName + "/" + objectName;
+            String objectPath = bucketName + "/" + storedObjectName;
 
             return CaseFile.builder()
                     .originalFileName(file.getOriginalFilename())
@@ -94,19 +110,23 @@ public class MinioServiceImpl implements MinioService {
             String storedFileName = generateFileName(file.getOriginalFilename());
             String objectName = folder + "/application/" + fio + "/" + storedFileName;
 
+            byte[] bytes;
             try (InputStream inputStream = file.getInputStream()) {
-                minioClient.putObject(
+                bytes = inputStream.readAllBytes();
+            }
+            byte[] storedBytes = encryptBytes(bytes);
+            String storedObjectName = storedObjectName(objectName);
+            minioClient.putObject(
                         PutObjectArgs.builder()
                                 .bucket(bucketName)
-                                .object(objectName)
-                                .stream(inputStream, file.getSize(), -1)
+                                .object(storedObjectName)
+                                .stream(new ByteArrayInputStream(storedBytes), storedBytes.length, -1)
                                 .contentType(file.getContentType())
                                 .build()
-                );
-            }
+            );
 
             // Store the object path instead of direct URL
-            String objectPath = bucketName + "/" + objectName;
+            String objectPath = bucketName + "/" + storedObjectName;
 
             return CaseInterrogationApplicationFile.builder()
                     .originalFileName(file.getOriginalFilename())
@@ -130,18 +150,23 @@ public class MinioServiceImpl implements MinioService {
 
             String objectName = folder + "/audio/" + fio + "/" + storedFileName;
 
+            byte[] bytes;
             try (InputStream inputStream = file.getInputStream()) {
-                minioClient.putObject(
+                bytes = inputStream.readAllBytes();
+            }
+            byte[] storedBytes = encryptBytes(bytes);
+            String storedObjectName = storedObjectName(objectName);
+            minioClient.putObject(
                         PutObjectArgs.builder()
                                 .bucket(bucketName)
-                                .object(objectName)
-                                .stream(inputStream, file.getSize(), -1)
+                                .object(storedObjectName)
+                                .stream(new ByteArrayInputStream(storedBytes), storedBytes.length, -1)
                                 .contentType(file.getContentType())
                                 .build()
-                );
-            }
+            );    
+    
 
-            String objectPath = bucketName + "/" + objectName;
+            String objectPath = bucketName + "/" + storedObjectName;
 
             log.info("Audio uploaded successfully for interrogation: {}, path: {}",
                     folder, objectPath);
@@ -304,12 +329,19 @@ public class MinioServiceImpl implements MinioService {
     public InputStream downloadFile(String objectPath) {
         try {
             String objectName = extractObjectNameFromPath(objectPath);
-            return minioClient.getObject(
+            
+            InputStream in = minioClient.getObject(
                     GetObjectArgs.builder()
                             .bucket(bucketName)
                             .object(objectName)
                             .build()
             );
+            if (fileCipher.isEnabled() && fileCipher.isEncryptedName(objectName)){
+                try(in){
+                    return new ByteArrayInputStream(fileCipher.decrypt(in.readAllBytes()));
+                }
+            }
+            return in;
         } catch (Exception e) {
             log.error("Error downloading file from Minio: {}", e.getMessage(), e);
             throw new IllegalStateException("Failed to download file", e);
@@ -320,13 +352,15 @@ public class MinioServiceImpl implements MinioService {
 
         String objectName = String.format("%s/osmotr/%s/%s", caseNumber, subfolder, fileName);
         try {
+            byte[] storedBytes = encryptBytes(bytes);
+            String storedObjectName = storedObjectName(objectName);
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(bucketName)
-                    .object(objectName)
-                    .stream(new ByteArrayInputStream(bytes), bytes.length, -1)
+                    .object(storedObjectName)
+                    .stream(new ByteArrayInputStream(storedBytes), storedBytes.length, -1)
                     .contentType("application/pdf")
                     .build());
-            return bucketName + "/" + objectName;
+            return bucketName + "/" + storedObjectName;
         } catch (Exception e) {
             throw new RuntimeException("Failed to upload osmotr file: " + objectName, e);
         }
@@ -335,13 +369,15 @@ public class MinioServiceImpl implements MinioService {
     public String uploadOsmotrGeneratedFile(byte[] bytes, String caseNumber, String fileName, String subfolder) {
         String objectName = String.format("%s/osmotr/%s/%s", caseNumber, subfolder, fileName);
         try {
+            byte[] storedbytes = encryptBytes(bytes);
+            String storedObjectName = storedObjectName(objectName);
             minioClient.putObject(PutObjectArgs.builder()
                     .bucket(bucketName)
-                    .object(objectName)
-                    .stream(new ByteArrayInputStream(bytes), bytes.length, -1)
+                    .object(storedObjectName)
+                    .stream(new ByteArrayInputStream(storedbytes), storedbytes.length, -1)
                     .contentType("application/vnd.openxmlformats-officedocument.wordprocessingml.document")
                     .build());
-            return bucketName + "/" + objectName;
+            return bucketName + "/" + storedObjectName;
         } catch (Exception e) {
             throw new IllegalStateException("Failed to upload osmotr generated file: " + objectName, e);
         }
