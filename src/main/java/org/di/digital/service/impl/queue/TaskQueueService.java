@@ -108,6 +108,7 @@ public class TaskQueueService {
             log.warn("Task for caseFileId {} already exists, skipping", caseFileId);
             return;
         }
+        int priority = getCasePriority(caseId);
 
         TaskQueue task = TaskQueue.builder()
                 .userEmail(userEmail)
@@ -119,7 +120,7 @@ public class TaskQueueService {
                 .fileUrl(fileUrl)
                 .status(TaskStatus.PENDING)
                 .createdAt(LocalDateTime.now())
-                .priority(0)
+                .priority(priority)
                 .build();
 
         taskQueueRepository.save(task);
@@ -365,14 +366,16 @@ public class TaskQueueService {
         return mongoTemplate.findDistinct(query, "caseId", TaskQueue.class, Long.class);
     }
     public int getCasePriority(Long caseId) {
-        boolean active = caseRepository.findById(caseId)
-                .map(Case::isStatus)
-                .orElse(true);
-
-        if (!active) {
+        Case caseEntity = caseRepository.findById(caseId).orElse(null);
+        if (caseEntity == null) {
+            return 0;
+        }
+        if (!caseEntity.isStatus()) {
             return -1;
         }
-
+        if (caseEntity.getPriority() != null) {
+            return caseEntity.getPriority();
+        }
         return taskQueueRepository
                 .findByCaseId(caseId)
                 .stream()

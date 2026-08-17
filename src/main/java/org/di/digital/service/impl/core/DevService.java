@@ -43,6 +43,11 @@ public class DevService {
     // ─── Priority ────────────────────────────────────────────────
 
     public void setCasePriority(String caseNumber, int priority) {
+        caseRepository.findByNumber(caseNumber).ifPresent(c -> {
+            c.setPriority(priority);
+            caseRepository.save(c);
+        });
+
         Query query = new Query(
                 Criteria.where("caseNumber").is(caseNumber)
         );

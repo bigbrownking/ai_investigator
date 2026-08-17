@@ -21,7 +21,6 @@ import java.util.Set;
 
 @Repository
 public interface CaseRepository extends JpaRepository<Case, Long>, JpaSpecificationExecutor<Case> {
-
     @Query("SELECT c FROM Case c " +
             "LEFT JOIN c.users u " +
             "WHERE (c.owner.email = :userEmail OR u.email = :userEmail) " +

@@ -46,6 +46,8 @@ public class Case {
     @Builder.Default
     private boolean status = true;
 
+    @Column(name = "priority")
+    private Integer priority;
     @OneToOne(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
     private CasePlan casePlan;
 
