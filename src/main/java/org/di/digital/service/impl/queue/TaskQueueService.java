@@ -4,10 +4,12 @@ import jakarta.annotation.PostConstruct;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
+import org.di.digital.model.cases.Case;
 import org.di.digital.model.queue.QueueState;
 import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.TaskStatus;
 import org.di.digital.repository.cases.CaseFileRepository;
+import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.queue.QueueStateRepository;
 import org.di.digital.repository.queue.TaskQueueRepository;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
@@ -22,10 +24,7 @@ import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Objects;
-import java.util.Set;
+import java.util.*;
 
 @Slf4j
 @Service
@@ -37,6 +36,7 @@ public class TaskQueueService {
     private final MongoTemplate mongoTemplate;
     private final RabbitAdmin rabbitAdmin;
     private final CaseFileRepository caseFileRepository;
+    private final CaseRepository caseRepository;
 
     @Value("${spring.rabbitmq.mediator.queue}")
     public String DOCUMENT_QUEUE;
@@ -140,6 +140,10 @@ public class TaskQueueService {
                         .lastSelectedUser(null)
                         .build());
 
+        if (state.getLastSelectedCaseByUser() == null) {
+            state.setLastSelectedCaseByUser(new HashMap<>());
+        }
+
         String lastSelectedUser = state.getLastSelectedUser();
 
         int startIndex = 0;
@@ -153,29 +157,105 @@ public class TaskQueueService {
         for (int i = 0; i < users.size(); i++) {
             String candidate = users.get((startIndex + i) % users.size());
 
-            Query taskQuery = new Query();
-            taskQuery.addCriteria(Criteria.where("userEmail").is(candidate)
-                    .and("status").is(TaskStatus.PENDING)
-                    .and("priority").is(maxPriority));
-            if (excludedCaseIds != null && !excludedCaseIds.isEmpty()) {
-                taskQuery.addCriteria(Criteria.where("caseId").nin(excludedCaseIds));
-            }
-            taskQuery.with(Sort.by(Sort.Direction.ASC, "createdAt"));
-            taskQuery.limit(1);
-
-            TaskQueue task = mongoTemplate.findOne(taskQuery, TaskQueue.class);
+            TaskQueue task = pickNextTaskForUser(candidate, maxPriority, excludedCaseIds, state);
 
             if (task != null) {
                 state.setLastSelectedUser(candidate);
+                state.getLastSelectedCaseByUser().put(candidate, task.getCaseId());
                 queueStateRepository.save(state);
 
-                log.info("Selected task {} for user {} (priority={})",
-                        task.getFileName(), candidate, maxPriority);
+                log.info("Selected task {} for user {} (caseId={}, priority={})",
+                        task.getFileName(), candidate, task.getCaseId(), maxPriority);
                 return task;
             }
         }
 
         return null;
+    }
+    private TaskQueue pickNextTaskForUser(String userEmail, int maxPriority,
+                                          List<Long> excludedCaseIds, QueueState state) {
+        List<Long> caseIds = getOrderedCaseIdsForUser(userEmail, maxPriority, excludedCaseIds);
+        if (caseIds.isEmpty()) return null;
+
+        Long lastCase = state.getLastSelectedCaseByUser().get(userEmail);
+
+        int startIndex = 0;
+        if (lastCase != null) {
+            int lastIndex = caseIds.indexOf(lastCase);
+            if (lastIndex != -1) {
+                startIndex = (lastIndex + 1) % caseIds.size();
+            }
+        }
+
+        for (int i = 0; i < caseIds.size(); i++) {
+            Long candidateCase = caseIds.get((startIndex + i) % caseIds.size());
+            TaskQueue task = pickNextTaskForCase(userEmail, candidateCase, maxPriority);
+            if (task != null) {
+                return task;
+            }
+        }
+
+        return null;
+    }
+
+    private List<Long> getOrderedCaseIdsForUser(String userEmail, int priority,
+                                                List<Long> excludedCaseIds) {
+        Criteria matchCriteria = Criteria.where("userEmail").is(userEmail)
+                .and("status").is(TaskStatus.PENDING)
+                .and("priority").is(priority);
+        if (excludedCaseIds != null && !excludedCaseIds.isEmpty()) {
+            matchCriteria.and("caseId").nin(excludedCaseIds);
+        }
+
+        Aggregation aggregation = Aggregation.newAggregation(
+                Aggregation.match(matchCriteria),
+                Aggregation.group("caseId")
+                        .min("createdAt").as("firstTaskTime"),
+                Aggregation.sort(Sort.by(Sort.Direction.ASC, "firstTaskTime"))
+        );
+
+        AggregationResults<Document> results =
+                mongoTemplate.aggregate(aggregation, "task_queue", Document.class);
+
+        return results.getMappedResults()
+                .stream()
+                .map(doc -> doc.get("_id") == null ? null : ((Number) doc.get("_id")).longValue())
+                .filter(Objects::nonNull)
+                .toList();
+    }
+
+    private TaskQueue pickNextTaskForCase(String userEmail, Long caseId, int maxPriority) {
+        Query taskQuery = new Query();
+        taskQuery.addCriteria(Criteria.where("userEmail").is(userEmail)
+                .and("caseId").is(caseId)
+                .and("status").is(TaskStatus.PENDING)
+                .and("priority").is(maxPriority));
+        taskQuery.with(Sort.by(Sort.Direction.ASC, "createdAt"));
+        taskQuery.limit(1);
+
+        return mongoTemplate.findOne(taskQuery, TaskQueue.class);
+    }
+    public int pruneCasePointers() {
+        QueueState state = queueStateRepository.findById(ROUND_ROBIN_STATE_ID).orElse(null);
+        if (state == null || state.getLastSelectedCaseByUser() == null
+                || state.getLastSelectedCaseByUser().isEmpty()) {
+            return 0;
+        }
+
+        Query q = new Query(Criteria.where("status").is(TaskStatus.PENDING));
+        Set<String> usersWithPending = new HashSet<>(
+                mongoTemplate.findDistinct(q, "userEmail", TaskQueue.class, String.class));
+
+        Map<String, Long> pointers = state.getLastSelectedCaseByUser();
+        int before = pointers.size();
+        pointers.keySet().removeIf(user -> !usersWithPending.contains(user));
+        int removed = before - pointers.size();
+
+        if (removed > 0) {
+            queueStateRepository.save(state);
+            log.info("Pruned {} stale case pointers from round-robin state", removed);
+        }
+        return removed;
     }
     public boolean markAsSentToProcessing(Long caseFileId) {
         Query q = new Query(Criteria.where("caseFileId").is(caseFileId)
@@ -285,9 +365,18 @@ public class TaskQueueService {
         return mongoTemplate.findDistinct(query, "caseId", TaskQueue.class, Long.class);
     }
     public int getCasePriority(Long caseId) {
+        boolean active = caseRepository.findById(caseId)
+                .map(Case::isStatus)
+                .orElse(true);
+
+        if (!active) {
+            return -1;
+        }
+
         return taskQueueRepository
                 .findByCaseId(caseId)
                 .stream()
+                .filter(task -> task.getStatus() == TaskStatus.PENDING)
                 .map(TaskQueue::getPriority)
                 .filter(Objects::nonNull)
                 .max(Integer::compareTo)
