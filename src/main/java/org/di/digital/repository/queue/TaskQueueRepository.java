@@ -24,4 +24,5 @@ public interface TaskQueueRepository extends MongoRepository<TaskQueue, String> 
     List<TaskQueue> findByCaseIdAndStatus(Long caseId, TaskStatus status);
     List<TaskQueue> findByUserEmailAndStatusAndPriorityOrderByCreatedAtAsc(
             String userEmail, TaskStatus status, int priority);
+    List<TaskQueue> findByCaseId(Long caseId);
 }

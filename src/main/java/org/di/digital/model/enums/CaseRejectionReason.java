@@ -6,6 +6,8 @@ import lombok.Getter;
 public enum CaseRejectionReason {
     DEADLINE_INTERRUPTED("Прерванные сроки", "Мерзімдері үзілген", "Interrupted deadlines"),
     TERMINATED("Прекращенные", "Тоқтатылған", "Terminated"),
+    SENT_186("Передано в порядке ст. 186 УПК РК", "Қазақстан Республикасы Қылмыстық-процестік кодексінің 186-бабына сәйкес берілді.",
+            "Transferred pursuant to Article 186 of the Code of Criminal Procedure of the Republic of Kazakhstan."),
     SENT_TO_COURT("Направленные в суд", "Сотқа жіберілген", "Sent to court");
 
     private final String label;

@@ -72,6 +72,12 @@ public class RoundRobinScheduler {
 
             documentQueueService.sendDocumentForProcessing(message);
 
+            boolean marked = taskQueueService.markAsSentToProcessing(task.getCaseFileId());
+            if (!marked) {
+                log.warn("Task for caseFileId {} was not in PENDING when marking PROCESSING (race?), skipping",
+                        task.getCaseFileId());
+            }
+
             notificationService.sendCaseNotificationToAllUsers(
                     task.getCaseNumber(),
                     "Файл добавлен в очередь обработки: " + task.getFileName(),

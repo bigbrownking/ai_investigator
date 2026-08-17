@@ -40,6 +40,9 @@ public class CaseFile {
     @Column(name = "pages")
     private Integer pages;
 
+    @Column(name = "processing_duration_seconds")
+    private Long processingDurationSeconds;
+
     @Column(name = "start_page")
     private Integer startPage;
 

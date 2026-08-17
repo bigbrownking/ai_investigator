@@ -12,5 +12,5 @@ public interface AuthService {
     String forgotPassword(ForgotPasswordRequest request);
     String resetPassword(ResetPasswordRequest request);
     JwtResponse refreshToken(RefreshTokenRequest request);
-    String changePassword(ChangePasswordRequest request, User user);
+    String changeExpiredPassword(String preAuthToken, String encryptedNewPassword);
 }

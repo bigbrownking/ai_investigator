@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.TaskStatus;
 import org.di.digital.service.impl.core.DevService;
+import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.*;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -24,6 +25,7 @@ public class DevController {
     private final IndictmentMigrationService indictmentMigrationService;
     private final FileOwnerMigrationService fileOwnerMigrationService;
     private final InterrogationOwnerMigrationService interrogationOwnerMigrationService;
+    private final TaskQueueService taskQueueService;
 
     // ─── Stats ────────────────────────────────────────────────────
 
@@ -156,4 +158,14 @@ public class DevController {
         return devService.getAvgTimePerPage();
     }
 
+    @PostMapping("/reconcile")
+    public ResponseEntity<TaskQueueService.OrphanCleanupResult> reconcile(
+            @RequestParam(defaultValue = "true") boolean dryRun) {
+        return ResponseEntity.ok(taskQueueService.reconcileOrphanedTasks(dryRun));
+    }
+
+    @PostMapping("/reset-stuck")
+    public ResponseEntity<Integer> resetStuck() {
+        return ResponseEntity.ok(taskQueueService.resetStuckProcessingTasks());
+    }
 }

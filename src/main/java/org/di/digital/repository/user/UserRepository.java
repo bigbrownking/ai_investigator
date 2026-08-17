@@ -1,8 +1,10 @@
 package org.di.digital.repository.user;
 
 import org.di.digital.model.user.User;
+import org.di.digital.repository.search.UserSpecifications;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -19,8 +21,8 @@ import java.util.Optional;
 public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificationExecutor<User> {
     Optional<User> findByEmail(String email);
 
-
     Optional<User> findByIin(String iin);
+    List<User> findAllByDeletedFalse(Specification<User> userSpecifications, Pageable pageable);
 
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.settings WHERE u.email = :email")
     Optional<User> findByEmailWithSettings(@Param("email") String email);
@@ -29,8 +31,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     Page<User> findByRegionId(Long regionId, Pageable pageable);
     long countByCreatedDateBetween(LocalDateTime start, LocalDateTime end);
-    long countByActiveTrueAndCreatedDateBetween(LocalDateTime start, LocalDateTime end);
-    long countByActiveFalseAndCreatedDateBetween(LocalDateTime start, LocalDateTime end);
+    long countByActiveTrueAndDeletedFalseAndCreatedDateBetween(LocalDateTime start, LocalDateTime end);
+    long countByActiveFalseAndDeletedFalseAndCreatedDateBetween(LocalDateTime start, LocalDateTime end);
 
     long countByRegionId(Long regionId);
 

@@ -69,6 +69,13 @@ public class User {
     @NotBlank
     private String password;
 
+    @Column(name = "failed_login_attempts")
+    @Builder.Default
+    private int failedLoginAttempts = 0;
+
+    @Column(name = "lock_time")
+    private LocalDateTime lockTime;
+
     @Column(nullable = false)
     private boolean active;
 
@@ -97,7 +104,7 @@ public class User {
 
     @Builder.Default
     @Column(name = "is_deleted")
-    private Boolean is_deleted = false;
+    private boolean deleted = false;
 
     @Builder.Default
     @Column(name = "face_enabled")

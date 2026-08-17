@@ -40,6 +40,7 @@ public class CaseResponse {
     private String lastActivityType;
     private LocalDateTime qualificationGeneratedAt;
     private LocalDateTime indictmentGeneratedAt;
+    private long priority;
 
     private String ownerFio;
 }

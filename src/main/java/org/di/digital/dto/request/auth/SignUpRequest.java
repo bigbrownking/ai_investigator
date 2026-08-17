@@ -14,6 +14,6 @@ public class SignUpRequest {
     private Long rankId;
     private Long administrationId;
     private Long regionId;
-    private String faceReferenceJobId;   // добавлено
-    private String jobToken;             // добавлено
+    private String faceReferenceJobId;
+    private String jobToken;
 }

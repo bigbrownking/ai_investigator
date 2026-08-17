@@ -41,6 +41,7 @@ public class CaseFileServiceImpl implements CaseFileService {
 
         caseFile.setStatus(CaseFileStatusEnum.COMPLETED);
         caseFile.setCompletedAt(LocalDateTime.now());
+        caseFile.setProcessingDurationSeconds(processingDurationSeconds);
 
         if (classification != null) {
             caseFile.setClassificationStatus(classification.getStatus());
@@ -61,32 +62,17 @@ public class CaseFileServiceImpl implements CaseFileService {
     }
 
     @Override
-    public CaseFile markAsFailed(Long caseFileId, String errorMessage) {
+    public CaseFile markAsFailed(Long caseFileId, String errorMessage, Long processingDurationSeconds) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
                 .orElseThrow(() -> new NotFoundException("Файл не найден: " + caseFileId));
 
         caseFile.setStatus(CaseFileStatusEnum.FAILED);
         caseFile.setCompletedAt(LocalDateTime.now());
+        caseFile.setProcessingDurationSeconds(processingDurationSeconds);  // <-- новое
 
         caseFileRepository.save(caseFile);
-
         taskQueueService.failTask(caseFileId, errorMessage);
-
-        log.info("File {} marked as FAILED", caseFileId);
         return caseFile;
-    }
-
-    @Override
-    public void markAsProcessing(Long caseFileId) {
-        CaseFile caseFile = caseFileRepository.findById(caseFileId)
-                .orElseThrow(() -> new NotFoundException("Файл не найден: " + caseFileId));
-
-        caseFile.setStatus(CaseFileStatusEnum.PROCESSING);
-        caseFile.setCompletedAt(LocalDateTime.now());
-
-        caseFileRepository.save(caseFile);
-
-        log.info("File {} marked as FAILED", caseFileId);
     }
     @Override
     @Transactional

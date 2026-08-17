@@ -14,7 +14,8 @@ import java.util.List;
 public class UserSpecifications {
     public static Specification<User> build(UserSearchRequest req) {
         return Specification
-                .where(hasIin(req.getIin()))
+                .where(notDeleted())
+                .and(hasIin(req.getIin()))
                 .and(hasFio(req.getFio()))
                 .and(hasEmail(req.getEmail()))
                 .and(hasProfession(req.getProfession()))
@@ -26,18 +27,8 @@ public class UserSpecifications {
 
     public static Specification<User> buildForRegions(List<Long> regionIds, UserSearchRequest req) {
         return Specification
-                .where(inRegions(regionIds))
-                .and(hasIin(req.getIin()))
-                .and(hasFio(req.getFio()))
-                .and(hasEmail(req.getEmail()))
-                .and(hasProfession(req.getProfession()))
-                .and(hasAdministration(req.getAdministration()))
-                .and(isActive(req.getActive()));
-    }
-
-    public static Specification<User> buildForRegion(Long regionId, UserSearchRequest req) {
-        return Specification
-                .where(inRegion(regionId))
+                .where(notDeleted())
+                .and(inRegions(regionIds))
                 .and(hasIin(req.getIin()))
                 .and(hasFio(req.getFio()))
                 .and(hasEmail(req.getEmail()))
@@ -51,36 +42,10 @@ public class UserSpecifications {
                 root.get("region").get("id").in(regionIds);
     }
 
-    private static Specification<User> inRegion(Long regionId) {
-        return (root, query, cb) ->
-                cb.equal(root.get("region").get("id"), regionId);
-    }
-
     private static Specification<User> hasIin(String iin) {
         return (root, query, cb) ->
                 StringUtils.hasText(iin)
                         ? cb.like(cb.lower(root.get("iin")), like(iin))
-                        : null;
-    }
-
-    private static Specification<User> hasName(String name) {
-        return (root, query, cb) ->
-                StringUtils.hasText(name)
-                        ? cb.like(cb.lower(root.get("name")), like(name))
-                        : null;
-    }
-
-    private static Specification<User> hasSurname(String surname) {
-        return (root, query, cb) ->
-                StringUtils.hasText(surname)
-                        ? cb.like(cb.lower(root.get("surname")), like(surname))
-                        : null;
-    }
-
-    private static Specification<User> hasFathername(String fathername) {
-        return (root, query, cb) ->
-                StringUtils.hasText(fathername)
-                        ? cb.like(cb.lower(root.get("fathername")), like(fathername))
                         : null;
     }
 
@@ -168,5 +133,11 @@ public class UserSpecifications {
 
     private static String like(String value) {
         return "%" + value.toLowerCase() + "%";
+    }
+    private static Specification<User> notDeleted() {
+        return (root, query, cb) ->
+                cb.or(
+                        cb.isFalse(root.get("deleted"))
+                );
     }
 }

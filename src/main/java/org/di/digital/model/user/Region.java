@@ -25,6 +25,12 @@ public class Region implements Localizable {
     @Column(name = "kz_name")
     private String kzName;
 
+    @Column(name = "ru_city")
+    private String ruCity;
+
+    @Column(name = "kz_city")
+    private String kzCity;
+
     @OneToMany(mappedBy = "region", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<User> users;
 

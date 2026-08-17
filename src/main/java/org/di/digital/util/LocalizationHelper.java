@@ -92,6 +92,13 @@ public class LocalizationHelper {
             case EN, RU -> entity.getRuName();
         };
     }
+    public String getLocalizedCity(Localizable entity, UserSettingsLanguage language) {
+        if (entity == null) return null;
+        return switch (language) {
+            case KZ -> entity.getKzCity() + " қ.";
+            case EN, RU -> "г. "+entity.getRuCity();
+        };
+    }
     public String getLocalizedInterrogation(Localizable entity, String language){
         if(entity == null){
             return null;

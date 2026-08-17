@@ -7,6 +7,9 @@ import org.di.digital.dto.response.auth.JwtResponse;
 import org.di.digital.service.auth.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+
 import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 @RestController
@@ -42,11 +45,18 @@ public class AuthController {
     }
 
     @PostMapping("/refresh")
-    public ResponseEntity<JwtResponse> refresh(@RequestBody RefreshTokenRequest refreshTokenRequest){
+    public ResponseEntity<JwtResponse> refresh(@RequestBody RefreshTokenRequest refreshTokenRequest) {
         return ResponseEntity.ok(authService.refreshToken(refreshTokenRequest));
     }
-    @PostMapping("change-password")
-    public ResponseEntity<String> changePassword(@RequestBody ChangePasswordRequest request){
-        return ResponseEntity.ok(authService.changePassword(request, getCurrentUser()));
+
+    @PostMapping("/change-expired-password")
+    public ResponseEntity<String> changeExpiredPassword(
+            @RequestHeader("Authorization") String authHeader,
+            @RequestBody ChangeExpiredPasswordRequest request) {
+        if (authHeader == null || !authHeader.startsWith("Bearer_")) {
+            throw new IllegalStateException("Что то пошло не так.");
+        }
+        String token = authHeader.substring("Bearer_".length());
+        return ResponseEntity.ok(authService.changeExpiredPassword(token, request.getNewPassword()));
     }
 }

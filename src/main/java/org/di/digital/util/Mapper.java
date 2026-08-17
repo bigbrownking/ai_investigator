@@ -33,6 +33,7 @@ import org.di.digital.model.user.*;
 import org.di.digital.repository.queue.TaskQueueRepository;
 import org.di.digital.repository.user.RegionRepository;
 import org.di.digital.service.core.MinioService;
+import org.di.digital.service.impl.queue.TaskQueueService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -49,6 +50,7 @@ public class Mapper {
     private final MinioService minioService;
     private final LocalizationHelper localizationHelper;
     private final RegionRepository regionRepository;
+    private final TaskQueueService taskQueueService;
 
     @Value("${last.seen.ttl}")
     private int ttl;
@@ -224,6 +226,7 @@ public class Mapper {
                         .map(user -> mapToCaseUserResponse(user, caseEntity))
                         .collect(Collectors.toList()))
                 .createdDate(caseEntity.getCreatedDate())
+                .priority(taskQueueService.getCasePriority(caseEntity.getId()))
                 .ownerFio(caseEntity.getOwner().getFio())
                 .lastActivityDate(caseEntity.getLastActivityDate())
                 .lastActivityType(caseEntity.getLastActivityType())
@@ -388,7 +391,7 @@ public class Mapper {
 
         String city = interrogation.getCity() != null
                 ? interrogation.getCity()
-                : localizationHelper.extractRegionShortName(user.getRegion().getKzName(), user.getSettings().getLanguage());
+                : localizationHelper.getLocalizedCity(user.getRegion(), user.getSettings().getLanguage());
 
         CaseInterrogationProtocolResponse protocolResponse = null;
         String fio = interrogation.getFio();
@@ -637,6 +640,7 @@ public class Mapper {
                 .createdDate(c.getCreatedDate())
                 .lastActivityDate(c.getLastActivityDate())
                 .lastActivityType(c.getLastActivityType())
+                .priority(taskQueueService.getCasePriority(c.getId()))
                 .ownerFio(ownerFio)
                 .participantFios(c.getUsers().stream()
                         .map(User::getFio)

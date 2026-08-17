@@ -7,6 +7,7 @@ import org.bson.Document;
 import org.di.digital.model.queue.QueueState;
 import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.TaskStatus;
+import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.queue.QueueStateRepository;
 import org.di.digital.repository.queue.TaskQueueRepository;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
@@ -17,10 +18,14 @@ import org.springframework.data.mongodb.core.aggregation.Aggregation;
 import org.springframework.data.mongodb.core.aggregation.AggregationResults;
 import org.springframework.data.mongodb.core.query.Criteria;
 import org.springframework.data.mongodb.core.query.Query;
+import org.springframework.data.mongodb.core.query.Update;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Objects;
+import java.util.Set;
 
 @Slf4j
 @Service
@@ -31,33 +36,46 @@ public class TaskQueueService {
     private final QueueStateRepository queueStateRepository;
     private final MongoTemplate mongoTemplate;
     private final RabbitAdmin rabbitAdmin;
+    private final CaseFileRepository caseFileRepository;
 
     @Value("${spring.rabbitmq.mediator.queue}")
     public String DOCUMENT_QUEUE;
+
+    @Value("${scheduler.stuck-task.timeout-minutes:15}")
+    private long stuckTimeoutMinutes;
+
+    @Value("${scheduler.orphan-reconciliation.min-age-minutes:2}")
+    private long orphanMinAgeMinutes;
     private static final String ROUND_ROBIN_STATE_ID = "round_robin_state";
 
     @PostConstruct
-    public void resetStuckTasks() {
-        Query query = new Query();
-        query.addCriteria(Criteria.where("status").is(TaskStatus.PROCESSING)
-                .and("sentToQueueAt").lt(LocalDateTime.now()));
-        List<TaskQueue> stuckTasks = mongoTemplate.find(query, TaskQueue.class);
-
-        if (!stuckTasks.isEmpty()) {
-            stuckTasks.forEach(task -> {
-                task.setStatus(TaskStatus.PENDING);
-                task.setSentToQueueAt(null);
-            });
-            taskQueueRepository.saveAll(stuckTasks);
-            log.info("Reset {} stuck PROCESSING tasks to PENDING", stuckTasks.size());
-        }
-
+    public void onStartupCleanup() {
+        int n = resetStuckProcessingTasks();
+        log.info("Startup cleanup: reset {} stuck tasks", n);
         try {
             rabbitAdmin.purgeQueue(DOCUMENT_QUEUE, false);
             log.info("Purged RabbitMQ queue on startup");
         } catch (Exception e) {
             log.error("Failed to purge queue", e);
         }
+    }
+
+    public int resetStuckProcessingTasks() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(stuckTimeoutMinutes);
+        Query query = new Query(Criteria.where("status").is(TaskStatus.PROCESSING)
+                .and("sentToQueueAt").lt(cutoff));
+        List<TaskQueue> stuck = mongoTemplate.find(query, TaskQueue.class);
+        if (stuck.isEmpty()) return 0;
+        stuck.forEach(task -> {
+            task.setStatus(TaskStatus.PENDING);
+            task.setSentToQueueAt(null);
+            task.setLastHeartbeatAt(null);
+        });
+        taskQueueRepository.saveAll(stuck);
+        log.warn("Reset {} stuck PROCESSING tasks (older than {} min) back to PENDING: {}",
+                stuck.size(), stuckTimeoutMinutes,
+                stuck.stream().map(TaskQueue::getCaseFileId).toList());
+        return stuck.size();
     }
     public void retryTask(Long caseFileId, String userEmail, Long caseId,
                           String caseNumber, String fileName, String fileUrl, String language) {
@@ -148,10 +166,6 @@ public class TaskQueueService {
             TaskQueue task = mongoTemplate.findOne(taskQuery, TaskQueue.class);
 
             if (task != null) {
-                task.setStatus(TaskStatus.PROCESSING);
-                task.setSentToQueueAt(LocalDateTime.now());
-                taskQueueRepository.save(task);
-
                 state.setLastSelectedUser(candidate);
                 queueStateRepository.save(state);
 
@@ -162,6 +176,15 @@ public class TaskQueueService {
         }
 
         return null;
+    }
+    public boolean markAsSentToProcessing(Long caseFileId) {
+        Query q = new Query(Criteria.where("caseFileId").is(caseFileId)
+                .and("status").is(TaskStatus.PENDING));
+        Update u = new Update()
+                        .set("status", TaskStatus.PROCESSING)
+                        .set("sentToQueueAt", LocalDateTime.now());
+        var res = mongoTemplate.updateFirst(q, u, TaskQueue.class);
+        return res.getModifiedCount() > 0;
     }
 
     private int getMaxPendingPriority(List<Long> excludedCaseIds) {
@@ -261,4 +284,55 @@ public class TaskQueueService {
         query.addCriteria(Criteria.where("status").is(TaskStatus.PROCESSING));
         return mongoTemplate.findDistinct(query, "caseId", TaskQueue.class, Long.class);
     }
+    public int getCasePriority(Long caseId) {
+        return taskQueueRepository
+                .findByCaseId(caseId)
+                .stream()
+                .map(TaskQueue::getPriority)
+                .filter(Objects::nonNull)
+                .max(Integer::compareTo)
+                .orElse(0);
+    }
+
+    public List<Long> findOrphanedCaseFileIds() {
+        LocalDateTime cutoff = LocalDateTime.now().minusMinutes(orphanMinAgeMinutes);
+        Query q = new Query(Criteria.where("createdAt").lt(cutoff));
+
+        List<Long> mongoIds = mongoTemplate.findDistinct(
+                q, "caseFileId", TaskQueue.class, Long.class);
+
+        if (mongoIds.isEmpty()) return List.of();
+
+        Set<Long> existing = new HashSet<>(caseFileRepository.findExistingIds(mongoIds));
+
+        return mongoIds.stream()
+                .filter(id -> id != null && !existing.contains(id))
+                .toList();
+    }
+    public OrphanCleanupResult reconcileOrphanedTasks(boolean dryRun) {
+        List<Long> orphaned = findOrphanedCaseFileIds();
+
+        if (orphaned.isEmpty()) {
+            return new OrphanCleanupResult(0, 0, List.of(), dryRun);
+        }
+
+        long deleted = 0;
+        if (!dryRun) {
+            LocalDateTime cutoff = LocalDateTime.now().minusMinutes(orphanMinAgeMinutes);
+            Query q = new Query(Criteria.where("caseFileId").in(orphaned)
+                    .and("createdAt").lt(cutoff));
+            deleted = mongoTemplate.remove(q, TaskQueue.class).getDeletedCount();
+            log.warn("Reconciliation: removed {} orphaned tasks, caseFileIds={}", deleted, orphaned);
+        } else {
+            log.info("Reconciliation DRY-RUN: {} orphaned tasks, caseFileIds={}", orphaned.size(), orphaned);
+        }
+
+        return new OrphanCleanupResult(orphaned.size(), deleted, orphaned, dryRun);
+    }
+    public record OrphanCleanupResult(
+            int orphanedFound,
+            long deleted,
+            List<Long> orphanedCaseFileIds,
+            boolean dryRun
+    ) {}
 }

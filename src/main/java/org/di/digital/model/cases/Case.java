@@ -11,6 +11,7 @@ import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.plan.CasePlan;
 import org.di.digital.model.plan.PlanApprovalHistory;
 import org.di.digital.model.qualification.CaseQualification;
+import org.di.digital.model.report.CaseReport;
 import org.di.digital.model.user.User;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;
@@ -57,6 +58,9 @@ public class Case {
     @Builder.Default
     @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.EAGER)
     private List<CaseFile> files = new ArrayList<>();
+
+    @OneToOne(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true, fetch = FetchType.LAZY)
+    private CaseReport caseReport;
 
     @Builder.Default
     @OneToMany(mappedBy = "caseEntity", cascade = CascadeType.ALL, orphanRemoval = true)

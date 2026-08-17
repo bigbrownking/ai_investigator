@@ -49,7 +49,6 @@ public class WebConfig {
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
                 .authorizeHttpRequests(auth -> auth
                         .dispatcherTypeMatchers(DispatcherType.ASYNC).permitAll()
-
                         .requestMatchers(
                                 "/swagger-ui/**",
                                 "/swagger-ui.html",
@@ -58,10 +57,24 @@ public class WebConfig {
                                 "/swagger-resources/**",
                                 "/webjars/**"
                         ).permitAll()
-                        .requestMatchers(HttpMethod.POST, "/face-id/jobs/reference-set").permitAll()
-                        .requestMatchers(HttpMethod.POST, "/face-id/face-complete", "/face-id/challenges").permitAll()
-                        .requestMatchers(HttpMethod.DELETE, "/face-id/user/*").hasAnyAuthority("ADMIN")
-                        .requestMatchers("/face-id/**").authenticated()
+                        .requestMatchers("/actuator/prometheus", "/actuator/health").permitAll()
+                        .requestMatchers(
+                                "/auth/login",
+                                "/auth/signup",
+                                "/auth/forgot-password",
+                                "/auth/reset-password",
+                                "/auth/refresh",
+                                "/auth/change-password",
+                                "/auth/change-expired-password"
+                        ).permitAll()
+                        .requestMatchers(
+                                "/face-id/challenges",
+                                "/face-id/jobs/**",
+                                "/face-id/face-complete",
+                                "/face-id/test/**"
+                        ).permitAll()
+                        .requestMatchers("/face-id/me").authenticated()
+                        .requestMatchers("/face-id/user/**").hasAuthority("ADMIN")
 
                         .requestMatchers("/actuator/**").permitAll()
 
@@ -70,7 +83,6 @@ public class WebConfig {
                         .requestMatchers("/app/**").permitAll()
 
                         .requestMatchers("/error/**").permitAll()
-                        .requestMatchers("/auth/**").permitAll()
                         .requestMatchers("/dict/**").permitAll()
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
                         .requestMatchers("/reg-admin/**").hasAnyAuthority("REG_ADMIN", "ADVANCED_USER")

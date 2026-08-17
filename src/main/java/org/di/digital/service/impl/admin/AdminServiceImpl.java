@@ -123,8 +123,8 @@ public class AdminServiceImpl implements AdminService {
                 .first(result.isFirst())
                 .last(result.isLast())
                 .empty(result.isEmpty())
-                .activeUsers(userRepository.countByActiveTrueAndCreatedDateBetween(start, end))
-                .inactiveUsers(userRepository.countByActiveFalseAndCreatedDateBetween(start, end))
+                .activeUsers(userRepository.countByActiveFalseAndDeletedFalseAndCreatedDateBetween(start, end))
+                .inactiveUsers(userRepository.countByActiveFalseAndDeletedFalseAndCreatedDateBetween(start, end))
                 .build();
     }
 
@@ -390,7 +390,8 @@ public class AdminServiceImpl implements AdminService {
 
         caseRepository.removeUserFromAllCases(userId);
 
-        user.setIs_deleted(true);
+        user.setActive(false);
+        user.setDeleted(true);
         userRepository.save(user);
         log.info("User {} soft-deleted by admin", userId);
     }

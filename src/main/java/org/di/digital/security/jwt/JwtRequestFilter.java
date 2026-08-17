@@ -7,7 +7,6 @@ import jakarta.servlet.http.HttpServletResponse;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.repository.user.UserRepository;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.UsernamePasswordAuthenticationToken;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -41,6 +40,7 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 if (!userDetails.isEnabled()) {
                     log.warn("User {} is disabled", username);
                     response.setStatus(HttpServletResponse.SC_FORBIDDEN);
+                    response.setContentType("application/json");
                     response.getWriter().write("{\"error\": \"Account is disabled\"}");
                     return;
                 }

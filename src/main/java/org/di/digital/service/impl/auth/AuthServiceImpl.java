@@ -1,5 +1,6 @@
 package org.di.digital.service.impl.auth;
 
+import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.client.FaceAuthClient;
@@ -11,6 +12,7 @@ import org.di.digital.model.user.*;
 import org.di.digital.repository.user.*;
 import org.di.digital.security.crypto.RsaDecryptor;
 import org.di.digital.security.jwt.JwtTokenUtil;
+import org.di.digital.security.jwt.OneTimeTokenService;
 import org.di.digital.security.jwt.PreAuthTokenUtil;
 import org.di.digital.service.LogService;
 import org.di.digital.service.auth.AuthService;
@@ -21,6 +23,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
@@ -38,6 +41,12 @@ public class AuthServiceImpl implements AuthService {
 
     @Value("${app.password.history-size}")
     private int passwordHistorySize;
+
+    @Value("${app.login.max-attempts}")
+    private int maxLoginAttempts;
+
+    @Value("${app.login.lock-duration-minutes}")
+    private int lockDurationMinutes;
 
     private final PasswordHistoryRepository passwordHistoryRepository;
 
@@ -62,6 +71,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final FaceAuthClient faceAuthClient;
     private final PreAuthTokenUtil preAuthTokenUtil;
+    private final OneTimeTokenService oneTimeTokenService;
 
     private String decryptAndValidatePassword(String encryptedPassword) {
         String raw = rsaDecryptor.decrypt(encryptedPassword);
@@ -175,6 +185,7 @@ public class AuthServiceImpl implements AuthService {
                     add(userRole);
                 }})
                 .active(false)
+                .deleted(false)
                 .build();
 
         UserSettings userSettings = UserSettings.builder()
@@ -294,17 +305,36 @@ public class AuthServiceImpl implements AuthService {
         User user = userRepository.findByIin(request.getIin())
                 .orElseThrow(() -> new NotFoundException("Пользователь с таким ИИН не найден: " + request.getIin()));
 
-        if (user.getIs_deleted()) throw new IllegalStateException("Данный аккаунт удален");
+        if (user.isDeleted()) throw new IllegalStateException("Данный аккаунт удален");
         if (!user.isActive()) throw new IllegalStateException("Пользователь еще не был подтвержден админом");
+
+        if (isLocked(user)) {
+            long minutesLeft = Duration.between(LocalDateTime.now(), user.getLockTime()).toMinutes() + 1;
+            throw new IllegalStateException("Аккаунт заблокирован из-за превышения числа попыток входа. Повторите через " + minutesLeft + " мин.");
+        }
 
         String rawPassword = rsaDecryptor.decrypt(request.getPassword());
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
+            registerFailedAttempt(user);
             throw new IllegalStateException("Вы ввели неправильный пароль");
         }
+
+        resetFailedAttempts(user);
 
         logService.log(String.format("User logged in %s user", request.getIin()),
                 LogLevel.INFO, LogAction.LOGIN, null, user.getEmail());
 
+        // Сценарий 1: пароль истёк -> pre-auth PASSWORD_RESET.
+        if (isPasswordExpired(user)) {
+            String preAuth = preAuthTokenUtil.generatePasswordReset(user.getId(), user.getEmail());
+            return JwtResponse.builder()
+                    .username(user.getEmail())
+                    .passwordExpired(true)
+                    .preAuthToken(preAuth)
+                    .build();
+        }
+
+        // Whitelist
         if (user.getIin() != null && whitelistIins.contains(user.getIin())) {
             String access = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
             String refresh = jwtTokenUtil.generateRefreshToken(user.getEmail());
@@ -314,32 +344,29 @@ public class AuthServiceImpl implements AuthService {
                     .faceEnabled(user.isFaceEnabled())
                     .requiresFaceId(false)
                     .faceEnrollmentRequired(false)
-                    .passwordExpired(isPasswordExpired(user))
                     .build();
         }
 
         // Сценарий 2: лицо ещё НЕ поставлено -> pre-auth ENROLLMENT.
         if (!user.isFaceEnabled()) {
-            String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), true);
+            String preAuth = preAuthTokenUtil.generateFace(user.getId(), user.getEmail(), true);
             return JwtResponse.builder()
                     .type("Bearer").username(user.getEmail())
                     .faceEnabled(false)
                     .requiresFaceId(true)
                     .faceEnrollmentRequired(true)
                     .preAuthToken(preAuth)
-                    .passwordExpired(isPasswordExpired(user))
                     .build();
         }
 
         // Сценарий 3: лицо есть -> pre-auth AUTH, фронт проводит verify.
-        String preAuth = preAuthTokenUtil.generate(user.getId(), user.getEmail(), false);
+        String preAuth = preAuthTokenUtil.generateFace(user.getId(), user.getEmail(), false);
         return JwtResponse.builder()
                 .type("Bearer").username(user.getEmail())
                 .faceEnabled(true)
                 .requiresFaceId(true)
                 .faceEnrollmentRequired(false)
                 .preAuthToken(preAuth)
-                .passwordExpired(isPasswordExpired(user))
                 .build();
     }
 
@@ -356,6 +383,37 @@ public class AuthServiceImpl implements AuthService {
         }
 
         return changedAt.isBefore(LocalDateTime.now().minusDays(passwordExpiryDays));
+    }
+    private boolean isLocked(User user) {
+        if (user.getLockTime() == null) return false;
+
+        if (user.getLockTime().isAfter(LocalDateTime.now())) {
+            return true;
+        }
+        user.setLockTime(null);
+        user.setFailedLoginAttempts(0);
+        userRepository.save(user);
+        return false;
+    }
+
+    private void registerFailedAttempt(User user) {
+        int attempts = user.getFailedLoginAttempts() + 1;
+        user.setFailedLoginAttempts(attempts);
+
+        if (attempts >= maxLoginAttempts) {
+            user.setLockTime(LocalDateTime.now().plusMinutes(lockDurationMinutes));
+            log.info("User {} locked for {} min after {} failed attempts",
+                    user.getIin(), lockDurationMinutes, attempts);
+        }
+        userRepository.save(user);
+    }
+
+    private void resetFailedAttempts(User user) {
+        if (user.getFailedLoginAttempts() != 0 || user.getLockTime() != null) {
+            user.setFailedLoginAttempts(0);
+            user.setLockTime(null);
+            userRepository.save(user);
+        }
     }
 
     @Override
@@ -453,25 +511,14 @@ public class AuthServiceImpl implements AuthService {
         return "Пароль успешно изменён";
     }
 
-    @Override
-    @Transactional
-    public String changePassword(ChangePasswordRequest request, User currentUser) {
-        User user = userRepository.findById(currentUser.getId())
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+    private String applyNewPassword(User user, String encryptedNewPassword) {
+        String rawNew = decryptAndValidatePassword(encryptedNewPassword);
 
-        String rawCurrent = rsaDecryptor.decrypt(request.getCurrentPassword());
-        if (!passwordEncoder.matches(rawCurrent, user.getPassword())) {
-            throw new IllegalStateException("Текущий пароль введен неправильно");
-        }
-
-        String rawNew = rsaDecryptor.decrypt(request.getNewPassword());
         if (passwordEncoder.matches(rawNew, user.getPassword())) {
             throw new IllegalStateException("Новый пароль не должен совпадать с текущим");
         }
 
-        List<PasswordHistory> history = passwordHistoryRepository
-                .findTop5ByUserOrderByChangedAtDesc(user);
-
+        List<PasswordHistory> history = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
         for (PasswordHistory h : history) {
             if (passwordEncoder.matches(rawNew, h.getPasswordHash())) {
                 throw new IllegalStateException("Этот пароль уже использовался ранее");
@@ -486,11 +533,34 @@ public class AuthServiceImpl implements AuthService {
 
         user.setPassword(passwordEncoder.encode(rawNew));
         user.setPasswordChangedAt(LocalDateTime.now());
+        userRepository.save(user);
 
         List<PasswordHistory> all = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
         if (all.size() > passwordHistorySize) {
             passwordHistoryRepository.deleteAll(all.subList(passwordHistorySize, all.size()));
         }
+
         return "Пароль успешно изменён";
+    }
+
+    @Override
+    @Transactional
+    public String changeExpiredPassword(String preAuthToken, String encryptedNewPassword) {
+        Claims claims = preAuthTokenUtil.validatePasswordReset(preAuthToken);
+
+        String jti = preAuthTokenUtil.jti(claims);
+        if (jti == null) {
+            throw new IllegalStateException("Недействительный токен смены пароля");
+        }
+
+        boolean firstUse = oneTimeTokenService.markUsed(jti, preAuthTokenUtil.expiresAt(claims));
+        if (!firstUse) {
+            throw new IllegalStateException("Токен смены пароля уже был использован");
+        }
+
+        User user = userRepository.findById(preAuthTokenUtil.userId(claims))
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+
+        return applyNewPassword(user, encryptedNewPassword);
     }
 }

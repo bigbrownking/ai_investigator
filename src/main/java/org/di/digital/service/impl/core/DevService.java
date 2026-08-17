@@ -45,7 +45,6 @@ public class DevService {
     public void setCasePriority(String caseNumber, int priority) {
         Query query = new Query(
                 Criteria.where("caseNumber").is(caseNumber)
-                        .and("status").is(TaskStatus.PENDING)
         );
         Update update = new Update().set("priority", priority);
         long modified = mongoTemplate.updateMulti(query, update, TaskQueue.class).getModifiedCount();

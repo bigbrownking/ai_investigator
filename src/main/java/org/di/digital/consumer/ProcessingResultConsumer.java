@@ -79,7 +79,7 @@ public class ProcessingResultConsumer {
     }
 
     private void handleFailure(ProcessingResultMessage message) {
-        CaseFile caseFile = caseFileService.markAsFailed(message.getCaseFileId(), message.getErrorMessage());
+        CaseFile caseFile = caseFileService.markAsFailed(message.getCaseFileId(), message.getErrorMessage(), message.getProcessingDurationSeconds());
 
         // Send case-level notification
         notificationService.notifyFileProcessingFailed(
