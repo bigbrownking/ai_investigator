@@ -20,8 +20,8 @@ import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.service.FeedbackService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.core.MinioService;
-import org.di.digital.util.Mapper;
 import org.di.digital.util.PageCounter;
+import org.di.digital.util.mapper.SupportMapper;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -45,7 +45,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     private final ReviewRepository reviewRepository;
     private final MinioService minioService;
     private final LogService logService;
-    private final Mapper mapper;
+    private final SupportMapper mapper;
     private final PageCounter pageCounter;
 
     @Value("${files.max-pages-per-file}")
@@ -99,7 +99,7 @@ public class FeedbackServiceImpl implements FeedbackService {
                 null,
                 email
         );
-        return mapper.mapToSupportTicketDto(saved);
+        return mapper.toSupportTicketDto(saved);
     }
 
     @Override
@@ -210,6 +210,6 @@ public class FeedbackServiceImpl implements FeedbackService {
                 null,
                 email
         );
-        return mapper.mapToReviewDto(saved);
+        return mapper.toReviewDto(saved);
     }
 }

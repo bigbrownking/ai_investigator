@@ -27,8 +27,8 @@ import org.di.digital.service.interrogation.CaseInterrogationService;
 import org.di.digital.service.FLService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.core.MinioService;
-import org.di.digital.util.Mapper;
 import org.di.digital.util.PageCounter;
+import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -65,7 +65,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final MinioService minioService;
     private final LogService logService;
     private final FLService flService;
-    private final Mapper mapper;
+    private final InterrogationMapper mapper;
     private final WebClient.Builder webClientBuilder;
     private final PageCounter pageCounter;
     private final UserUtil userUtil;
@@ -98,7 +98,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .filter(i -> fio == null || (i.getFio() != null && i.getFio().toLowerCase().contains(fio.toLowerCase())))
                 .filter(i -> isDop == null || Objects.equals(i.getIsDop(), isDop))
                 .filter(i -> date == null || i.getDate().equals(date))
-                .map(mapper::mapToInterrogationResponse)
+                .map(mapper::toResponse)
                 .collect(Collectors.toList());
     }
 
@@ -189,7 +189,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 email
         );
 
-        return mapper.mapToQAResponse(savedQa);
+        return mapper.toShortQAResponse(savedQa);
     }
     @Override
     @Transactional
@@ -487,7 +487,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         otherAudio.setStatus(QAStatusEnum.TRANSCRIBED);
         caseInterrogationRepository.save(interrogation);
 
-        return mapper.mapToOtherAudioResponse(otherAudio);
+        return mapper.toOtherAudioResponse(otherAudio);
     }
 
     @Transactional(readOnly = true)
@@ -506,7 +506,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .orElseThrow(() -> new RuntimeException("Допрос не найден: " + interrogationId));
 
         return interrogation.getQaList().stream()
-                .map(mapper::mapToQAResponse)
+                .map(mapper::toShortQAResponse)
                 .collect(Collectors.toList());
     }
 
@@ -525,7 +525,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             throw new RuntimeException("Допрос не принадлежит делу: " + caseId);
         }
 
-        return mapper.mapToInterrogationFullResponse(interrogation, user);
+        return mapper.toFullResponse(interrogation, user);
     }
 
     @Override

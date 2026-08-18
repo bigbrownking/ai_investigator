@@ -21,7 +21,7 @@ import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.util.LocalizationHelper;
-import org.di.digital.util.Mapper;
+import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -40,7 +40,7 @@ public class InterrogationCreateWriter {
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final LogService logService;
-    private final Mapper mapper;
+    private final InterrogationMapper mapper;
     private final UserUtil userUtil;
     private final LocalizationHelper localizationHelper;
     private final InterrogationCategoryResolver categoryResolver;
@@ -166,7 +166,7 @@ public class InterrogationCreateWriter {
                         interrogation.getFio(), caseNumber, email),
                 LogLevel.INFO, LogAction.INTERROGATION_ADDED, caseNumber, user.getEmail());
 
-        return mapper.mapToInterrogationFullResponse(saved, user);
+        return mapper.toFullResponse(saved, user);
     }
 
     private String formatDate(LocalDate date) {

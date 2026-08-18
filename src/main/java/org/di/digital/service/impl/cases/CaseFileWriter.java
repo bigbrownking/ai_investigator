@@ -16,7 +16,7 @@ import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.service.impl.queue.TaskQueueService;
-import org.di.digital.util.Mapper;
+import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -37,7 +37,7 @@ public class CaseFileWriter {
     private final CaseFileRepository caseFileRepository;
     private final TaskQueueService taskQueueService;
     private final LogService logService;
-    private final Mapper mapper;
+    private final CaseMapper mapper;
     private final UserUtil userUtil;
 
 
@@ -89,7 +89,7 @@ public class CaseFileWriter {
         logService.log(String.format("Case %s created by user %s", caseEntity.getNumber(), email),
                 LogLevel.INFO, LogAction.CASE_CREATED, caseEntity.getNumber(), email);
 
-        return mapper.mapToCaseResponse(caseEntity);
+        return mapper.toResponse(caseEntity);
     }
 
 
@@ -156,7 +156,7 @@ public class CaseFileWriter {
                         email, caseEntity.getNumber(), fileNames),
                 LogLevel.INFO, LogAction.FILE_UPLOAD, caseEntity.getNumber(), email);
 
-        return savedFiles.stream().map(mapper::mapToCaseFileResponse).toList();
+        return savedFiles.stream().map(mapper::toFileResponse).toList();
     }
 
 

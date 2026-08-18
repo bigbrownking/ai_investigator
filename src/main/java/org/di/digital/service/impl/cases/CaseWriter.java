@@ -13,7 +13,7 @@ import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
-import org.di.digital.util.Mapper;
+import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -27,7 +27,7 @@ public class CaseWriter {
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final LogService logService;
-    private final Mapper mapper;
+    private final CaseMapper mapper;
     private final UserUtil userUtil;
 
     @Transactional(readOnly = true)
@@ -99,7 +99,7 @@ public class CaseWriter {
 
         logService.log(String.format("Case %s edited by user %s", saved.getNumber(), email),
                 LogLevel.INFO, LogAction.CASE_UPDATED, saved.getNumber(), email);
-        return mapper.mapToCaseResponse(saved);
+        return mapper.toResponse(saved);
     }
 
     public record EditPrecheck(String oldNumber, boolean numberChanges) {}

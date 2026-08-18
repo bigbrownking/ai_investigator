@@ -15,7 +15,7 @@ import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.service.impl.queue.TaskQueueService;
-import org.di.digital.util.Mapper;
+import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -32,7 +32,7 @@ public class ApplicationFileWriter {
     private final UserRepository userRepository;
     private final TaskQueueService taskQueueService;
     private final LogService logService;
-    private final Mapper mapper;
+    private final InterrogationMapper mapper;
     private final UserUtil userUtil;
 
     // ---- Фаза 1: валидация + собрать контекст для загрузки ----
@@ -132,7 +132,7 @@ public class ApplicationFileWriter {
         }
 
         List<CaseInterrogationApplicationFileResponse> result = interrogation.getApplicationFiles().stream()
-                .map(mapper::mapToApplicationFileResponse)
+                .map(mapper::toApplicationFileResponse)
                 .toList();
 
         String fileNames = uploaded.stream()

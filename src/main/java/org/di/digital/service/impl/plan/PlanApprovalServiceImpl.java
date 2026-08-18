@@ -17,7 +17,7 @@ import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.service.plan.PlanApprovalService;
 import org.di.digital.service.impl.core.NotificationService;
-import org.di.digital.util.Mapper;
+import org.di.digital.util.mapper.PlanMapper;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -35,7 +35,7 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
     private final PlanApprovalHistoryRepository historyRepository;
     private final LogService logService;
     private final NotificationService notificationService;
-    private final Mapper mapper;
+    private final PlanMapper mapper;
 
     @Override
     @Transactional
@@ -157,7 +157,7 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
         return historyRepository
                 .findByCaseEntityIdOrderByReviewedAtDesc(caseEntity.getId())
                 .stream()
-                .map(mapper::toPlanApprovalHistoryDto)
+                .map(mapper::toApprovalHistoryDto)
                 .toList();
     }
 

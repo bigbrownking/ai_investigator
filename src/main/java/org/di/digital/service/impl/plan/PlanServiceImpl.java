@@ -27,7 +27,7 @@ import org.di.digital.service.LogService;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.DocumentFormatterService;
 import org.di.digital.service.impl.core.NotificationService;
-import org.di.digital.util.Mapper;
+import org.di.digital.util.mapper.PlanMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.ParameterizedTypeReference;
@@ -74,7 +74,7 @@ public class PlanServiceImpl implements PlanService {
     private final UserUtil userUtil;
     private final PlanResponseAssembler assembler;
 
-    private final Mapper mapper;
+    private final PlanMapper mapper;
 
     @Value("${model.host}")
     private String planHost;
@@ -538,7 +538,7 @@ public class PlanServiceImpl implements PlanService {
         return planEditHistoryRepository
                 .findByCaseEntityIdOrderByEditedAtDesc(caseEntity.getId())
                 .stream()
-                .map(mapper::toPlanEditHistoryDto)
+                .map(mapper::toEditHistoryDto)
                 .toList();
     }
     public boolean canWithdraw(PlanStatus status) {

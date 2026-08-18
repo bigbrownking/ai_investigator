@@ -34,7 +34,10 @@ import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
 import org.di.digital.service.admin.RegAdminService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
-import org.di.digital.util.Mapper;
+import org.di.digital.util.mapper.CaseMapper;
+import org.di.digital.util.mapper.InterrogationMapper;
+import org.di.digital.util.mapper.SupportMapper;
+import org.di.digital.util.mapper.UserMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
@@ -58,9 +61,12 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final LogRepository logRepository;
+    private final UserMapper userMapper;
+    private final CaseMapper caseMapper;
+    private final InterrogationMapper interrogationMapper;
+    private final SupportMapper supportMapper;
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final InterrogationExportService interrogationExportService;
-    private final Mapper mapper;
     private final UserUtil userUtil;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
 
@@ -75,7 +81,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         Pageable pageable = PageRequest.of(page, size);
         Specification<Appeal> spec = AppealSpecifications.buildForRegions(regionIds, req);
-        return appealRepository.findAll(spec, pageable).map(mapper::toAppealDto);
+        return appealRepository.findAll(spec, pageable).map(supportMapper::toAppealDto);
     }
 
     @Override
@@ -89,7 +95,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         Pageable pageable = PageRequest.of(page, size);
         Specification<User> spec = UserSpecifications.buildForRegions(regionIds, req);
-        return userRepository.findAll(spec, pageable).map(mapper::mapToUserProfileResponse);
+        return userRepository.findAll(spec, pageable).map(userMapper::toProfile);
     }
 
     @Override
@@ -107,7 +113,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         Page<CaseListResponse> casePage = caseRepository
                 .findAll(spec, PageRequest.of(page, size))
-                .map(mapper::mapToCaseListResponse);
+                .map(caseMapper::toListResponse);
 
         List<Case> allFiltered = caseRepository.findAll(spec);
 
@@ -177,7 +183,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         Page<CaseListResponse> casePage = caseRepository
                 .findAll(spec, PageRequest.of(page, size))
-                .map(mapper::mapToCaseListResponse);
+                .map(caseMapper::toListResponse);
 
         List<Case> allFiltered = caseRepository.findAll(spec);
 
@@ -200,7 +206,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         userUtil.validateRegionAccess(admin, caseEntity);
 
-        return mapper.mapToCaseResponse(caseEntity);
+        return caseMapper.toResponse(caseEntity);
     }
 
     @Override
@@ -215,7 +221,7 @@ public class RegAdminServiceImpl implements RegAdminService {
         userUtil.validateUserRegionAccess(admin, user);
 
         return logRepository.findByEmail(email, PageRequest.of(page, size))
-                .map(mapper::toLogDto);
+                .map(supportMapper::toLogDto);
     }
 
     @Override
@@ -230,7 +236,7 @@ public class RegAdminServiceImpl implements RegAdminService {
         userUtil.validateRegionAccess(admin, interrogation.getCaseEntity());
 
         User owner = interrogation.getCaseEntity().getOwner();
-        return mapper.mapToInterrogationFullResponse(interrogation, owner);
+        return interrogationMapper.toFullResponse(interrogation, owner);
     }
 
     @Override
@@ -390,7 +396,7 @@ public class RegAdminServiceImpl implements RegAdminService {
         return rejectionReasonStatusRepository
                 .findAllByCaseIdInOrderByTimestampDesc(caseIds)
                 .stream()
-                .map(mapper::toRejectionReasonResponse)
+                .map(caseMapper::toRejectionReasonResponse)
                 .toList();
     }
 }

@@ -12,7 +12,7 @@ import org.di.digital.model.enums.settings.UserSettingsDetalizationLevel;
 import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.enums.settings.UserSettingsTheme;
 import org.di.digital.repository.user.*;
-import org.di.digital.util.Mapper;
+import org.di.digital.util.mapper.DictionaryMapper;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
@@ -32,7 +32,7 @@ public class DictionaryController {
     private final AdministrationRepository administrationRepository;
     private final ProfessionRepository professionRepository;
     private final RankRepository rankRepository;
-    private final Mapper mapper;
+    private final DictionaryMapper mapper;
 
     private UserSettingsLanguage currentLang() {
         try {

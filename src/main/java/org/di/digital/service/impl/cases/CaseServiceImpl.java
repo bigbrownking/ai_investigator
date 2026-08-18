@@ -33,8 +33,8 @@ import org.di.digital.service.LogService;
 import org.di.digital.service.core.MinioService;
 import org.di.digital.service.impl.core.DevService;
 import org.di.digital.service.impl.queue.TaskQueueService;
-import org.di.digital.util.Mapper;
 import org.di.digital.util.PageCounter;
+import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.requests.RequestUrlBuilder;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
@@ -68,7 +68,7 @@ public class CaseServiceImpl implements CaseService {
     private final MinioService minioService;
     private final TaskQueueService taskQueueService;
     private final LogService logService;
-    private final Mapper mapper;
+    private final CaseMapper mapper;
     private final PageCounter pageCounter;
     private final CaseFileRepository caseFileRepository;
     private final DevService devService;
@@ -191,7 +191,7 @@ public class CaseServiceImpl implements CaseService {
                 savedCase.getNumber(),
                 email);
 
-        return mapper.mapToCaseResponse(savedCase);
+        return mapper.toResponse(savedCase);
     }
 
     private void renameWorkspace(String oldNumber, String newNumber) {
@@ -234,7 +234,7 @@ public class CaseServiceImpl implements CaseService {
 
         userUtil.validateUserAccess(caseEntity, user);
 
-        return mapper.mapToCaseResponse(caseEntity);
+        return mapper.toResponse(caseEntity);
     }
 
     @Transactional
@@ -301,7 +301,7 @@ public class CaseServiceImpl implements CaseService {
 
                     List<CaseFileResponse> files = tomFiles.stream()
                             .map(f -> {
-                                CaseFileResponse dto = mapper.mapToCaseFileResponse(f);
+                                CaseFileResponse dto = mapper.toFileResponse(f);
                                 int pages = f.getPages() == null ? 0 : f.getPages();
 
                                 if (pages > 0) {
@@ -584,7 +584,7 @@ public class CaseServiceImpl implements CaseService {
                 LogAction.USER_ADD,
                 caseNumber,
                 currentUserEmail);
-        return mapper.mapToCaseUserResponse(userToAdd, savedCase);
+        return mapper.toUserResponse(userToAdd, savedCase);
     }
 
     @Override
@@ -685,7 +685,7 @@ public class CaseServiceImpl implements CaseService {
                 LogAction.FIGURANT_ADDED,
                 caseEntity.getNumber(),
                 currentUserEmail);
-        return mapper.mapToFigurantResponse(saved);
+        return mapper.toFigurantResponse(saved);
     }
 
     @Override
@@ -781,7 +781,7 @@ public class CaseServiceImpl implements CaseService {
         userUtil.validateUserAccess(caseEntity, currentUser);
 
         return caseEntity.getUsers().stream()
-                .map(user -> mapper.mapToCaseUserResponse(user, caseEntity))
+                .map(user -> mapper.toUserResponse(user, caseEntity))
                 .collect(Collectors.toList());
     }
 
@@ -796,7 +796,7 @@ public class CaseServiceImpl implements CaseService {
         userUtil.validateUserAccess(caseEntity, currentUser);
 
         return caseEntity.getFigurants().stream()
-                .map(mapper::mapToFigurantResponse)
+                .map(mapper::toFigurantResponse)
                 .collect(Collectors.toList());
     }
 
@@ -817,7 +817,7 @@ public class CaseServiceImpl implements CaseService {
         Pageable pageable = PageRequest.of(page, size);
         Page<Case> cases = caseRepository.findRecentCasesWithActivity(userEmail, pageable);
 
-        return cases.map(mapper::mapToCaseResponse);
+        return cases.map(mapper::toResponse);
     }
 
     @Override
@@ -826,7 +826,7 @@ public class CaseServiceImpl implements CaseService {
         Pageable pageable = PageRequest.of(page, size);
         Page<Case> cases = caseRepository.findCasesByActivityType(userEmail, activityType, pageable);
 
-        return cases.map(mapper::mapToCaseResponse);
+        return cases.map(mapper::toResponse);
     }
 
     @Transactional(readOnly = true)
@@ -837,7 +837,7 @@ public class CaseServiceImpl implements CaseService {
         return caseEntity.getFigurants().stream()
                 .filter(f -> number.equals(f.getNumber()) && documentType.equals(f.getDocumentType()))
                 .findFirst()
-                .map(mapper::mapToFigurantResponse);
+                .map(mapper::toFigurantResponse);
     }
 
     @Override
@@ -984,7 +984,7 @@ public class CaseServiceImpl implements CaseService {
                 .findByOriginalFileNameAndCaseEntityId(fileName, caseId)
                 .orElseThrow(() -> new NotFoundException("Файл не найден: " + fileName));
 
-        return mapper.mapToCaseFileResponse(caseFile);
+        return mapper.toFileResponse(caseFile);
     }
 
     @Override

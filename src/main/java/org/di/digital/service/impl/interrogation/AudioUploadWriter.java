@@ -17,7 +17,7 @@ import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
 import org.di.digital.service.impl.queue.AudioQueueService;
-import org.di.digital.util.Mapper;
+import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -36,7 +36,7 @@ public class AudioUploadWriter {
     private final CaseInterrogationAudioRecordRepository audioRecordRepository;
     private final AudioQueueService audioQueueService;
     private final LogService logService;
-    private final Mapper mapper;
+    private final InterrogationMapper mapper;
     private final UserUtil userUtil;
 
     // ---- Фаза 1: валидация + timeGuard + получить fio/caseNumber для MinIO-пути ----
@@ -136,7 +136,7 @@ public class AudioUploadWriter {
                 String.format("Uploading qa audio %s by %s user in case %s", audioUrl, email, caseNumber),
                 LogLevel.INFO, LogAction.AUDIO_UPLOADED, caseNumber, email);
 
-        return mapper.mapToQAResponse(qa);
+        return mapper.toShortQAResponse(qa);
     }
 
     // ---- Фаза 3 (Other): сохранить record, отправить в очередь, вернуть DTO ----
@@ -197,7 +197,7 @@ public class AudioUploadWriter {
                 String.format("Uploading additional audio %s by %s user in case %s", audioUrl, email, caseNumber),
                 LogLevel.INFO, LogAction.AUDIO_UPLOADED, caseNumber, email);
 
-        return mapper.mapToOtherAudioResponse(otherAudio);
+        return mapper.toOtherAudioResponse(otherAudio);
     }
 
     public record AudioUploadContext(String caseNumber, String fio, String language) {}

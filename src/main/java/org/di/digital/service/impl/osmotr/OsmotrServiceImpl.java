@@ -22,8 +22,8 @@ import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.core.MinioService;
 import org.di.digital.service.osmotr.OsmotrService;
 import org.di.digital.service.impl.queue.OsmotrQueueService;
-import org.di.digital.util.Mapper;
 import org.di.digital.util.PdfSplitter;
+import org.di.digital.util.mapper.OsmotrMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.MediaType;
@@ -52,7 +52,7 @@ public class OsmotrServiceImpl implements OsmotrService {
     private final CaseRepository caseRepository;
     private final OsmotrQueueService osmotrQueueService;
     private final PdfSplitter pdfSplitter;
-    private final Mapper mapper;
+    private final OsmotrMapper mapper;
     private final UserUtil userUtil;
 
     @Value("${model.host}")
@@ -134,7 +134,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .userId(user.getId())
                 .build());
 
-        return mapper.toOsmotrResultDto(saved);
+        return mapper.toDto(saved);
     }
 
     @Transactional(readOnly = true)
@@ -147,7 +147,7 @@ public class OsmotrServiceImpl implements OsmotrService {
 
         return osmotrResultRepository.findByCaseNumber(caseNumber).stream()
                 .map(result -> {
-                    OsmotrResultDto dto = mapper.toOsmotrResultDto(result);
+                    OsmotrResultDto dto = mapper.toDto(result);
                     attachReportBase64(result, dto);
                     return dto;
                 })
@@ -164,7 +164,7 @@ public class OsmotrServiceImpl implements OsmotrService {
 
         return osmotrResultRepository.findById(resultId)
                 .map(result -> {
-                    OsmotrResultDto dto = mapper.toOsmotrResultDto(result);
+                    OsmotrResultDto dto = mapper.toDto(result);
                     attachReportBase64(result, dto);
                     return dto;
                 });
@@ -220,7 +220,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                         .build())
                 .toList();
 
-        OsmotrResultDto dto = mapper.toOsmotrResultDto(saved);
+        OsmotrResultDto dto = mapper.toDto(saved);
 
         try {
             OsmotrSubmitDecisionsResponse response = webClientBuilder.build()
@@ -364,7 +364,7 @@ public class OsmotrServiceImpl implements OsmotrService {
 
         return osmotrResultRepository.searchBySegmentText(caseNumber, q).stream()
                 .map(result -> {
-                    OsmotrResultDto dto = mapper.toOsmotrResultDto(result);
+                    OsmotrResultDto dto = mapper.toDto(result);
                     if (dto.getSegments() != null) {
                         List<OsmotrResultSegmentDto> matched = dto.getSegments().stream()
                                 .filter(s -> s.getInspectionText() != null

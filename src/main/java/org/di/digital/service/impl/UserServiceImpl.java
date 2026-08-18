@@ -15,7 +15,7 @@ import org.di.digital.model.user.*;
 import org.di.digital.repository.user.*;
 import org.di.digital.service.LogService;
 import org.di.digital.service.UserService;
-import org.di.digital.util.Mapper;
+import org.di.digital.util.mapper.UserMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -32,14 +32,14 @@ public class UserServiceImpl implements UserService {
     private final ProfessionRepository professionRepository;
     private final RankRepository rankRepository;
     private final LogService logService;
-    private final Mapper mapper;
+    private final UserMapper mapper;
 
     @Override
     public UserProfile getUserProfile(String email) {
         User user = userRepository.findByEmailWithSettings(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
 
-        return mapper.mapToUserProfileResponse(user);
+        return mapper.toProfile(user);
     }
 
     @Override
@@ -72,7 +72,7 @@ public class UserServiceImpl implements UserService {
         log.info("Updated settings for user {}: level={}, language={}, theme={}",
                 email, settings.getLevel(), settings.getLanguage(), settings.getTheme());
 
-        return mapper.mapToUserProfileResponse(user);
+        return mapper.toProfile(user);
     }
 
     @Override
@@ -150,7 +150,7 @@ public class UserServiceImpl implements UserService {
                 email
         );
 
-        return mapper.mapToUserProfileResponse(user);
+        return mapper.toProfile(user);
     }
     @Override
     public List<User> getMyBoss(String email) {

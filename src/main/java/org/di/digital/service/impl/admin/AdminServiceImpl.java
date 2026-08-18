@@ -49,7 +49,10 @@ import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.LocalizationHelper;
-import org.di.digital.util.Mapper;
+import org.di.digital.util.mapper.CaseMapper;
+import org.di.digital.util.mapper.InterrogationMapper;
+import org.di.digital.util.mapper.SupportMapper;
+import org.di.digital.util.mapper.UserMapper;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -90,7 +93,10 @@ public class AdminServiceImpl implements AdminService {
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final CaseFileRepository caseFileRepository;
     private final CaseAnalyticsRepository caseAnalyticsRepository;
-    private final Mapper mapper;
+    private final UserMapper userMapper;
+    private final CaseMapper caseMapper;
+    private final InterrogationMapper interrogationMapper;
+    private final SupportMapper supportMapper;
     private final LocalizationHelper localizationHelper;
     private final SupportTicketRepository supportTicketRepository;
     private final ReviewRepository reviewRepository;
@@ -103,7 +109,7 @@ public class AdminServiceImpl implements AdminService {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate"));
         Specification<User> spec = UserSpecifications.build(req);
         Page<UserProfile> result = userRepository.findAll(spec, pageable)
-                .map(mapper::mapToUserProfileResponse);
+                .map(userMapper::toProfile);
 
         LocalDateTime start = req.getFrom() != null
                 ? req.getFrom().atStartOfDay()
@@ -137,7 +143,7 @@ public class AdminServiceImpl implements AdminService {
 
         Page<CaseListResponse> casePage = caseRepository
                 .findAll(spec, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate")))
-                .map(mapper::mapToCaseListResponse);
+                .map(caseMapper::toListResponse);
 
         List<Case> allFiltered = caseRepository.findAll(spec);
 
@@ -175,7 +181,7 @@ public class AdminServiceImpl implements AdminService {
 
         Page<CaseListResponse> casePage = caseRepository
                 .findAll(spec, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate")))
-                .map(mapper::mapToCaseListResponse);
+                .map(caseMapper::toListResponse);
 
         List<Case> allFiltered = caseRepository.findAll(spec);
 
@@ -233,7 +239,7 @@ public class AdminServiceImpl implements AdminService {
 
         User user = interrogation.getCaseEntity().getOwner();
 
-        return mapper.mapToInterrogationFullResponse(interrogation, user);
+        return interrogationMapper.toFullResponse(interrogation, user);
     }
 
     @Override
@@ -241,7 +247,7 @@ public class AdminServiceImpl implements AdminService {
     public byte[] downloadInterrogation(Long interrogationId) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
                 .orElseThrow(() -> new NotFoundException("Допрос не найден: " + interrogationId));
-        CaseInterrogationFullResponse data = mapper.mapToInterrogationFullResponse(interrogation, interrogation.getCaseEntity().getOwner());
+        CaseInterrogationFullResponse data = interrogationMapper.toFullResponse(interrogation, interrogation.getCaseEntity().getOwner());
         return interrogationExportService.exportToDocx(data, interrogation.getCaseEntity().getOwner());
     }
 
@@ -250,7 +256,7 @@ public class AdminServiceImpl implements AdminService {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<Appeal> spec = AppealSpecifications.build(req);
         Page<AppealDto> result = appealRepository.findAll(spec, pageable)
-                .map(mapper::toAppealDto);
+                .map(supportMapper::toAppealDto);
 
         LocalDateTime start = req.getFrom() != null
                 ? req.getFrom().atStartOfDay()
@@ -427,13 +433,13 @@ public class AdminServiceImpl implements AdminService {
                 .build();
 
         Page<UserDto> users = userRepository.findByRegionId(regionId, pageable)
-                .map(mapper::mapToUserDto);
+                .map(userMapper::toDto);
 
         Page<CasePreviewResponse> cases = caseRepository.findByOwnerRegionId(regionId, pageable)
-                .map(mapper::mapToCasePreview);
+                .map(caseMapper::toPreview);
 
         Page<AppealDto> appeals = appealRepository.findByRegionId(regionId, pageable)
-                .map(mapper::toAppealDto);
+                .map(supportMapper::toAppealDto);
 
         return RegionSummaryDto.builder()
                 .stats(stats)
@@ -447,7 +453,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public CaseResponse getCaseDetail(Long caseId) {
         return caseRepository.findById(caseId)
-                .map(mapper::mapToCaseResponse)
+                .map(caseMapper::toResponse)
                 .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
     }
 
@@ -495,7 +501,7 @@ public class AdminServiceImpl implements AdminService {
         userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
         return logRepository.findByEmail(email, PageRequest.of(page, size))
-                .map(mapper::toLogDto);
+                .map(supportMapper::toLogDto);
     }
 
     @Override
@@ -503,7 +509,7 @@ public class AdminServiceImpl implements AdminService {
     public Page<SupportTicketDto> getAllSupportTickets(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return supportTicketRepository.findAll(pageable)
-                .map(mapper::mapToSupportTicketDto);
+                .map(supportMapper::toSupportTicketDto);
     }
 
     @Override
@@ -511,7 +517,7 @@ public class AdminServiceImpl implements AdminService {
     public SupportTicketDto getSupportTicketDetail(Long id) {
         SupportTicket ticket = supportTicketRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Тикет не найден: " + id));
-        return mapper.mapToSupportTicketDto(ticket);
+        return supportMapper.toSupportTicketDto(ticket);
     }
 
     @Override
@@ -519,7 +525,7 @@ public class AdminServiceImpl implements AdminService {
     public Page<ReviewDto> getAllReviews(int page, int size) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         return reviewRepository.findAll(pageable)
-                .map(mapper::mapToReviewDto);
+                .map(supportMapper::toReviewDto);
     }
 
     @Override
@@ -527,7 +533,7 @@ public class AdminServiceImpl implements AdminService {
     public ReviewDto getReviewDetail(Long id) {
         Review review = reviewRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Рецензия не найдена: " + id));
-        return mapper.mapToReviewDto(review);
+        return supportMapper.toReviewDto(review);
     }
 
     @Override
@@ -680,7 +686,7 @@ public class AdminServiceImpl implements AdminService {
 
         userRepository.save(user);
 
-        return mapper.mapToUserProfileResponse(user);
+        return userMapper.toProfile(user);
     }
 
     @Override
@@ -719,7 +725,7 @@ public class AdminServiceImpl implements AdminService {
         return rejectionReasonStatusRepository
                 .findAllByCaseIdOrderByTimestampDesc(caseId)
                 .stream()
-                .map(mapper::toRejectionReasonResponse)
+                .map(caseMapper::toRejectionReasonResponse)
                 .toList();
     }
 }
