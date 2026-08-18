@@ -1,7 +1,7 @@
 package org.di.digital.repository.cases;
 
 import org.di.digital.model.cases.CaseChatMessage;
-import org.di.digital.model.enums.MessageRole;
+import org.di.digital.model.enums.cases.MessageRole;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

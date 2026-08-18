@@ -20,8 +20,7 @@ import org.di.digital.model.user.Appeal;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.user.Region;
 import org.di.digital.model.user.User;
-import org.di.digital.model.enums.AppealStatus;
-import org.di.digital.model.enums.LogAction;
+import org.di.digital.model.enums.appeal.AppealStatus;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.repository.user.AppealRepository;
 import org.di.digital.repository.cases.CaseRepository;
@@ -48,8 +47,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-
-import static org.di.digital.util.requests.UserUtil.*;
 
 @Slf4j
 @Service

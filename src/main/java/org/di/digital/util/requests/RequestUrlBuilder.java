@@ -1,7 +1,7 @@
 package org.di.digital.util.requests;
 
 import lombok.experimental.UtilityClass;
-import org.di.digital.model.enums.TreeModuleType;
+import org.di.digital.model.enums.cases.TreeModuleType;
 
 @UtilityClass
 public class RequestUrlBuilder {

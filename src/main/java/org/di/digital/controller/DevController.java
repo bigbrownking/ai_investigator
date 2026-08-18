@@ -3,7 +3,7 @@ package org.di.digital.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.queue.TaskQueue;
-import org.di.digital.model.enums.TaskStatus;
+import org.di.digital.model.enums.file.TaskStatus;
 import org.di.digital.service.impl.core.DevService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.*;

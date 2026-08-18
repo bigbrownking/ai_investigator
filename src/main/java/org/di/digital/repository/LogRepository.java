@@ -1,7 +1,7 @@
 package org.di.digital.repository;
 
 import org.di.digital.model.Log;
-import org.di.digital.model.enums.LogAction;
+import org.di.digital.model.enums.log.LogAction;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

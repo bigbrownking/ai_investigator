@@ -4,7 +4,7 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
-import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
 
 import java.time.LocalDateTime;
 

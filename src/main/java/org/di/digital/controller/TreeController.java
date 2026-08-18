@@ -7,7 +7,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.tree.TreeDataResponse;
 import org.di.digital.dto.response.tree.TreeModuleResponse;
-import org.di.digital.model.enums.TreeModuleType;
+import org.di.digital.model.enums.cases.TreeModuleType;
 import org.di.digital.service.TreeService;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;

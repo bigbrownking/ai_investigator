@@ -1,7 +1,7 @@
 package org.di.digital.repository.user;
 
 import org.di.digital.model.user.Appeal;
-import org.di.digital.model.enums.AppealStatus;
+import org.di.digital.model.enums.appeal.AppealStatus;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

@@ -2,8 +2,8 @@ package org.di.digital.model;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.di.digital.model.enums.LogAction;
-import org.di.digital.model.enums.LogLevel;
+import org.di.digital.model.enums.log.LogAction;
+import org.di.digital.model.enums.log.LogLevel;
 import org.hibernate.annotations.OnDelete;
 import org.hibernate.annotations.OnDeleteAction;
 import org.springframework.data.annotation.CreatedDate;

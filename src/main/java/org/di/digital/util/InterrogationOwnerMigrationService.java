@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.Log;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.LogAction;
+import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.LogRepository;

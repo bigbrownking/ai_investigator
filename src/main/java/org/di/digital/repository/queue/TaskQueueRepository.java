@@ -1,8 +1,7 @@
 package org.di.digital.repository.queue;
 
 import org.di.digital.model.queue.TaskQueue;
-import org.di.digital.model.enums.TaskStatus;
-import org.springframework.data.mongodb.repository.Aggregation;
+import org.di.digital.model.enums.file.TaskStatus;
 import org.springframework.data.mongodb.repository.MongoRepository;
 import org.springframework.stereotype.Repository;
 

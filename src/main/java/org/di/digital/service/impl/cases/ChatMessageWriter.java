@@ -6,7 +6,7 @@ import org.di.digital.dto.response.cases.ReferenceDto;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChat;
 import org.di.digital.model.cases.CaseChatMessage;
-import org.di.digital.model.enums.MessageRole;
+import org.di.digital.model.enums.cases.MessageRole;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseChatRepository;
@@ -16,7 +16,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 
 @Slf4j
 @Service

@@ -2,8 +2,8 @@ package org.di.digital.dto.notification;
 
 import lombok.Builder;
 import lombok.Data;
-import org.di.digital.model.enums.PlanNotificationType;
-import org.di.digital.model.enums.PlanStatus;
+import org.di.digital.model.enums.plan.PlanNotificationType;
+import org.di.digital.model.enums.plan.PlanStatus;
 
 import java.time.LocalDateTime;
 

@@ -2,7 +2,7 @@ package org.di.digital.model.interrogation;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.di.digital.model.enums.QAStatusEnum;
+import org.di.digital.model.enums.interrogation.QAStatusEnum;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

@@ -2,9 +2,8 @@ package org.di.digital.model.cases;
 
 
 import java.time.LocalDateTime;
-import java.util.Optional;
 
-import org.di.digital.model.enums.CaseRejectionReason;
+import org.di.digital.model.enums.cases.CaseRejectionReason;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 

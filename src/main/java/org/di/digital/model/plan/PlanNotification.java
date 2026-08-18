@@ -2,8 +2,8 @@ package org.di.digital.model.plan;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.di.digital.model.enums.PlanNotificationType;
-import org.di.digital.model.enums.PlanStatus;
+import org.di.digital.model.enums.plan.PlanNotificationType;
+import org.di.digital.model.enums.plan.PlanStatus;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 

@@ -8,15 +8,14 @@ import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.plan.ManualStatusResponse;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.ActionStatus;
-import org.di.digital.model.enums.PlanStatus;
+import org.di.digital.model.enums.plan.ActionStatus;
+import org.di.digital.model.enums.plan.PlanStatus;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.nio.file.AccessDeniedException;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;

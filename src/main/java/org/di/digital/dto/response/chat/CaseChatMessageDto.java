@@ -6,7 +6,7 @@ import lombok.Data;
 import lombok.NoArgsConstructor;
 import org.di.digital.dto.response.cases.ReferenceDto;
 import org.di.digital.model.cases.CaseChatMessage;
-import org.di.digital.model.enums.MessageRole;
+import org.di.digital.model.enums.cases.MessageRole;
 
 import java.time.LocalDateTime;
 import java.util.Collections;

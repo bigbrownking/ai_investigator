@@ -3,7 +3,7 @@ package org.di.digital.service.impl.interrogation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.interrogation.InterrogationTimeStatusResponse;
-import org.di.digital.model.enums.InterrogationLimitProfile;
+import org.di.digital.model.enums.interrogation.InterrogationLimitProfile;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationTimerSession;
 import org.springframework.stereotype.Component;

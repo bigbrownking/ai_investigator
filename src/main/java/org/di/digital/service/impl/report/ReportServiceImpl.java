@@ -5,9 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.ReportResultMessage;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.CaseFileStatusEnum;
-import org.di.digital.model.enums.LogAction;
-import org.di.digital.model.enums.LogLevel;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
+import org.di.digital.model.enums.log.LogAction;
+import org.di.digital.model.enums.log.LogLevel;
 
 import org.di.digital.model.report.CaseReport;
 import org.di.digital.repository.cases.CaseRepository;

@@ -2,7 +2,7 @@ package org.di.digital.util.schedule;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.enums.TaskStatus;
+import org.di.digital.model.enums.file.TaskStatus;
 import org.di.digital.repository.queue.TaskQueueRepository;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.springframework.beans.factory.annotation.Value;

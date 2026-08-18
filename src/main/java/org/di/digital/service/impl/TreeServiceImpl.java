@@ -8,7 +8,7 @@ import org.di.digital.dto.response.tree.TreeModuleResponse;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.TreeData;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.TreeModuleType;
+import org.di.digital.model.enums.cases.TreeModuleType;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.TreeDataRepository;
 import org.di.digital.repository.cases.CaseRepository;

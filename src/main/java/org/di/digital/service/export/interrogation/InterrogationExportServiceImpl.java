@@ -4,12 +4,9 @@ import lombok.RequiredArgsConstructor;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.model.user.User;
-import org.di.digital.model.enums.LogAction;
-import org.di.digital.model.enums.LogLevel;
-import org.di.digital.service.export.interrogation.InterrogationExportService;
+import org.di.digital.model.enums.log.LogAction;
+import org.di.digital.model.enums.log.LogLevel;
 import org.di.digital.service.LogService;
-import org.di.digital.service.export.interrogation.BaseInterrogationDocBuilder;
-import org.di.digital.service.export.interrogation.InterrogationProtocolBuilder;
 import org.springframework.stereotype.Service;
 
 import java.io.ByteArrayOutputStream;

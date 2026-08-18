@@ -3,7 +3,7 @@ package org.di.digital.service.impl.plan;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.ApprovalLevel;
+import org.di.digital.model.enums.plan.ApprovalLevel;
 import org.di.digital.model.plan.CasePlan;
 import org.di.digital.repository.plan.CasePlanRepository;
 import org.di.digital.repository.user.UserRepository;

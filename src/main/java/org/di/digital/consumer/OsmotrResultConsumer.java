@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.OsmotrResultMessage;
 import org.di.digital.dto.response.osmotr.OsmotrDataItemDto;
 import org.di.digital.dto.response.osmotr.OsmotrReportResponse;
-import org.di.digital.model.enums.OsmotrProcessingStatus;
+import org.di.digital.model.enums.osmotr.OsmotrProcessingStatus;
 import org.di.digital.model.osmotr.OsmotrResult;
 import org.di.digital.model.osmotr.OsmotrResultSegment;
 import org.di.digital.repository.osmotr.OsmotrResultRepository;

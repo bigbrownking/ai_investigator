@@ -7,7 +7,7 @@ import org.di.digital.dto.message.ClassificationResult;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
-import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;

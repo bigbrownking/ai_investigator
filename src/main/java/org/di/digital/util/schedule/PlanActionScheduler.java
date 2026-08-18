@@ -2,8 +2,7 @@ package org.di.digital.util.schedule;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.PlanStatus;
+import org.di.digital.model.enums.plan.PlanStatus;
 import org.di.digital.model.plan.CasePlan;
 import org.di.digital.repository.plan.CasePlanRepository;
 import org.di.digital.service.impl.plan.PlanActionNotifier;

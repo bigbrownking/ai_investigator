@@ -1,4 +1,4 @@
-package org.di.digital.model.enums;
+package org.di.digital.model.enums.interrogation;
 
 public enum InterrogationTimeEvent {
     CONTINUOUS_WARNING,        // треб.1: 3:45 (2:45 спец.)

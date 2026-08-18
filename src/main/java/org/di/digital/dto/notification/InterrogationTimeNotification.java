@@ -1,7 +1,7 @@
 package org.di.digital.dto.notification;
 
 import lombok.*;
-import org.di.digital.model.enums.InterrogationTimeEvent;
+import org.di.digital.model.enums.interrogation.InterrogationTimeEvent;
 
 import java.time.LocalDateTime;
 

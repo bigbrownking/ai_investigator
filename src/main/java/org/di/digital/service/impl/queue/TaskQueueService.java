@@ -7,7 +7,7 @@ import org.bson.Document;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.queue.QueueState;
 import org.di.digital.model.queue.TaskQueue;
-import org.di.digital.model.enums.TaskStatus;
+import org.di.digital.model.enums.file.TaskStatus;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.queue.QueueStateRepository;
@@ -141,8 +141,8 @@ public class TaskQueueService {
                         .lastSelectedUser(null)
                         .build());
 
-        if (state.getLastSelectedCaseByUser() == null) {
-            state.setLastSelectedCaseByUser(new HashMap<>());
+        if (state.getLastSelectedCases() == null) {
+            state.setLastSelectedCases(new ArrayList<>());
         }
 
         String lastSelectedUser = state.getLastSelectedUser();
@@ -162,7 +162,7 @@ public class TaskQueueService {
 
             if (task != null) {
                 state.setLastSelectedUser(candidate);
-                state.getLastSelectedCaseByUser().put(candidate, task.getCaseId());
+                setLastCaseForUser(state, candidate, task.getCaseId());
                 queueStateRepository.save(state);
 
                 log.info("Selected task {} for user {} (caseId={}, priority={})",
@@ -178,7 +178,7 @@ public class TaskQueueService {
         List<Long> caseIds = getOrderedCaseIdsForUser(userEmail, maxPriority, excludedCaseIds);
         if (caseIds.isEmpty()) return null;
 
-        Long lastCase = state.getLastSelectedCaseByUser().get(userEmail);
+        Long lastCase = getLastCaseForUser(state, userEmail);
 
         int startIndex = 0;
         if (lastCase != null) {
@@ -197,6 +197,29 @@ public class TaskQueueService {
         }
 
         return null;
+    }
+    private Long getLastCaseForUser(QueueState state, String userEmail) {
+        if (state.getLastSelectedCases() == null) return null;
+        return state.getLastSelectedCases().stream()
+                .filter(p -> userEmail.equals(p.getUserEmail()))
+                .map(QueueState.UserCasePointer::getCaseId)
+                .findFirst()
+                .orElse(null);
+    }
+
+    private void setLastCaseForUser(QueueState state, String userEmail, Long caseId) {
+        if (state.getLastSelectedCases() == null) {
+            state.setLastSelectedCases(new ArrayList<>());
+        }
+        state.getLastSelectedCases().stream()
+                .filter(p -> userEmail.equals(p.getUserEmail()))
+                .findFirst()
+                .ifPresentOrElse(
+                        p -> p.setCaseId(caseId),
+                        () -> state.getLastSelectedCases().add(
+                                QueueState.UserCasePointer.builder()
+                                        .userEmail(userEmail).caseId(caseId).build())
+                );
     }
 
     private List<Long> getOrderedCaseIdsForUser(String userEmail, int priority,
@@ -238,8 +261,8 @@ public class TaskQueueService {
     }
     public int pruneCasePointers() {
         QueueState state = queueStateRepository.findById(ROUND_ROBIN_STATE_ID).orElse(null);
-        if (state == null || state.getLastSelectedCaseByUser() == null
-                || state.getLastSelectedCaseByUser().isEmpty()) {
+        if (state == null || state.getLastSelectedCases() == null
+                || state.getLastSelectedCases().isEmpty()) {
             return 0;
         }
 
@@ -247,9 +270,9 @@ public class TaskQueueService {
         Set<String> usersWithPending = new HashSet<>(
                 mongoTemplate.findDistinct(q, "userEmail", TaskQueue.class, String.class));
 
-        Map<String, Long> pointers = state.getLastSelectedCaseByUser();
+        List<QueueState.UserCasePointer> pointers = state.getLastSelectedCases();
         int before = pointers.size();
-        pointers.keySet().removeIf(user -> !usersWithPending.contains(user));
+        pointers.removeIf(p -> !usersWithPending.contains(p.getUserEmail()));
         int removed = before - pointers.size();
 
         if (removed > 0) {
@@ -258,6 +281,7 @@ public class TaskQueueService {
         }
         return removed;
     }
+
     public boolean markAsSentToProcessing(Long caseFileId) {
         Query q = new Query(Criteria.where("caseFileId").is(caseFileId)
                 .and("status").is(TaskStatus.PENDING));

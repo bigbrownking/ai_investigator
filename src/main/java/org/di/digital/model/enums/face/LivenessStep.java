@@ -1,4 +1,4 @@
-package org.di.digital.model.enums;
+package org.di.digital.model.enums.face;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;

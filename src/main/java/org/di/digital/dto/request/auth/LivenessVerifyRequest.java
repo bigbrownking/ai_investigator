@@ -1,7 +1,7 @@
 package org.di.digital.dto.request.auth;
 
 import lombok.Data;
-import org.di.digital.model.enums.LivenessStep;
+import org.di.digital.model.enums.face.LivenessStep;
 
 import java.util.List;
 

@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.PlanStatus;
+import org.di.digital.model.enums.plan.PlanStatus;
 import org.di.digital.model.user.User;
 import org.hibernate.annotations.JdbcTypeCode;
 import org.hibernate.type.SqlTypes;

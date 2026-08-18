@@ -12,7 +12,7 @@ import org.di.digital.dto.response.osmotr.OsmotrResultSegmentDto;
 import org.di.digital.dto.response.osmotr.OsmotrSubmitDecisionsResponse;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.OsmotrProcessingStatus;
+import org.di.digital.model.enums.osmotr.OsmotrProcessingStatus;
 import org.di.digital.model.osmotr.OsmotrResult;
 import org.di.digital.model.osmotr.OsmotrResultSegment;
 import org.di.digital.model.user.User;

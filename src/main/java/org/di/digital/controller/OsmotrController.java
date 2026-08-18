@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.osmotr.DistributionRequest;
 import org.di.digital.dto.response.osmotr.OsmotrResultDto;
-import org.di.digital.model.enums.OsmotrFileType;
+import org.di.digital.model.enums.osmotr.OsmotrFileType;
 import org.di.digital.service.osmotr.OsmotrService;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;

@@ -1,7 +1,7 @@
 package org.di.digital.dto.response.tree;
 
 import lombok.*;
-import org.di.digital.model.enums.TreeModuleType;
+import org.di.digital.model.enums.cases.TreeModuleType;
 
 import java.time.LocalDateTime;
 

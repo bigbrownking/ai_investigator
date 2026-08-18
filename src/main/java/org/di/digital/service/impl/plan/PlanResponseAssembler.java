@@ -3,7 +3,7 @@ package org.di.digital.service.impl.plan;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.PlanStatus;
+import org.di.digital.model.enums.plan.PlanStatus;
 import org.di.digital.model.user.User;
 import org.springframework.stereotype.Component;
 

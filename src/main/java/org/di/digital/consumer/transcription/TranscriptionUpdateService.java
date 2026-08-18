@@ -6,7 +6,7 @@ import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationAudioRecord;
 import org.di.digital.model.interrogation.CaseInterrogationOtherAudio;
 import org.di.digital.model.interrogation.CaseInterrogationQA;
-import org.di.digital.model.enums.QAStatusEnum;
+import org.di.digital.model.enums.interrogation.QAStatusEnum;
 import org.di.digital.repository.interrogation.CaseInterrogationIOtherAudioRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationQARepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;

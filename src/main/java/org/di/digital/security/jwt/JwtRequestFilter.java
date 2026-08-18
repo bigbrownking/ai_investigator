@@ -51,8 +51,6 @@ public class JwtRequestFilter extends OncePerRequestFilter {
                 SecurityContextHolder.getContext().setAuthentication(authentication);
 
                 userRepository.updateLastSeen(username, LocalDateTime.now());
-
-                log.info("Set authentication for user: {}", username);
             }
         } catch (Exception e) {
             log.error("Cannot set user authentication: {}", e.getMessage());

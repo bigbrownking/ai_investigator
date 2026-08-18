@@ -2,7 +2,7 @@ package org.di.digital.dto.response.plan;
 
 import lombok.Builder;
 import lombok.Getter;
-import org.di.digital.model.enums.PlanStatus;
+import org.di.digital.model.enums.plan.PlanStatus;
 
 import java.time.LocalDateTime;
 

@@ -4,12 +4,11 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.model.user.Appeal;
-import org.di.digital.model.enums.AppealStatus;
+import org.di.digital.model.enums.appeal.AppealStatus;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
-import java.time.LocalDateTime;
 import java.util.List;
 
 public class AppealSpecifications {

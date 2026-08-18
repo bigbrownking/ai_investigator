@@ -1,7 +1,7 @@
 package org.di.digital.service.impl.interrogation;
 
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.enums.InterrogationSpecialGround;
+import org.di.digital.model.enums.interrogation.InterrogationSpecialGround;
 import org.di.digital.model.fl.FLRecord;
 import org.springframework.stereotype.Component;
 

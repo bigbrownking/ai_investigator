@@ -2,7 +2,7 @@ package org.di.digital.model.osmotr;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.di.digital.model.enums.OsmotrProcessingStatus;
+import org.di.digital.model.enums.osmotr.OsmotrProcessingStatus;
 
 import java.time.LocalDateTime;
 import java.util.ArrayList;

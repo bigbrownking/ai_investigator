@@ -1,6 +1,6 @@
 package org.di.digital.repository.plan;
 
-import org.di.digital.model.enums.PlanStatus;
+import org.di.digital.model.enums.plan.PlanStatus;
 import org.di.digital.model.plan.CasePlan;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;

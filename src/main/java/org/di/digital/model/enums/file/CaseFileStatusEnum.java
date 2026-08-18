@@ -1,4 +1,4 @@
-package org.di.digital.model.enums;
+package org.di.digital.model.enums.file;
 
 import com.fasterxml.jackson.annotation.JsonValue;
 import lombok.Getter;

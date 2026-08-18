@@ -2,7 +2,7 @@ package org.di.digital.dto.response.auth;
 
 import lombok.Builder;
 import lombok.Getter;
-import org.di.digital.model.enums.LivenessStep;
+import org.di.digital.model.enums.face.LivenessStep;
 
 import java.time.LocalDateTime;
 import java.util.List;

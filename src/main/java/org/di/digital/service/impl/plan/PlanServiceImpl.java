@@ -8,6 +8,10 @@ import org.di.digital.dto.response.plan.*;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.*;
+import org.di.digital.model.enums.log.LogAction;
+import org.di.digital.model.enums.log.LogLevel;
+import org.di.digital.model.enums.plan.ApprovalLevel;
+import org.di.digital.model.enums.plan.PlanStatus;
 import org.di.digital.model.plan.CasePlan;
 import org.di.digital.model.plan.PlanEditHistory;
 import org.di.digital.model.plan.PlanNotification;
@@ -43,7 +47,6 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -52,7 +55,6 @@ import static org.di.digital.util.requests.RequestUrlBuilder.planGeneratorUrl;
 import static org.di.digital.util.requests.RequestUrlBuilder.planUpdateUrl;
 import static org.di.digital.util.requests.RequestBodyBuilder.manualStatusBody;
 import static org.di.digital.util.requests.RequestUrlBuilder.manualStatusUrl;
-import static org.di.digital.util.requests.UserUtil.*;
 
 @Slf4j
 @Service

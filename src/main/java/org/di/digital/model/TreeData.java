@@ -4,7 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.TreeModuleType;
+import org.di.digital.model.enums.cases.TreeModuleType;
 import org.hibernate.annotations.ColumnTransformer;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.annotation.LastModifiedDate;

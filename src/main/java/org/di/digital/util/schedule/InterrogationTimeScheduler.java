@@ -3,8 +3,8 @@ package org.di.digital.util.schedule;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.interrogation.InterrogationTimeStatusResponse;
-import org.di.digital.model.enums.CaseInterrogationStatusEnum;
-import org.di.digital.model.enums.InterrogationTimeEvent;
+import org.di.digital.model.enums.interrogation.CaseInterrogationStatusEnum;
+import org.di.digital.model.enums.interrogation.InterrogationTimeEvent;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationTimerSession;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
@@ -41,7 +41,6 @@ public class InterrogationTimeScheduler {
         if (active.isEmpty()) return;
 
         LocalDateTime now = LocalDateTime.now();
-        log.info("Interrogation time check: {} active", active.size());
 
         for (CaseInterrogation i : active) {
             try {

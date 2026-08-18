@@ -1,7 +1,7 @@
 package org.di.digital.repository.cases;
 
 import org.di.digital.model.cases.CaseFile;
-import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

@@ -4,7 +4,7 @@ import org.di.digital.dto.request.interrogation.AddInterrogationRequest;
 import org.di.digital.dto.request.interrogation.EditAudioTranscribedTextRequest;
 import org.di.digital.dto.request.interrogation.UpdateProtocolFieldRequest;
 import org.di.digital.dto.response.interrogation.*;
-import org.di.digital.model.enums.InterrogationSpecialGround;
+import org.di.digital.model.enums.interrogation.InterrogationSpecialGround;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.springframework.web.multipart.MultipartFile;
 

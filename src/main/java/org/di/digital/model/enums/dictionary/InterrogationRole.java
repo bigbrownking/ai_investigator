@@ -1,7 +1,7 @@
 package org.di.digital.model.enums.dictionary;
 
 import lombok.Getter;
-import org.di.digital.model.enums.UserSettingsLanguage;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 
 @Getter
 public enum InterrogationRole {

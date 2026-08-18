@@ -1,6 +1,7 @@
-package org.di.digital.model.enums;
+package org.di.digital.model.enums.cases;
 
 import lombok.Getter;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 
 @Getter
 public enum CaseRejectionReason {

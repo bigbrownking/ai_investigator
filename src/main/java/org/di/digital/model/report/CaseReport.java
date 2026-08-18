@@ -3,7 +3,7 @@ package org.di.digital.model.report;
 import jakarta.persistence.*;
 import lombok.*;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
 
 import java.time.LocalDateTime;
 

@@ -19,7 +19,7 @@ import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
-import org.di.digital.model.enums.CaseRejectionReason;
+import org.di.digital.model.enums.cases.CaseRejectionReason;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.admin.AdminService;
 import org.di.digital.service.auth.AuthService;

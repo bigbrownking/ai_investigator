@@ -1,7 +1,7 @@
 package org.di.digital.model.queue;
 
 import lombok.*;
-import org.di.digital.model.enums.TaskStatus;
+import org.di.digital.model.enums.file.TaskStatus;
 import org.springframework.data.annotation.Id;
 import org.springframework.data.mongodb.core.index.CompoundIndex;
 import org.springframework.data.mongodb.core.mapping.Document;

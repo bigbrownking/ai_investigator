@@ -3,9 +3,9 @@ package org.di.digital.model.interrogation;
 import jakarta.persistence.*;
 import lombok.*;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.CaseInterrogationStatusEnum;
-import org.di.digital.model.enums.InterrogationLimitProfile;
-import org.di.digital.model.enums.InterrogationSpecialGround;
+import org.di.digital.model.enums.interrogation.CaseInterrogationStatusEnum;
+import org.di.digital.model.enums.interrogation.InterrogationLimitProfile;
+import org.di.digital.model.enums.interrogation.InterrogationSpecialGround;
 import org.di.digital.model.user.User;
 import org.springframework.data.annotation.CreatedDate;
 

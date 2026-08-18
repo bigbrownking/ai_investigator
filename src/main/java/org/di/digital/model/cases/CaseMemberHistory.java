@@ -2,7 +2,7 @@ package org.di.digital.model.cases;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.di.digital.model.enums.CaseMemberAction;
+import org.di.digital.model.enums.cases.CaseMemberAction;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 

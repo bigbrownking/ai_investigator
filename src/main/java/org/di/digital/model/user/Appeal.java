@@ -2,9 +2,7 @@ package org.di.digital.model.user;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.di.digital.model.enums.AppealStatus;
-import org.di.digital.model.user.Region;
-import org.di.digital.model.user.User;
+import org.di.digital.model.enums.appeal.AppealStatus;
 import org.springframework.data.annotation.CreatedDate;
 
 import java.time.LocalDateTime;

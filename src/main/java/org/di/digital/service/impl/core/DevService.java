@@ -7,7 +7,7 @@ import org.di.digital.consumer.figurant.FigurantSyncService;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.queue.TaskQueue;
-import org.di.digital.model.enums.TaskStatus;
+import org.di.digital.model.enums.file.TaskStatus;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.qualification.CaseQualificationRepository;

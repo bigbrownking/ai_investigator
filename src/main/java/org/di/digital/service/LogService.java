@@ -1,8 +1,8 @@
 package org.di.digital.service;
 
 import org.di.digital.model.Log;
-import org.di.digital.model.enums.LogAction;
-import org.di.digital.model.enums.LogLevel;
+import org.di.digital.model.enums.log.LogAction;
+import org.di.digital.model.enums.log.LogLevel;
 import org.springframework.data.domain.Page;
 
 import java.time.LocalDateTime;

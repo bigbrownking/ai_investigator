@@ -2,7 +2,7 @@ package org.di.digital.dto.message;
 
 import lombok.*;
 import org.di.digital.dto.response.osmotr.OsmotrReportResponse;
-import org.di.digital.model.enums.OsmotrProcessingStatus;
+import org.di.digital.model.enums.osmotr.OsmotrProcessingStatus;
 
 import java.time.LocalDateTime;
 

@@ -4,7 +4,7 @@ import org.di.digital.dto.request.plan.AddPlanActionRequest;
 import org.di.digital.dto.request.plan.ManualStatusRequest;
 import org.di.digital.dto.response.plan.*;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.PlanStatus;
+import org.di.digital.model.enums.plan.PlanStatus;
 import org.di.digital.model.plan.PlanNotification;
 import org.springframework.core.io.Resource;
 

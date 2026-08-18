@@ -4,8 +4,8 @@ import lombok.*;
 import jakarta.persistence.Id;
 import org.springframework.data.mongodb.core.mapping.Document;
 
-import java.util.HashMap;
-import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
 
 @Getter
 @Setter
@@ -17,6 +17,17 @@ public class QueueState {
     @Id
     private String id = "round_robin_state";
     private String lastSelectedUser;
+
     @Builder.Default
-    private Map<String, Long> lastSelectedCaseByUser = new HashMap<>();
+    private List<UserCasePointer> lastSelectedCases = new ArrayList<>();
+
+    @Getter
+    @Setter
+    @NoArgsConstructor
+    @AllArgsConstructor
+    @Builder
+    public static class UserCasePointer {
+        private String userEmail;
+        private Long caseId;
+    }
 }

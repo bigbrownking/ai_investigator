@@ -1,4 +1,4 @@
-package org.di.digital.model.enums;
+package org.di.digital.model.enums.osmotr;
 
 public enum OsmotrProcessingStatus {
     PENDING, PROCESSING, COMPLETED, FAILED

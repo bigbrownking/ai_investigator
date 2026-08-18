@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.DocumentProcessingMessage;
 import org.di.digital.model.cases.CaseFile;
-import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.service.impl.queue.DocumentQueueService;

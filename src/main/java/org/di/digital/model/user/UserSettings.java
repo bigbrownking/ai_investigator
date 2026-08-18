@@ -3,9 +3,9 @@ package org.di.digital.model.user;
 import jakarta.persistence.*;
 import lombok.*;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.model.enums.UserSettingsDetalizationLevel;
-import org.di.digital.model.enums.UserSettingsLanguage;
-import org.di.digital.model.enums.UserSettingsTheme;
+import org.di.digital.model.enums.settings.UserSettingsDetalizationLevel;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
+import org.di.digital.model.enums.settings.UserSettingsTheme;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;
 
 @Slf4j

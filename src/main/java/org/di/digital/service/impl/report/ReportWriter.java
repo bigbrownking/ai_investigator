@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.ReportProcessingMessage;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.CaseFileStatusEnum;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.report.CaseReport;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseRepository;

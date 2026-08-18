@@ -3,7 +3,7 @@ package org.di.digital.model.plan;
 import jakarta.persistence.*;
 import lombok.*;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.enums.PlanStatus;
+import org.di.digital.model.enums.plan.PlanStatus;
 import org.di.digital.model.user.User;
 import org.springframework.data.annotation.CreatedDate;
 import org.springframework.data.jpa.domain.support.AuditingEntityListener;

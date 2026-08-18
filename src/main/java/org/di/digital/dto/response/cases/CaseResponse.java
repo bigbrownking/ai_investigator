@@ -3,11 +3,9 @@ package org.di.digital.dto.response.cases;
 
 import lombok.*;
 import org.di.digital.dto.response.interrogation.CaseInterrogationResponse;
-import org.di.digital.model.enums.PlanStatus;
 
 import java.time.LocalDateTime;
 import java.util.List;
-import java.util.Map;
 
 @Getter
 @Setter

@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.cases.ReferenceDto;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChatMessage;
-import org.di.digital.model.enums.MessageRole;
+import org.di.digital.model.enums.cases.MessageRole;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationCaseChat;
 import org.di.digital.model.user.User;

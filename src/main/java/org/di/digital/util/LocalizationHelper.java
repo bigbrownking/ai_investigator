@@ -1,7 +1,7 @@
 package org.di.digital.util;
 
 import org.di.digital.model.Localizable;
-import org.di.digital.model.enums.UserSettingsLanguage;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.springframework.stereotype.Component;
 import org.springframework.util.StringUtils;
 

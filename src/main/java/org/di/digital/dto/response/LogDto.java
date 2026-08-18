@@ -2,8 +2,6 @@ package org.di.digital.dto.response;
 
 import lombok.Builder;
 import lombok.Data;
-import org.di.digital.model.enums.LogAction;
-import org.di.digital.model.enums.LogLevel;
 
 import java.time.LocalDateTime;
 

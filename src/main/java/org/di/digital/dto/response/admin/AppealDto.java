@@ -1,7 +1,6 @@
 package org.di.digital.dto.response.admin;
 
 import lombok.*;
-import org.di.digital.model.enums.AppealStatus;
 
 import java.time.LocalDateTime;
 
