@@ -1,13 +1,13 @@
 package org.di.digital.util;
 
+import lombok.NoArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
 import java.time.LocalDate;
 
 @Slf4j
+@NoArgsConstructor
 public class IinParser {
-
-    private IinParser() {}
 
     public static LocalDate parseBirthDate(String iin) {
         if (iin == null || iin.length() != 12 || !iin.matches("\\d{12}")) {

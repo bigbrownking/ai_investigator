@@ -22,17 +22,6 @@ public class CaseSpecifications {
                 .and(hasOwnerName(req.getOwnerName()))
                 .and(hasRegion(req.getRegion()));
     }
-
-    public static Specification<Case> buildForRegion(Long regionId, CaseSearchRequest req) {
-        return Specification
-                .where(inRegion(regionId))
-                .and(hasNumber(req.getNumber()))
-                .and(hasTitle(req.getTitle()))
-                .and(isActive(req.getStatus()))
-                .and(createdAfter(req.getFrom()))
-                .and(createdBefore(req.getTo()))
-                .and(hasOwnerName(req.getOwnerName()));
-    }
     public static Specification<Case> buildForRegions(List<Long> regionIds, CaseSearchRequest req) {
         return Specification
                 .where(inRegions(regionIds))

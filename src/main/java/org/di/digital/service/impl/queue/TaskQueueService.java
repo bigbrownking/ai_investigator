@@ -5,12 +5,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.bson.Document;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.queue.QueueState;
 import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.file.TaskStatus;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
-import org.di.digital.repository.queue.QueueStateRepository;
 import org.di.digital.repository.queue.TaskQueueRepository;
 import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.beans.factory.annotation.Value;
@@ -32,7 +30,6 @@ import java.util.*;
 public class TaskQueueService {
 
     private final TaskQueueRepository taskQueueRepository;
-    private final QueueStateRepository queueStateRepository;
     private final MongoTemplate mongoTemplate;
     private final RabbitAdmin rabbitAdmin;
     private final CaseFileRepository caseFileRepository;
@@ -46,8 +43,6 @@ public class TaskQueueService {
 
     @Value("${scheduler.orphan-reconciliation.min-age-minutes:2}")
     private long orphanMinAgeMinutes;
-    private static final String ROUND_ROBIN_STATE_ID = "round_robin_state";
-
     @PostConstruct
     public void onStartupCleanup() {
         int n = resetStuckProcessingTasks();
@@ -127,159 +122,89 @@ public class TaskQueueService {
         log.info("Added task {} to queue for user {}", fileName, userEmail);
     }
 
-    public TaskQueue getNextTaskByRoundRobin(List<Long> excludedCaseIds) {
-        int maxPriority = getMaxPendingPriority(excludedCaseIds);
+    public TaskQueue getNextTaskByRoundRobin(List<Long> excludedCaseIds,
+                                             List<String> excludedUsers) {
+        int maxPriority = getMaxPendingPriority(excludedCaseIds, excludedUsers);
 
-        List<String> users = getOrderedUsersWithPendingTasksByPriority(maxPriority, excludedCaseIds);
-        log.info("DEBUG: Max priority={}, users with this priority: {}", maxPriority, users);
+        // 1) считаем, сколько файлов каждого дела УЖE ушло из pending (обработано/в обработке)
+        //    это "прогресс дела" — чем больше, тем позже его очередь
+        Criteria progressMatch = Criteria.where("priority").is(maxPriority)
+                .and("status").in(TaskStatus.PROCESSING, TaskStatus.COMPLETED);
+        Aggregation progressAgg = Aggregation.newAggregation(
+                Aggregation.match(progressMatch),
+                Aggregation.group("caseId").count().as("sentCount")
+        );
+        Map<Long, Integer> sentByCase = new HashMap<>();
+        mongoTemplate.aggregate(progressAgg, "task_queue", Document.class)
+                .getMappedResults().forEach(d -> {
+                    Object id = d.get("_id");
+                    if (id != null) sentByCase.put(((Number) id).longValue(),
+                            ((Number) d.get("sentCount")).intValue());
+                });
 
-        if (users.isEmpty()) return null;
-
-        QueueState state = queueStateRepository.findById(ROUND_ROBIN_STATE_ID)
-                .orElse(QueueState.builder()
-                        .id(ROUND_ROBIN_STATE_ID)
-                        .lastSelectedUser(null)
-                        .build());
-
-        if (state.getLastSelectedCases() == null) {
-            state.setLastSelectedCases(new ArrayList<>());
-        }
-
-        String lastSelectedUser = state.getLastSelectedUser();
-
-        int startIndex = 0;
-        if (lastSelectedUser != null) {
-            int lastIndex = users.indexOf(lastSelectedUser);
-            if (lastIndex != -1) {
-                startIndex = (lastIndex + 1) % users.size();
-            }
-        }
-
-        for (int i = 0; i < users.size(); i++) {
-            String candidate = users.get((startIndex + i) % users.size());
-
-            TaskQueue task = pickNextTaskForUser(candidate, maxPriority, excludedCaseIds, state);
-
-            if (task != null) {
-                state.setLastSelectedUser(candidate);
-                setLastCaseForUser(state, candidate, task.getCaseId());
-                queueStateRepository.save(state);
-
-                log.info("Selected task {} for user {} (caseId={}, priority={})",
-                        task.getFileName(), candidate, task.getCaseId(), maxPriority);
-                return task;
-            }
-        }
-
-        return null;
-    }
-    private TaskQueue pickNextTaskForUser(String userEmail, int maxPriority,
-                                          List<Long> excludedCaseIds, QueueState state) {
-        List<Long> caseIds = getOrderedCaseIdsForUser(userEmail, maxPriority, excludedCaseIds);
-        if (caseIds.isEmpty()) return null;
-
-        Long lastCase = getLastCaseForUser(state, userEmail);
-
-        int startIndex = 0;
-        if (lastCase != null) {
-            int lastIndex = caseIds.indexOf(lastCase);
-            if (lastIndex != -1) {
-                startIndex = (lastIndex + 1) % caseIds.size();
-            }
-        }
-
-        for (int i = 0; i < caseIds.size(); i++) {
-            Long candidateCase = caseIds.get((startIndex + i) % caseIds.size());
-            TaskQueue task = pickNextTaskForCase(userEmail, candidateCase, maxPriority);
-            if (task != null) {
-                return task;
-            }
-        }
-
-        return null;
-    }
-    private Long getLastCaseForUser(QueueState state, String userEmail) {
-        if (state.getLastSelectedCases() == null) return null;
-        return state.getLastSelectedCases().stream()
-                .filter(p -> userEmail.equals(p.getUserEmail()))
-                .map(QueueState.UserCasePointer::getCaseId)
-                .findFirst()
-                .orElse(null);
-    }
-
-    private void setLastCaseForUser(QueueState state, String userEmail, Long caseId) {
-        if (state.getLastSelectedCases() == null) {
-            state.setLastSelectedCases(new ArrayList<>());
-        }
-        state.getLastSelectedCases().stream()
-                .filter(p -> userEmail.equals(p.getUserEmail()))
-                .findFirst()
-                .ifPresentOrElse(
-                        p -> p.setCaseId(caseId),
-                        () -> state.getLastSelectedCases().add(
-                                QueueState.UserCasePointer.builder()
-                                        .userEmail(userEmail).caseId(caseId).build())
-                );
-    }
-
-    private List<Long> getOrderedCaseIdsForUser(String userEmail, int priority,
-                                                List<Long> excludedCaseIds) {
-        Criteria matchCriteria = Criteria.where("userEmail").is(userEmail)
-                .and("status").is(TaskStatus.PENDING)
-                .and("priority").is(priority);
+        // 2) кандидаты: по одному самому раннему pending-файлу на каждое (user, case),
+        //    плюс userFirstTask для тай-брейка
+        Criteria match = Criteria.where("status").is(TaskStatus.PENDING)
+                .and("priority").is(maxPriority);
         if (excludedCaseIds != null && !excludedCaseIds.isEmpty()) {
-            matchCriteria.and("caseId").nin(excludedCaseIds);
+            match.and("caseId").nin(excludedCaseIds);
+        }
+        if (excludedUsers != null && !excludedUsers.isEmpty()) {
+            match.and("userEmail").nin(excludedUsers);
         }
 
         Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(matchCriteria),
-                Aggregation.group("caseId")
-                        .min("createdAt").as("firstTaskTime"),
-                Aggregation.sort(Sort.by(Sort.Direction.ASC, "firstTaskTime"))
+                Aggregation.match(match),
+                context -> new Document("$setWindowFields", new Document()
+                        .append("partitionBy", "$userEmail")
+                        .append("sortBy", new Document("createdAt", 1))
+                        .append("output", new Document("userFirstTask",
+                                new Document("$min", "$createdAt")
+                                        .append("window", new Document("documents",
+                                                Arrays.asList("unbounded", "unbounded")))))),
+                Aggregation.sort(Sort.by(Sort.Direction.ASC, "createdAt")),
+                context -> new Document("$group", new Document()
+                        .append("_id", new Document("userEmail", "$userEmail")
+                                .append("caseId", "$caseId"))
+                        .append("doc", new Document("$first", "$$ROOT"))),
+                Aggregation.replaceRoot("doc")
         );
 
-        AggregationResults<Document> results =
-                mongoTemplate.aggregate(aggregation, "task_queue", Document.class);
+        // читаем как Document, чтобы достать userFirstTask (в TaskQueue такого поля нет)
+        List<Document> candidateDocs = new ArrayList<>(mongoTemplate
+                .aggregate(aggregation, "task_queue", Document.class)
+                .getMappedResults());
 
-        return results.getMappedResults()
-                .stream()
-                .map(doc -> doc.get("_id") == null ? null : ((Number) doc.get("_id")).longValue())
-                .filter(Objects::nonNull)
-                .toList();
-    }
+        if (candidateDocs.isEmpty()) return null;
 
-    private TaskQueue pickNextTaskForCase(String userEmail, Long caseId, int maxPriority) {
-        Query taskQuery = new Query();
-        taskQuery.addCriteria(Criteria.where("userEmail").is(userEmail)
-                .and("caseId").is(caseId)
-                .and("status").is(TaskStatus.PENDING)
-                .and("priority").is(maxPriority));
-        taskQuery.with(Sort.by(Sort.Direction.ASC, "createdAt"));
-        taskQuery.limit(1);
-
-        return mongoTemplate.findOne(taskQuery, TaskQueue.class);
-    }
-    public int pruneCasePointers() {
-        QueueState state = queueStateRepository.findById(ROUND_ROBIN_STATE_ID).orElse(null);
-        if (state == null || state.getLastSelectedCases() == null
-                || state.getLastSelectedCases().isEmpty()) {
-            return 0;
+        // время первой задачи каждого юзера — для тай-брейка "кто раньше начал грузить"
+        Map<String, Date> userFirstTask = new HashMap<>();
+        for (Document d : candidateDocs) {
+            userFirstTask.putIfAbsent(d.getString("userEmail"), d.getDate("userFirstTask"));
         }
 
-        Query q = new Query(Criteria.where("status").is(TaskStatus.PENDING));
-        Set<String> usersWithPending = new HashSet<>(
-                mongoTemplate.findDistinct(q, "userEmail", TaskQueue.class, String.class));
+        // 3) сортировка: сначала дело с наименьшим прогрессом (дела чередуются),
+        //    при равном прогрессе — юзер, который раньше начал грузить, затем createdAt
+        candidateDocs.sort(Comparator
+                .comparingInt((Document d) ->
+                        sentByCase.getOrDefault(((Number) d.get("caseId")).longValue(), 0))
+                .thenComparing(d -> userFirstTask.get(d.getString("userEmail")))
+                .thenComparing(d -> d.getDate("createdAt")));
 
-        List<QueueState.UserCasePointer> pointers = state.getLastSelectedCases();
-        int before = pointers.size();
-        pointers.removeIf(p -> !usersWithPending.contains(p.getUserEmail()));
-        int removed = before - pointers.size();
+        Document top = candidateDocs.get(0);
+        Long caseId = ((Number) top.get("caseId")).longValue();
 
-        if (removed > 0) {
-            queueStateRepository.save(state);
-            log.info("Pruned {} stale case pointers from round-robin state", removed);
-        }
-        return removed;
+        TaskQueue task = mongoTemplate.getConverter().read(TaskQueue.class, top);
+
+        log.info("Selected task {} for user {} (caseId={}, sent={}, userFirstTask={}, priority={})",
+                task.getFileName(), task.getUserEmail(), caseId,
+                sentByCase.getOrDefault(caseId, 0),
+                userFirstTask.get(task.getUserEmail()), maxPriority);
+        return task;
+    }
+    public List<String> getProcessingUserEmails() {
+        Query query = new Query(Criteria.where("status").is(TaskStatus.PROCESSING));
+        return mongoTemplate.findDistinct(query, "userEmail", TaskQueue.class, String.class);
     }
 
     public boolean markAsSentToProcessing(Long caseFileId) {
@@ -292,40 +217,19 @@ public class TaskQueueService {
         return res.getModifiedCount() > 0;
     }
 
-    private int getMaxPendingPriority(List<Long> excludedCaseIds) {
-        Query query = new Query();
+    private int getMaxPendingPriority(List<Long> excludedCaseIds, List<String> excludedUsers) {
         Criteria criteria = Criteria.where("status").is(TaskStatus.PENDING);
         if (excludedCaseIds != null && !excludedCaseIds.isEmpty()) {
             criteria.and("caseId").nin(excludedCaseIds);
         }
-        query.addCriteria(criteria);
-        query.with(Sort.by(Sort.Direction.DESC, "priority"));
-        query.limit(1);
+        if (excludedUsers != null && !excludedUsers.isEmpty()) {
+            criteria.and("userEmail").nin(excludedUsers);
+        }
+        Query query = new Query(criteria)
+                .with(Sort.by(Sort.Direction.DESC, "priority"))
+                .limit(1);
         TaskQueue top = mongoTemplate.findOne(query, TaskQueue.class);
         return top != null ? top.getPriority() : 0;
-    }
-
-    private List<String> getOrderedUsersWithPendingTasksByPriority(int priority, List<Long> excludedCaseIds) {
-        Criteria matchCriteria = Criteria.where("status").is(TaskStatus.PENDING)
-                .and("priority").is(priority);
-        if (excludedCaseIds != null && !excludedCaseIds.isEmpty()) {
-            matchCriteria.and("caseId").nin(excludedCaseIds);
-        }
-
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(matchCriteria),
-                Aggregation.group("userEmail")
-                        .min("createdAt").as("firstTaskTime"),
-                Aggregation.sort(Sort.by(Sort.Direction.ASC, "firstTaskTime"))
-        );
-
-        AggregationResults<Document> results =
-                mongoTemplate.aggregate(aggregation, "task_queue", Document.class);
-
-        return results.getMappedResults()
-                .stream()
-                .map(doc -> doc.getString("_id"))
-                .toList();
     }
 
     public void completeTask(Long caseFileId, Long processingDurationSeconds) {
@@ -366,22 +270,6 @@ public class TaskQueueService {
     public void deleteTasksByCaseId(Long caseId){ taskQueueRepository.deleteByCaseId(caseId);}
     public Long getProcessingTasksCount() {
         return taskQueueRepository.countByStatus(TaskStatus.PROCESSING);
-    }
-
-    public Double getAverageProcessingDuration() {
-        Aggregation aggregation = Aggregation.newAggregation(
-                Aggregation.match(
-                        Criteria.where("status").is(TaskStatus.COMPLETED)
-                                .and("processingDurationSeconds").ne(null)
-                ),
-                Aggregation.group().avg("processingDurationSeconds").as("avgDuration")
-        );
-
-        AggregationResults<Document> results =
-                mongoTemplate.aggregate(aggregation, "task_queue", Document.class);
-
-        Document result = results.getUniqueMappedResult();
-        return result != null ? result.getDouble("avgDuration") : null;
     }
 
     public List<Long> getProcessingCaseIds() {

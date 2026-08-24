@@ -56,6 +56,7 @@ import java.util.stream.Collectors;
 
 import static org.di.digital.util.requests.RequestUrlBuilder.deleteAllDocumentsUrl;
 import static org.di.digital.util.requests.RequestUrlBuilder.deleteDocumentUrl;
+import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 @Slf4j
 @Service
@@ -75,6 +76,7 @@ public class CaseServiceImpl implements CaseService {
     private final CaseFileWriter caseFileWriter;
     private final CaseWriter caseWriter;
     private final UserUtil userUtil;
+    private final CaseRejectionEnricher caseRejectionEnricher;
     private final CaseMemberHistoryRepository caseMemberHistoryRepository;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
 
@@ -351,17 +353,18 @@ public class CaseServiceImpl implements CaseService {
 
     @Transactional(readOnly = true)
     public List<CasePreviewResponse> getUserCases(String email, String sort) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+
         List<CasePreviewResponse> previews = caseRepository.findPreviewsForUser(email);
+
+        caseRejectionEnricher.enrich(previews, user.getSettings().getLanguage());
 
         Comparator<CasePreviewResponse> cmp = Comparator.comparing(CasePreviewResponse::getCreatedDate,
                 "asc".equalsIgnoreCase(sort)
                         ? Comparator.nullsLast(Comparator.naturalOrder())
                         : Comparator.nullsLast(Comparator.reverseOrder()));
-        previews.forEach(p -> {
-            if (p.getOwnerFio() != null) {
-                p.setOwnerFio(p.getOwnerFio().trim().replaceAll("\\s+", " "));
-            }
-        });
+
         return previews.stream().sorted(cmp).collect(Collectors.toList());
     }
 

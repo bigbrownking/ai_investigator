@@ -4,22 +4,36 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.user.UpdateProfileRequest;
 import org.di.digital.dto.request.user.UserSettingsRequest;
+import org.di.digital.dto.response.access.FileGrantDto;
+import org.di.digital.dto.response.access.ModulePermissionDto;
+import org.di.digital.dto.response.access.UserCaseAccessDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
+import org.di.digital.model.enums.permission.DocumentAccessScope;
 import org.di.digital.model.enums.settings.UserSettingsDetalizationLevel;
 import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.enums.settings.UserSettingsTheme;
 import org.di.digital.model.user.*;
+import org.di.digital.repository.assess.CaseFileAccessRepository;
+import org.di.digital.repository.assess.CaseUserAccessRepository;
 import org.di.digital.repository.user.*;
 import org.di.digital.service.LogService;
 import org.di.digital.service.UserService;
+import org.di.digital.util.mapper.PermissionMapper;
 import org.di.digital.util.mapper.UserMapper;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.Arrays;
+import java.util.EnumSet;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
@@ -32,6 +46,9 @@ public class UserServiceImpl implements UserService {
     private final ProfessionRepository professionRepository;
     private final RankRepository rankRepository;
     private final LogService logService;
+    private final CaseUserAccessRepository caseUserAccessRepository;
+    private final CaseFileAccessRepository caseFileAccessRepository;
+    private final PermissionMapper permissionMapper;
     private final UserMapper mapper;
 
     @Override
@@ -162,5 +179,45 @@ public class UserServiceImpl implements UserService {
         }
 
         return user.getRegion().getAdmins();
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public List<UserCaseAccessDto> getUserAccesses(Long userId) {
+        User user = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userId));
+
+        Map<Long, List<FileGrantDto>> grantsByCase = caseFileAccessRepository.findByUserId(user.getId())
+                .stream()
+                .collect(Collectors.groupingBy(
+                        fa -> fa.getFile().getCaseEntity().getId(),
+                        Collectors.mapping(
+                                fa -> new FileGrantDto(fa.getFile().getId(), fa.getActions()),
+                                Collectors.toList())));
+
+        return caseUserAccessRepository.findByUserId(user.getId()).stream()
+                .map(access -> {
+                    Case caseEntity = access.getCaseEntity();
+                    boolean owner = caseEntity.isOwner(user);
+
+                    List<ModulePermissionDto> perms = owner
+                            ? Arrays.stream(CaseModule.values())
+                            .map(m -> new ModulePermissionDto(m, EnumSet.allOf(CaseAction.class)))
+                            .toList()
+                            : permissionMapper.group(access.getPermissions());
+
+                    List<FileGrantDto> fileGrants = access.getDocumentScope() == DocumentAccessScope.RESTRICTED
+                            ? grantsByCase.getOrDefault(caseEntity.getId(), List.of())
+                            : List.of();
+
+                    return new UserCaseAccessDto(
+                            caseEntity.getId(),
+                            caseEntity.getNumber(),
+                            caseEntity.getTitle(),
+                            owner,
+                            access.getDocumentScope(),
+                            perms,
+                            fileGrants);
+                })
+                .toList();
     }
 }

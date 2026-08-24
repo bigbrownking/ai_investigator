@@ -4,5 +4,6 @@ public enum CaseAction {
     READ,
     UPDATE,
     ADD,
-    DELETE
+    DELETE,
+    DOWNLOAD
 }

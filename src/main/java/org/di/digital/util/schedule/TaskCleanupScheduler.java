@@ -20,8 +20,6 @@ public class TaskCleanupScheduler {
     private int cleanup;
 
     private final TaskQueueRepository taskQueueRepository;
-    private final TaskQueueService taskQueueService;
-
 
     @Scheduled(cron = "${scheduler.task.cleanup}", zone = "Asia/Almaty")
     public void cleanupOldTasks() {
@@ -29,13 +27,5 @@ public class TaskCleanupScheduler {
         taskQueueRepository.deleteByStatusAndCompletedAtBefore(
                 TaskStatus.COMPLETED, cutoffDate
         );
-    }
-    @Scheduled(cron = "${scheduler.round-robin-state.cleanup}", zone = "Asia/Almaty")
-    public void pruneRoundRobinState() {
-        try {
-            taskQueueService.pruneCasePointers();
-        } catch (Exception e) {
-            log.error("Round-robin state prune failed", e);
-        }
     }
 }

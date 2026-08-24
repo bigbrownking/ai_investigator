@@ -3,11 +3,9 @@ package org.di.digital.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChangeOwnerRequest;
+import org.di.digital.dto.request.search.*;
 import org.di.digital.dto.request.user.UpdateProfileRequest;
 import org.di.digital.dto.request.auth.SignUpRequest;
-import org.di.digital.dto.request.search.AppealSearchRequest;
-import org.di.digital.dto.request.search.CaseSearchRequest;
-import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.*;
 import org.di.digital.dto.response.cases.CasePageResponse;
@@ -184,8 +182,9 @@ public class AdminController {
     @GetMapping("/support")
     public ResponseEntity<Page<SupportTicketDto>> getAllSupportTickets(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(adminService.getAllSupportTickets(page, size));
+            @RequestParam(defaultValue = "20") int size,
+            @ModelAttribute SupportTicketSearchRequest request) {
+        return ResponseEntity.ok(adminService.getAllSupportTickets(page, size, request));
     }
     @GetMapping("/support/{id}")
     public ResponseEntity<SupportTicketDto> getSupportTicketDetail(@PathVariable Long id) {
@@ -195,8 +194,9 @@ public class AdminController {
     @GetMapping("/reviews")
     public ResponseEntity<Page<ReviewDto>> getAllReviews(
             @RequestParam(defaultValue = "0") int page,
-            @RequestParam(defaultValue = "20") int size) {
-        return ResponseEntity.ok(adminService.getAllReviews(page, size));
+            @RequestParam(defaultValue = "20") int size,
+            @ModelAttribute ReviewSearchRequest request) {
+        return ResponseEntity.ok(adminService.getAllReviews(page, size, request));
     }
 
     @GetMapping("/reviews/{id}")

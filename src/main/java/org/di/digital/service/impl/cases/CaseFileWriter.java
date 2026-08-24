@@ -15,6 +15,7 @@ import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.requests.UserUtil;
@@ -33,6 +34,7 @@ public class CaseFileWriter {
     private static final int MAX_PAGES_PER_TOM = 180;
 
     private final CaseRepository caseRepository;
+    private final CaseAccessService caseAccessService;
     private final UserRepository userRepository;
     private final CaseFileRepository caseFileRepository;
     private final TaskQueueService taskQueueService;
@@ -63,6 +65,8 @@ public class CaseFileWriter {
         newCase.addUser(user);
 
         Case saved = caseRepository.saveAndFlush(newCase);
+        caseAccessService.grantFullAccess(saved, user);
+
         return new CreatedCase(saved.getId(), saved.getNumber());
     }
 

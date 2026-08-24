@@ -75,10 +75,42 @@ public interface CaseRepository extends JpaRepository<Case, Long>, JpaSpecificat
             """)
     List<CasePreviewResponse> findPreviewsForUser(@Param("email") String email);
 
+    @Query("""
+        select new org.di.digital.dto.response.cases.CasePreviewResponse(
+                c.id, c.title, c.number, c.status, c.language,
+                c.createdDate, c.updatedDate,
+                concat(o.surname, ' ', o.name, ' ', o.fathername))
+        from Case c
+        left join c.owner o
+        where o.region.id = :regionId
+        """)
+    Page<CasePreviewResponse> findPreviewsByOwnerRegionId(@Param("regionId") Long regionId, Pageable pageable);
+
     @Modifying
     @Transactional
     @Query(value = "DELETE FROM case_users WHERE user_id = :userId", nativeQuery = true)
     void removeUserFromAllCases(@Param("userId") Long userId);
 
     List<Case> findByOwnerRegionIdIn(List<Long> regionIds);
+
+    @Query("select coalesce(sum(size(c.files)),0) from Case c where c.id in :ids")
+    long sumFileCount(@Param("ids") List<Long> ids);
+
+    @Query("select coalesce(sum(f.pages),0) from Case c join c.files f where c.id in :ids")
+    long sumPages(@Param("ids") List<Long> ids);
+
+    @Query("select coalesce(sum(size(c.interrogations)),0) from Case c where c.id in :ids")
+    long sumInterrogations(@Param("ids") List<Long> ids);
+
+    @Query("""
+       select coalesce(count(distinct i.id), 0)
+       from Case c
+       join c.interrogations i
+       join i.qaList qa
+       where c.id in :ids
+         and (qa.audioFileUrl is not null or size(qa.audioRecords) > 0)
+       """)
+    long countAudioInterrogations(@Param("ids") List<Long> ids);
+    @Query("select coalesce(sum(case when c.status = true then 1 else 0 end),0) from Case c where c.id in :ids")
+    long countActive(@Param("ids") List<Long> ids);
 }

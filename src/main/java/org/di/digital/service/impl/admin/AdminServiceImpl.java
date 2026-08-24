@@ -2,10 +2,8 @@ package org.di.digital.service.impl.admin;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.search.*;
 import org.di.digital.dto.request.user.UpdateProfileRequest;
-import org.di.digital.dto.request.search.AppealSearchRequest;
-import org.di.digital.dto.request.search.CaseSearchRequest;
-import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.*;
 import org.di.digital.dto.response.cases.CaseListResponse;
@@ -38,14 +36,13 @@ import org.di.digital.repository.indictment.CaseIndictmentRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationQARepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.qualification.CaseQualificationRepository;
-import org.di.digital.repository.search.AppealSpecifications;
-import org.di.digital.repository.search.CaseSpecifications;
-import org.di.digital.repository.search.UserSpecifications;
+import org.di.digital.repository.search.*;
 import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.repository.user.*;
 import org.di.digital.service.admin.AdminService;
 import org.di.digital.service.cases.CaseService;
+import org.di.digital.service.impl.cases.CaseRejectionEnricher;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.LocalizationHelper;
@@ -102,6 +99,7 @@ public class AdminServiceImpl implements AdminService {
     private final ReviewRepository reviewRepository;
     private final InterrogationExportService interrogationExportService;
     private final CaseService caseService;
+    private final CaseRejectionEnricher caseRejectionEnricher;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
 
     @Override
@@ -145,33 +143,7 @@ public class AdminServiceImpl implements AdminService {
                 .findAll(spec, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate")))
                 .map(caseMapper::toListResponse);
 
-        List<Case> allFiltered = caseRepository.findAll(spec);
-
-        long totalDocuments = allFiltered.stream()
-                .mapToLong(c -> c.getFiles().size())
-                .sum();
-
-        long totalPages = allFiltered.stream()
-                .mapToLong(c -> c.getFiles().stream()
-                        .mapToLong(f -> f.getPages() != null ? f.getPages() : 0)
-                        .sum())
-                .sum();
-
-        long totalInterrogations = allFiltered.stream()
-                .mapToLong(c -> c.getInterrogations().size())
-                .sum();
-
-        long audioInterrogations = allFiltered.stream()
-                .mapToLong(Case::audioUsedCount)
-                .sum();
-
-        return CasePageResponse.builder()
-                .cases(casePage)
-                .totalDocuments(totalDocuments)
-                .totalPages(totalPages)
-                .totalInterrogations(totalInterrogations)
-                .audioInterrogations(audioInterrogations)
-                .build();
+        return caseMapper.build(spec, casePage);
     }
 
     @Override
@@ -183,53 +155,7 @@ public class AdminServiceImpl implements AdminService {
                 .findAll(spec, PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdDate")))
                 .map(caseMapper::toListResponse);
 
-        List<Case> allFiltered = caseRepository.findAll(spec);
-
-        long totalDocuments = allFiltered.stream()
-                .mapToLong(c -> c.getFiles() != null ? c.getFiles().size() : 0)
-                .sum();
-
-        long totalInterrogations = allFiltered.stream()
-                .mapToLong(c -> c.getInterrogations() != null ? c.getInterrogations().size() : 0)
-                .sum();
-
-        long totalPages = allFiltered.stream()
-                .filter(c -> c.getFiles() != null)
-                .mapToLong(c -> c.getFiles().stream()
-                        .mapToLong(f -> f.getPages() != null ? f.getPages() : 0)
-                        .sum())
-                .sum();
-
-        long audioInterrogations = allFiltered.stream()
-                .mapToLong(c -> {
-                    try {
-                        return c.audioUsedCount();
-                    } catch (Exception e) {
-                        log.warn("audioUsedCount failed for case {}: {}",
-                                c.getId(), e.getMessage());
-                        return 0L;
-                    }
-                })
-                .sum();
-
-        long activeCases = allFiltered.stream()
-                .filter(Case::isStatus)
-                .count();
-
-        long inactiveCases = allFiltered.stream()
-                .filter(c -> !c.isStatus())
-                .count();
-
-
-        return CasePageResponse.builder()
-                .cases(casePage)
-                .totalDocuments(totalDocuments)
-                .totalPages(totalPages)
-                .totalInterrogations(totalInterrogations)
-                .audioInterrogations(audioInterrogations)
-                .activeCases(activeCases)
-                .inactiveCases(inactiveCases)
-                .build();
+        return caseMapper.build(spec, casePage);
     }
 
     @Override
@@ -437,6 +363,7 @@ public class AdminServiceImpl implements AdminService {
 
         Page<CasePreviewResponse> cases = caseRepository.findByOwnerRegionId(regionId, pageable)
                 .map(caseMapper::toPreview);
+        caseRejectionEnricher.enrich(cases.getContent(), getCurrentUser().getSettings().getLanguage());
 
         Page<AppealDto> appeals = appealRepository.findByRegionId(regionId, pageable)
                 .map(supportMapper::toAppealDto);
@@ -506,9 +433,10 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<SupportTicketDto> getAllSupportTickets(int page, int size) {
+    public Page<SupportTicketDto> getAllSupportTickets(int page, int size, SupportTicketSearchRequest req) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return supportTicketRepository.findAll(pageable)
+        Specification<SupportTicket> spec = SupportTicketSpecifications.build(req);
+        return supportTicketRepository.findAll(spec, pageable)
                 .map(supportMapper::toSupportTicketDto);
     }
 
@@ -522,9 +450,10 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public Page<ReviewDto> getAllReviews(int page, int size) {
+    public Page<ReviewDto> getAllReviews(int page, int size, ReviewSearchRequest req) {
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
-        return reviewRepository.findAll(pageable)
+        Specification<Review> spec = ReviewSpecifications.build(req);
+        return reviewRepository.findAll(spec, pageable)
                 .map(supportMapper::toReviewDto);
     }
 

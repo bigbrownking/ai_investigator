@@ -1,6 +1,7 @@
 package org.di.digital.dto.response.cases;
 
 import lombok.*;
+import org.di.digital.model.enums.cases.CaseRejectionReason;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -10,7 +11,7 @@ import java.util.List;
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class CaseListResponse {
+public class CaseListResponse implements RejectionEnrichable {
     private Long id;
     private String title;
     private String number;
@@ -28,4 +29,8 @@ public class CaseListResponse {
     private long priority;
     private String ownerFio;
     private List<String> participantFios;
+
+    private String rejectionReason;
+    private String rejectionByFio;
+    private LocalDateTime rejectionAt;
 }

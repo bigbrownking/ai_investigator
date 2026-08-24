@@ -1,9 +1,7 @@
 package org.di.digital.service.admin;
 
+import org.di.digital.dto.request.search.*;
 import org.di.digital.dto.request.user.UpdateProfileRequest;
-import org.di.digital.dto.request.search.AppealSearchRequest;
-import org.di.digital.dto.request.search.CaseSearchRequest;
-import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.*;
 import org.di.digital.dto.response.cases.CasePageResponse;
@@ -38,9 +36,9 @@ public interface AdminService {
     void approveAppeal(Long appealId, Long adminId);
     void rejectAppeal(Long appealId, Long adminId);
     Page<LogDto> getUserLogs(String email, int page, int size);
-    Page<SupportTicketDto> getAllSupportTickets(int page, int size);
+    Page<SupportTicketDto> getAllSupportTickets(int page, int size, SupportTicketSearchRequest request);
     SupportTicketDto getSupportTicketDetail(Long id);
-    Page<ReviewDto> getAllReviews(int page, int size);
+    Page<ReviewDto> getAllReviews(int page, int size, ReviewSearchRequest request);
     ReviewDto getReviewDetail(Long id);
     void assignAdvancedUserRole(String email);
     void assignRegAdminRole(String email, List<String> regions);

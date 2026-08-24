@@ -15,7 +15,9 @@ import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @Component
@@ -30,7 +32,7 @@ public class RoundRobinScheduler {
     @Value("${scheduler.round-robin.max-concurrent}")
     private int maxConcurrent;
 
-    @Scheduled(fixedDelayString = "${scheduler.round-robin.delay-seconds}", timeUnit = java.util.concurrent.TimeUnit.SECONDS, zone = "Asia/Almaty")
+    @Scheduled(fixedDelayString = "${scheduler.round-robin.delay-seconds}", timeUnit = TimeUnit.SECONDS, zone = "Asia/Almaty")
     @Transactional
     public void processTasksRoundRobin() {
         long processingCount = taskQueueService.getProcessingTasksCount();
@@ -39,12 +41,16 @@ public class RoundRobinScheduler {
             return;
         }
 
+        List<Long> excludedCaseIds = new ArrayList<>(taskQueueService.getProcessingCaseIds());
+        List<String> excludedUsers = new ArrayList<>(taskQueueService.getProcessingUserEmails());
+
         for (int i = 0; i < freeSlots; i++) {
-            List<Long> excludedCaseIds = taskQueueService.getProcessingCaseIds();
-            TaskQueue task = taskQueueService.getNextTaskByRoundRobin(excludedCaseIds);
+            TaskQueue task = taskQueueService.getNextTaskByRoundRobin(excludedCaseIds, excludedUsers);
             if (task == null) {
                 break;
             }
+            excludedCaseIds.add(task.getCaseId());
+            excludedUsers.add(task.getUserEmail());
             dispatchTask(task);
         }
     }

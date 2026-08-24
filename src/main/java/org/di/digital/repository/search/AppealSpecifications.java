@@ -30,15 +30,6 @@ public class AppealSpecifications {
                 .and(createdBetween(req.getFrom(), req.getTo()));
     }
 
-    public static Specification<Appeal> buildForRegion(Long regionId, AppealSearchRequest req) {
-        return Specification
-                .where(inRegion(regionId))
-                .and(hasStatus(req.getStatus()))
-                .and(hasFrom(req.getCameFrom()))
-                .and(hasTo(req.getCameTo()))
-                .and(createdBetween(req.getFrom(), req.getTo()));
-    }
-
     private static Specification<Appeal> inRegions(List<Long> regionIds) {
         return (root, query, cb) ->
                 root.get("region").get("id").in(regionIds);

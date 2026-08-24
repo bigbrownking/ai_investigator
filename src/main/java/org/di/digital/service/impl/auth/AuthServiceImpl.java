@@ -3,7 +3,6 @@ package org.di.digital.service.impl.auth;
 import io.jsonwebtoken.Claims;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.client.FaceAuthClient;
 import org.di.digital.dto.request.auth.*;
 import org.di.digital.dto.response.auth.JwtResponse;
 import org.di.digital.exception.NotFoundException;
@@ -74,7 +73,6 @@ public class AuthServiceImpl implements AuthService {
     private final RsaDecryptor rsaDecryptor;
     private final NotificationService notificationService;
     private final EmailService emailService;
-    private final FaceAuthClient faceAuthClient;
     private final PreAuthTokenUtil preAuthTokenUtil;
     private final OneTimeTokenService oneTimeTokenService;
 
@@ -203,15 +201,6 @@ public class AuthServiceImpl implements AuthService {
         user.setSettings(userSettings);
         User savedUser = userRepository.save(user);
         log.info("User created successfully with ID: {}", savedUser.getId());
-        if (request.getFaceReferenceJobId() != null) {
-            Map<String, Object> res = faceAuthClient.adopt(
-                    request.getFaceReferenceJobId(), request.getJobToken(), savedUser.getId());
-            if (!Boolean.TRUE.equals(res.get("adopted"))) {
-                throw new IllegalStateException("Не удалось привязать Face ID к регистрации");
-            }
-            savedUser.setFaceEnabled(true);
-            userRepository.save(savedUser);
-        }
         Appeal appeal = Appeal.builder()
                 .user(savedUser)
                 .region(region)
@@ -329,7 +318,7 @@ public class AuthServiceImpl implements AuthService {
         logService.log(String.format("User logged in %s user", request.getIin()),
                 LogLevel.INFO, LogAction.LOGIN, null, user.getEmail());
 
-        // Сценарий 1: пароль истёк -> pre-auth PASSWORD_RESET.
+        // пароль истёк -> pre-auth PASSWORD_RESET.
         if (isPasswordExpired(user)) {
             String preAuth = preAuthTokenUtil.generatePasswordReset(user.getId(), user.getEmail());
             return JwtResponse.builder()
@@ -339,39 +328,11 @@ public class AuthServiceImpl implements AuthService {
                     .build();
         }
 
-        // Whitelist
-        if (user.getIin() != null && whitelistIins.contains(user.getIin())) {
-            String access = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
-            String refresh = jwtTokenUtil.generateRefreshToken(user.getEmail());
-            return JwtResponse.builder()
-                    .token(access).refreshToken(refresh)
-                    .type("Bearer").username(user.getEmail())
-                    .faceEnabled(user.isFaceEnabled())
-                    .requiresFaceId(false)
-                    .faceEnrollmentRequired(false)
-                    .build();
-        }
-
-        // Сценарий 2: лицо ещё НЕ поставлено -> pre-auth ENROLLMENT.
-        if (!user.isFaceEnabled()) {
-            String preAuth = preAuthTokenUtil.generateFace(user.getId(), user.getEmail(), true);
-            return JwtResponse.builder()
-                    .type("Bearer").username(user.getEmail())
-                    .faceEnabled(false)
-                    .requiresFaceId(true)
-                    .faceEnrollmentRequired(true)
-                    .preAuthToken(preAuth)
-                    .build();
-        }
-
-        // Сценарий 3: лицо есть -> pre-auth AUTH, фронт проводит verify.
-        String preAuth = preAuthTokenUtil.generateFace(user.getId(), user.getEmail(), false);
+        String access = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
+        String refresh = jwtTokenUtil.generateRefreshToken(user.getEmail());
         return JwtResponse.builder()
+                .token(access).refreshToken(refresh)
                 .type("Bearer").username(user.getEmail())
-                .faceEnabled(true)
-                .requiresFaceId(true)
-                .faceEnrollmentRequired(false)
-                .preAuthToken(preAuth)
                 .build();
     }
 
@@ -389,6 +350,7 @@ public class AuthServiceImpl implements AuthService {
 
         return changedAt.isBefore(LocalDateTime.now().minusDays(passwordExpiryDays));
     }
+
     private boolean isLocked(User user) {
         if (user.getLockTime() == null) return false;
 
@@ -445,7 +407,6 @@ public class AuthServiceImpl implements AuthService {
                 .token(newAccessToken)
                 .refreshToken(newRefreshToken)
                 .type("Bearer")
-                .faceEnabled(user.isFaceEnabled())
                 .username(user.getEmail())
                 .build();
     }

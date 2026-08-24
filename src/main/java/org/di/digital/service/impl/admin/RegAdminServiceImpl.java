@@ -99,6 +99,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public CasePageResponse getUserCases(Long adminId, Long userId, int page, int size, CaseSearchRequest req) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new NotFoundException("Админ не найден"));
@@ -115,14 +116,7 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .findAll(spec, PageRequest.of(page, size))
                 .map(caseMapper::toListResponse);
 
-        List<Case> allFiltered = caseRepository.findAll(spec);
-
-        return CasePageResponse.builder()
-                .cases(casePage)
-                .totalDocuments(allFiltered.stream().mapToLong(c -> c.getFiles().size()).sum())
-                .totalInterrogations(allFiltered.stream().mapToLong(c -> c.getInterrogations().size()).sum())
-                .audioInterrogations(allFiltered.stream().mapToLong(Case::audioUsedCount).sum())
-                .build();
+        return caseMapper.build(spec, casePage);
     }
 
     @Override
@@ -173,9 +167,7 @@ public class RegAdminServiceImpl implements RegAdminService {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new NotFoundException("Админ не найден"));
 
-        List<Region> adminRegions = userUtil.getAdminRegions(admin);
-
-        List<Long> regionIds = adminRegions.stream()
+        List<Long> regionIds = userUtil.getAdminRegions(admin).stream()
                 .map(Region::getId)
                 .toList();
 
@@ -185,14 +177,7 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .findAll(spec, PageRequest.of(page, size))
                 .map(caseMapper::toListResponse);
 
-        List<Case> allFiltered = caseRepository.findAll(spec);
-
-        return CasePageResponse.builder()
-                .cases(casePage)
-                .totalDocuments(allFiltered.stream().mapToLong(c -> c.getFiles().size()).sum())
-                .totalInterrogations(allFiltered.stream().mapToLong(c -> c.getInterrogations().size()).sum())
-                .audioInterrogations(allFiltered.stream().mapToLong(Case::audioUsedCount).sum())
-                .build();
+        return caseMapper.build(spec, casePage);
     }
 
     @Override

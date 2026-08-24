@@ -11,12 +11,19 @@ import org.di.digital.model.cases.CaseMemberHistory;
 import org.di.digital.model.cases.RejectionReasonStatus;
 import org.di.digital.model.interrogation.CaseFigurant;
 import org.di.digital.model.user.User;
+import org.di.digital.repository.cases.CaseIdOnly;
+import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.service.impl.cases.CaseRejectionEnricher;
 import org.di.digital.service.impl.queue.TaskQueueService;
+import org.springframework.data.domain.Page;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 @Component
 @RequiredArgsConstructor
@@ -25,6 +32,8 @@ public class CaseMapper {
     private final FileUrlResolver fileUrls;
     private final TaskQueueService taskQueueService;
     private final InterrogationMapper interrogationMapper;
+    private final CaseRepository caseRepository;
+    private final CaseRejectionEnricher caseRejectionEnricher;
 
     public CaseResponse toResponse(Case c) {
         return CaseResponse.builder()
@@ -69,7 +78,7 @@ public class CaseMapper {
                 .language(c.getLanguage())
                 .createdDate(c.getCreatedDate())
                 .updatedDate(c.getUpdatedDate())
-                .ownerFio(c.getOwner().getFio())
+                .ownerFio(c.getOwner() != null ? c.getOwner().getFio() : null)
                 .build();
     }
 
@@ -165,6 +174,24 @@ public class CaseMapper {
                 .rejectionReason(r.getRejectionReason())
                 .performedByFio(r.getPerformedByFio())
                 .timestamp(r.getTimestamp())
+                .build();
+    }
+    public CasePageResponse build(Specification<Case> spec, Page<CaseListResponse> casePage) {
+        caseRejectionEnricher.enrich(casePage.getContent(), getCurrentUser().getSettings().getLanguage());
+
+        List<CaseIdOnly> rows = caseRepository.findBy(spec, q -> q.as(CaseIdOnly.class).all());
+        List<Long> ids = rows == null ? List.of() : rows.stream().map(CaseIdOnly::getId).toList();
+
+        long active = caseRepository.countActive(ids);
+
+        return CasePageResponse.builder()
+                .cases(casePage)
+                .totalDocuments(caseRepository.sumFileCount(ids))
+                .totalPages(caseRepository.sumPages(ids))
+                .totalInterrogations(caseRepository.sumInterrogations(ids))
+                .audioInterrogations(caseRepository.countAudioInterrogations(ids))
+                .activeCases(active)
+                .inactiveCases(ids.size() - active)
                 .build();
     }
 
