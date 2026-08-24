@@ -7,6 +7,7 @@ import org.springframework.boot.jdbc.autoconfigure.DataSourceProperties;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Primary;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.orm.jpa.JpaTransactionManager;
 import org.springframework.transaction.PlatformTransactionManager;
 
@@ -30,6 +31,12 @@ public class PrimaryDatasourceConfig {
                 .type(HikariDataSource.class)
                 .build();
     }
+    @Bean
+    @Primary
+    public JdbcTemplate jdbcTemplate(DataSource primaryDataSource) {
+        return new JdbcTemplate(primaryDataSource);
+    }
+
     @Bean
     @Primary
     public PlatformTransactionManager transactionManager(
