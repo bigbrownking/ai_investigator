@@ -36,6 +36,12 @@ import org.di.digital.service.core.MinioService;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
+import jakarta.servlet.http.HttpServletRequest;
+import org.springframework.web.context.request.RequestContextHolder;
+import org.springframework.web.context.request.ServletRequestAttributes;
+import org.springframework.web.util.UriUtils;
+
+import java.nio.charset.StandardCharsets;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
 import java.util.*;
@@ -52,6 +58,30 @@ public class Mapper {
 
     @Value("${last.seen.ttl}")
     private int ttl;
+
+    private String getToken() {
+        ServletRequestAttributes attrs = (ServletRequestAttributes) RequestContextHolder.getRequestAttributes();
+        if (attrs == null) return null;
+        HttpServletRequest request = attrs.getRequest();
+        String auth = request.getHeader("Authorization");
+        if (auth != null && auth.startsWith("Bearer ")) {
+            return auth.substring(7);
+        }
+        return null;
+    }
+
+    private String filePreviewUrl(String fileUrl) {
+        String token = getToken();
+        return "/api/files/preview?path=" + UriUtils.encode(fileUrl, StandardCharsets.UTF_8)
+                + (token != null ? "&token=" + UriUtils.encode(token, StandardCharsets.UTF_8) : "");
+    }
+
+    private String fileDownloadUrl(String fileUrl, String fileName) {
+        String token = getToken();
+        return "/api/files/download?path=" + UriUtils.encode(fileUrl, StandardCharsets.UTF_8)
+                + "&name=" + UriUtils.encode(fileName, StandardCharsets.UTF_8)
+                + (token != null ? "&token=" + UriUtils.encode(token, StandardCharsets.UTF_8) : "");
+    }
 
     public CaseInterrogationResponse mapToInterrogationResponse(CaseInterrogation interrogation) {
         return CaseInterrogationResponse.builder()
@@ -88,7 +118,7 @@ public class Mapper {
         return AudioRecordResponse.builder()
                 .id(record.getId())
                 .audioUrl(record.getAudioFileUrl() != null
-                        ? minioService.generatePresignedUrlForPreview(record.getAudioFileUrl())
+                        ? filePreviewUrl(record.getAudioFileUrl())
                         : null)
                 .transcribedText(record.getTranscribedText())
                 .status(record.getStatus() != null ? record.getStatus().name() : null)
@@ -497,8 +527,8 @@ public class Mapper {
                 .fileSize(f.getFileSize())
                 .status(f.getStatus().getLabel())
                 .language(f.getLanguage())
-                .previewUrl(minioService.generatePresignedUrlForPreview(f.getFileUrl()))
-                .downloadUrl(minioService.generatePresignedUrlForDownload(f.getFileUrl(), f.getOriginalFileName()))
+                .previewUrl(filePreviewUrl(f.getFileUrl()))
+                .downloadUrl(fileDownloadUrl(f.getFileUrl(), f.getOriginalFileName()))
                 .uploadedAt(String.valueOf(f.getUploadedAt()))
                 .completedAt(String.valueOf(f.getCompletedAt()))
                 .isQualification(f.isQualification())
@@ -518,8 +548,8 @@ public class Mapper {
                 .displayName(file.getDisplayName())
                 .originalFileName(file.getOriginalFileName())
                 .storedFileName(file.getStoredFileName())
-                .previewUrl(minioService.generatePresignedUrlForPreview(file.getFileUrl()))
-                .downloadUrl(minioService.generatePresignedUrlForDownload(file.getFileUrl(), file.getOriginalFileName()))
+                .previewUrl(filePreviewUrl(file.getFileUrl()))
+                .downloadUrl(fileDownloadUrl(file.getFileUrl(), file.getOriginalFileName()))
                 .contentType(file.getContentType())
                 .fileSize(file.getFileSize())
                 .pages(file.getPages() != null ? file.getPages() : 0)
@@ -650,8 +680,8 @@ public class Mapper {
                         .id(p.getId())
                         .originalFileName(p.getOriginalFileName())
                         .contentType(p.getContentType())
-                        .previewUrl(minioService.generatePresignedUrlForPreview(p.getFileUrl()))
-                        .downloadUrl(minioService.generatePresignedUrlForDownload(p.getFileUrl(), p.getOriginalFileName()))
+                        .previewUrl(filePreviewUrl(p.getFileUrl()))
+                        .downloadUrl(fileDownloadUrl(p.getFileUrl(), p.getOriginalFileName()))
                         .build())
                 .toList();
 
@@ -698,8 +728,8 @@ public class Mapper {
                 .map(f -> ReviewFileDto.builder()
                         .originalFileName(f.getOriginalFileName())
                         .contentType(f.getContentType())
-                        .previewUrl(minioService.generatePresignedUrlForPreview(f.getFileUrl()))
-                        .downloadUrl(minioService.generatePresignedUrlForDownload(f.getFileUrl(), f.getOriginalFileName()))
+                        .previewUrl(filePreviewUrl(f.getFileUrl()))
+                        .downloadUrl(fileDownloadUrl(f.getFileUrl(), f.getOriginalFileName()))
                         .build())
                 .collect(Collectors.toList());
 

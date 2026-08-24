@@ -2,11 +2,11 @@ package org.di.digital.util;
 
 import io.minio.*;
 import io.minio.messages.Item;
-import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.repository.queue.TaskQueueRepository;
 import org.di.digital.security.crypto.FileCipher;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Service;
@@ -17,7 +17,6 @@ import java.util.List;
 
 @Slf4j
 @Service
-@RequiredArgsConstructor
 public class EncryptFilesMigrationService {
 
     private final MinioClient minioClient;
@@ -25,7 +24,16 @@ public class EncryptFilesMigrationService {
     private final JdbcTemplate jdbcTemplate;
     private final TaskQueueRepository taskQueueRepository;
 
-    @Value("${minio.bucket.name:cases}")
+    public EncryptFilesMigrationService(MinioClient minioClient, FileCipher fileCipher,
+                                        @Qualifier("jdbcTemplate") JdbcTemplate jdbcTemplate,
+                                        TaskQueueRepository taskQueueRepository) {
+        this.minioClient = minioClient;
+        this.fileCipher = fileCipher;
+        this.jdbcTemplate = jdbcTemplate;
+        this.taskQueueRepository = taskQueueRepository;
+    }
+
+    @Value("${minio.bucket.name:testcases}")
     private String bucketName;
 
     private static final List<String[]> URL_COLUMNS = List.of(

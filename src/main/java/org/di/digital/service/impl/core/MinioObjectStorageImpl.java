@@ -8,6 +8,8 @@ import io.minio.messages.DeleteObject;
 import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+
+import org.di.digital.security.crypto.FileCipher;
 import org.di.digital.service.core.MinioObjectStorage;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
@@ -25,7 +27,7 @@ public class MinioObjectStorageImpl implements MinioObjectStorage {
 
     private final MinioClient minioClient;
 
-    @Value("${minio.bucket.name:cases}")
+    @Value("${minio.bucket.name:testcases}")
     private String bucketName;
 
     @Value("${minio.url}")
@@ -36,6 +38,8 @@ public class MinioObjectStorageImpl implements MinioObjectStorage {
 
     @Value("${minio.presigned.url.expiry.hours:24}")
     private int presignedUrlExpiryHours;
+
+    private final FileCipher fileCipher;
 
     @Override
     public String putObject(String objectName, InputStream stream, long size, String contentType) {
@@ -134,22 +138,56 @@ public class MinioObjectStorageImpl implements MinioObjectStorage {
         }
     }
 
-    @Override
-    public String presignedGetUrl(String objectName, Map<String, String> headers) {
-        try {
-            String presignedUrl = minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
-                    .method(Method.GET)
-                    .bucket(bucketName)
-                    .object(objectName)
-                    .expiry(presignedUrlExpiryHours, TimeUnit.HOURS)
-                    .extraQueryParams(headers)
-                    .build());
-            return toPublicUrl(presignedUrl);
-        } catch (Exception e) {
-            log.error("Error generating presigned URL for: {}", objectName, e);
-            throw new IllegalStateException("Failed to generate presigned URL", e);
+    public byte[] presignedGetUrl(String objectName) {
+    try {
+        InputStream stream = minioClient.getObject(
+                GetObjectArgs.builder()
+                        .bucket(bucketName)
+                        .object(objectName)
+                        .build()
+        );
+        byte[] encryptedBytes = stream.readAllBytes();
+        stream.close();
+
+        // 2. Если файл зашифрован или включен шифратор — расшифровываем
+        if (fileCipher.isEnabled() && fileCipher.isEncryptedName(objectName)) {
+            return fileCipher.decrypt(encryptedBytes);
         }
+        
+        return encryptedBytes;
+    } catch (Exception e) {
+        log.error("Error fetching/decrypting file for preview: {}", objectName, e);
+        throw new IllegalStateException("Failed to prepare file preview", e);
     }
+}
+
+
+@Override
+public String presignedGetUrl(String objectName, Map<String, String> headers) {
+    try {
+       if (fileCipher.isEnabled() && fileCipher.isEncryptedName(objectName)) {
+            log.warn("Presigned URL requested for encrypted object: {}. " +
+                     "Client won't be able to preview it directly. Use backend proxy endpoint instead.", objectName);
+            
+            return toPublicUrl("//files/preview?objectName=" + objectName);
+        }
+
+       String presignedUrl = minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+                .method(Method.GET)
+                .bucket(bucketName)
+                .object(objectName)
+                .expiry(presignedUrlExpiryHours, TimeUnit.HOURS)
+                .extraQueryParams(headers)
+                .build());
+
+        return toPublicUrl(presignedUrl);
+    } catch (Exception e) {
+        log.error("Error generating presigned URL for: {}", objectName, e);
+        throw new IllegalStateException("Failed to generate presigned URL", e);
+    }
+}
+ 
+    
 
     private String toPublicUrl(String presignedUrl) {
         if (minioPublicUrl != null && !minioPublicUrl.isBlank()) {

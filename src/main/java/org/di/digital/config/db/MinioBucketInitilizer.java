@@ -18,7 +18,7 @@ public class MinioBucketInitilizer implements ApplicationRunner {
 
     private final MinioClient minioClient;
 
-    @Value("${minio.bucket.name:cases}")
+    @Value("${minio.bucket.name:testcases}")
     private String bucketName;
 
     @Override
