@@ -65,7 +65,7 @@ public class CaseFileWriter {
         newCase.addUser(user);
 
         Case saved = caseRepository.saveAndFlush(newCase);
-        caseAccessService.grantFullAccess(saved, user);
+        //caseAccessService.grantFullAccess(saved, user);
 
         return new CreatedCase(saved.getId(), saved.getNumber());
     }
