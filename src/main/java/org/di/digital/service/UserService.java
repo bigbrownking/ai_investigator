@@ -13,5 +13,4 @@ public interface UserService {
     UserProfile updateUserSettings(String email, UserSettingsRequest request);
     UserProfile updateUserProfile(String email, UpdateProfileRequest request);
     List<User> getMyBoss(String email);
-    List<UserCaseAccessDto> getUserAccesses(Long userId);
 }

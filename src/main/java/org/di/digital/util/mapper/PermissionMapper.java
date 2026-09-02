@@ -4,6 +4,7 @@ import lombok.NoArgsConstructor;
 import org.di.digital.dto.response.access.ModulePermissionDto;
 import org.di.digital.model.cases.CasePermission;
 import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
 import org.springframework.stereotype.Component;
 
 import java.util.*;
@@ -26,14 +27,11 @@ public class PermissionMapper {
         }
         return result;
     }
-
-    public List<ModulePermissionDto> group(Set<CasePermission> perms) {
-        return perms.stream()
-                .collect(Collectors.groupingBy(
-                        CasePermission::getModule,
-                        Collectors.mapping(CasePermission::getAction, Collectors.toSet())))
-                .entrySet().stream()
-                .map(e -> new ModulePermissionDto(e.getKey(), e.getValue()))
-                .toList();
+    public Map<CaseModule, Set<CaseAction>> groupAsMap(Set<CasePermission> perms) {
+        Map<CaseModule, Set<CaseAction>> result = new EnumMap<>(CaseModule.class);
+        for (CasePermission p : perms) {
+            result.computeIfAbsent(p.getModule(), k -> new HashSet<>()).add(p.getAction());
+        }
+        return result;
     }
 }

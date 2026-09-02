@@ -25,6 +25,7 @@ public class DevController {
     private final IndictmentMigrationService indictmentMigrationService;
     private final FileOwnerMigrationService fileOwnerMigrationService;
     private final InterrogationOwnerMigrationService interrogationOwnerMigrationService;
+    private final CasePermissionMigrationService casePermissionMigrationService;
     private final TaskQueueService taskQueueService;
 
     // ─── Stats ────────────────────────────────────────────────────
@@ -151,6 +152,10 @@ public class DevController {
     @PostMapping("/migrate-interrogationOwners")
     public ResponseEntity<InterrogationOwnerMigrationService.InterrogationOwnerMigrationResult> migrate5() {
         return ResponseEntity.ok(interrogationOwnerMigrationService.migrateInterrogationOwners());
+    }
+    @PostMapping("/migrate-casePermissions")
+    public ResponseEntity<Integer> migrate6() {
+        return ResponseEntity.ok(casePermissionMigrationService.grantFullAccessToAllOwners());
     }
 
     @GetMapping("/avg-page")

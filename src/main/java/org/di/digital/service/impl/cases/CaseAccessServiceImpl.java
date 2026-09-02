@@ -157,14 +157,16 @@ public class CaseAccessServiceImpl implements CaseAccessService {
                 .filter(f -> allowed.contains(f.getId()))
                 .toList();
     }
-    public List<ModulePermissionDto> getMyPermissions(Case caseEntity, User user) {
+    public Map<CaseModule, Set<CaseAction>> getMyPermissions(Case caseEntity, User user) {
         if (caseEntity.isOwner(user)) {
-            return Arrays.stream(CaseModule.values())
-                    .map(m -> new ModulePermissionDto(m, EnumSet.allOf(CaseAction.class)))
-                    .toList();
+            Map<CaseModule, Set<CaseAction>> full = new EnumMap<>(CaseModule.class);
+            for (CaseModule m : CaseModule.values()) {
+                full.put(m, EnumSet.allOf(CaseAction.class));
+            }
+            return full;
         }
         return accessRepository.findByCaseEntityIdAndUserId(caseEntity.getId(), user.getId())
-                .map(a -> permissionMapper.group(a.getPermissions()))
-                .orElse(List.of());
+                .map(a -> permissionMapper.groupAsMap(a.getPermissions()))
+                .orElse(Map.of());
     }
 }

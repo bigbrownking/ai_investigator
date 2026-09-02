@@ -22,6 +22,7 @@ import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.export.DocumentFormatterService;
 import org.di.digital.service.impl.core.sse.SseHeartbeatUtil;
 import org.di.digital.service.qualification.QualificationService;
+import org.di.digital.util.TextUtils;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
 import org.springframework.core.io.Resource;
@@ -41,6 +42,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
 
+import static org.di.digital.util.TextUtils.stripHtml;
 import static org.di.digital.util.requests.RequestBodyBuilder.qualificationSectionBody;
 import static org.di.digital.util.requests.RequestUrlBuilder.*;
 
@@ -320,33 +322,42 @@ public class QualificationServiceImpl implements QualificationService {
         List<Map<String, Object>> sections = new ArrayList<>(qualification.getSections());
 
         int startSectionId = request.getStartSectionId();
-        int endSectionId = request.getEndSectionId();
-        int startOffset = request.getStartOffset();
-        int endOffset = request.getEndOffset();
-        String replacement = unwrapJsonString(request.getReplacementText());
+        int endSectionId   = request.getEndSectionId();
+        int startOffset    = request.getStartOffset();
+        int endOffset      = request.getEndOffset();
+        String replacement = stripHtml(unwrapJsonString(request.getReplacementText()));
 
         int startIdx = indexOfSection(sections, startSectionId);
-        int endIdx = indexOfSection(sections, endSectionId);
+        int endIdx   = indexOfSection(sections, endSectionId);
         if (startIdx < 0) throw new NotFoundException("Секция id=" + startSectionId + " не найдена");
-        if (endIdx < 0) throw new NotFoundException("Секция id=" + endSectionId + " не найдена");
+        if (endIdx   < 0) throw new NotFoundException("Секция id=" + endSectionId   + " не найдена");
         if (startIdx > endIdx) throw new IllegalStateException(
                 "Начальная секция идёт позже конечной: start=" + startSectionId + ", end=" + endSectionId);
 
         if (startIdx == endIdx) {
             Map<String, Object> s = sections.get(startIdx);
-            String text = (String) s.get("text");
-            checkRange(text, startOffset, endOffset);
-            s.put("text", text.substring(0, startOffset) + replacement + text.substring(endOffset));
+            String raw = (String) s.get("text");
+
+            int rawStart = TextUtils.visibleOffsetToRawOffset(raw, startOffset);
+            int rawEnd   = TextUtils.visibleOffsetToRawOffset(raw, endOffset);
+
+            checkRange(raw, rawStart, rawEnd);
+            s.put("text", raw.substring(0, rawStart) + replacement + raw.substring(rawEnd));
+
         } else {
             Map<String, Object> startSection = sections.get(startIdx);
-            Map<String, Object> endSection = sections.get(endIdx);
-            String startText = (String) startSection.get("text");
-            String endText = (String) endSection.get("text");
-            checkRange(startText, startOffset, startText == null ? 0 : startText.length());
-            checkRange(endText, 0, endOffset);
+            Map<String, Object> endSection   = sections.get(endIdx);
+            String startRaw = (String) startSection.get("text");
+            String endRaw   = (String) endSection.get("text");
 
-            startSection.put("text", startText.substring(0, startOffset) + replacement);
-            endSection.put("text", endText.substring(endOffset));
+            int rawStart = TextUtils.visibleOffsetToRawOffset(startRaw, startOffset);
+            int rawEnd   = TextUtils.visibleOffsetToRawOffset(endRaw,   endOffset);
+
+            checkRange(startRaw, rawStart, startRaw == null ? 0 : startRaw.length());
+            checkRange(endRaw,   0,        rawEnd);
+
+            startSection.put("text", startRaw.substring(0, rawStart) + replacement);
+            endSection.put("text",   endRaw.substring(rawEnd));
             for (int i = startIdx + 1; i < endIdx; i++) {
                 sections.get(i).put("text", "");
             }

@@ -9,6 +9,8 @@ import org.di.digital.model.enums.permission.CaseModule;
 import org.di.digital.model.user.User;
 
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 public interface CaseAccessService {
     void grantInitialAccess(Case caseEntity, User user, List<FileGrantDto> fileGrants);
@@ -21,5 +23,5 @@ public interface CaseAccessService {
     boolean canAccessFile(CaseFile file, User user, CaseAction action);
     void requireFile(CaseFile file, User user, CaseAction action);
     List<CaseFile> visibleFiles(Case caseEntity, User user);
-    List<ModulePermissionDto> getMyPermissions(Case caseEntity, User user);
+    Map<CaseModule, Set<CaseAction>> getMyPermissions(Case caseEntity, User user);
 }
