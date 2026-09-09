@@ -2,6 +2,8 @@ package org.di.digital.consumer.transcription;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationAudioRecord;
 import org.di.digital.model.interrogation.CaseInterrogationOtherAudio;
@@ -15,6 +17,8 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Comparator;
 import java.util.stream.Collectors;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -72,7 +76,7 @@ public class TranscriptionUpdateService {
         }
 
         CaseInterrogationOtherAudio otherAudio = otherAudioRepository.findById(qaId)
-                .orElseThrow(() -> new IllegalStateException("Вопрос/ответ не найден: " + qaId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.QA.localized(getCurrentLang(), qaId.toString())));
 
         otherAudio.setStatus(status);
 

@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.auth.*;
 import org.di.digital.dto.response.auth.JwtResponse;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.service.auth.AuthService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
@@ -53,9 +54,6 @@ public class AuthController {
     public ResponseEntity<String> changeExpiredPassword(
             @RequestHeader("Authorization") String authHeader,
             @RequestBody ChangeExpiredPasswordRequest request) {
-        if (authHeader == null || !authHeader.startsWith("Bearer_")) {
-            throw new IllegalStateException("Что то пошло не так.");
-        }
         String token = authHeader.substring("Bearer_".length());
         return ResponseEntity.ok(authService.changeExpiredPassword(token, request.getNewPassword()));
     }

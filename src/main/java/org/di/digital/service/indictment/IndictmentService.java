@@ -15,8 +15,8 @@ public interface IndictmentService {
     SseEmitter generateIndictmentPrompt(String caseNumber, String email,
                                         int startSectionId, int startOffset,
                                         int endSectionId, int endOffset, String prompt);
-    List<IndictmentSectionDto> applyRephrase(String caseNumber, IndictmentRephraseApplyRequest request);
+    List<IndictmentSectionDto> applyRephrase(String caseNumber, String email, IndictmentRephraseApplyRequest request);
     Resource downloadIndictmentAsWord(String caseNumber, String email);
-    List<IndictmentSectionDto> getIndictmentSections(String caseNumber);
-    IndictmentSectionDto updateSection(String caseNumber, IndictmentSectionUpdateRequest request);
+    List<IndictmentSectionDto> getIndictmentSections(String caseNumber, String email);
+    IndictmentSectionDto updateSection(String caseNumber, String email, IndictmentSectionUpdateRequest request);
 }

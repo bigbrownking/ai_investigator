@@ -4,6 +4,8 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.interrogation.AddInterrogationRequest;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.*;
 import org.di.digital.model.enums.interrogation.CaseInterrogationStatusEnum;
@@ -11,6 +13,9 @@ import org.di.digital.model.enums.interrogation.InterrogationLimitProfile;
 import org.di.digital.model.enums.interrogation.InterrogationSpecialGround;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.fl.FLAddress;
 import org.di.digital.model.fl.FLDocument;
 import org.di.digital.model.fl.FLRecord;
@@ -20,6 +25,7 @@ import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.util.LocalizationHelper;
 import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.requests.UserUtil;
@@ -31,6 +37,8 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -45,14 +53,16 @@ public class InterrogationCreateWriter {
     private final LocalizationHelper localizationHelper;
     private final InterrogationCategoryResolver categoryResolver;
     private final CaseInterrogationRepository caseInterrogationRepository;
+    private final CaseAccessService caseAccessService;
 
-    private static final Duration MIN_DOP_INTERVAL = Duration.ofMinutes(2);
+
+    private static final Duration MIN_DOP_INTERVAL = Duration.ofHours(2);
 
     @Transactional(readOnly = true)
     public String getCaseNumber(Long caseId) {
         return caseRepository.findById(caseId)
                 .map(Case::getNumber)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
     }
 
     @Transactional
@@ -61,16 +71,17 @@ public class InterrogationCreateWriter {
             LocalDateTime now, FLRecord flRecord, FLAddress flAddress, String article) {
 
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.INTERROGATION, CaseAction.ADD);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
-            throw new IllegalStateException(MessageConstant.NO_FILE_PROCESSED.format(caseEntity.getNumber()));
+            throw new IllegalStateException(MessageConstant.NO_FILE_PROCESSED.format(currentLang(), caseEntity.getNumber()));
         }
         if (caseEntity.getIsFinalIndictmentDone() != null && caseEntity.getIsFinalIndictmentDone()) {
-            throw new IllegalStateException(MessageConstant.CANNOT_CREATE_INTERROGATION.format(caseEntity.getNumber()));
+            throw new IllegalStateException(MessageConstant.CANNOT_CREATE_INTERROGATION.format(currentLang(), caseEntity.getNumber()));
         }
 
         String caseNumber = caseEntity.getNumber();
@@ -172,5 +183,9 @@ public class InterrogationCreateWriter {
     private String formatDate(LocalDate date) {
         if (date == null) return "";
         return date.format(DateTimeFormatter.ofPattern("dd.MM.yyyy")) + "г.";
+    }
+
+    private UserSettingsLanguage currentLang() {
+        return getCurrentLang();
     }
 }

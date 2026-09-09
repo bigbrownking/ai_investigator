@@ -8,6 +8,7 @@ import org.di.digital.dto.request.support.SupportTicketRequest;
 import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
@@ -34,6 +35,8 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -62,7 +65,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Transactional
     public SupportTicketDto createSupportTicket(SupportTicketRequest request, List<MultipartFile> photos, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CHAT.localized(getCurrentLang(), email)));
 
         SupportTicket ticket = SupportTicket.builder()
                 .user(user)
@@ -106,7 +109,7 @@ public class FeedbackServiceImpl implements FeedbackService {
     @Transactional
     public ReviewDto createReview(ReviewRequest request, MultipartHttpServletRequest multipart, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(getCurrentLang(), email)));
 
         Review review = Review.builder()
                 .user(user)

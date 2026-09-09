@@ -4,10 +4,13 @@ import jakarta.persistence.criteria.Join;
 import jakarta.persistence.criteria.JoinType;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.cases.RejectionReasonStatus;
+import org.di.digital.model.enums.cases.CaseRejectionReason;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.util.StringUtils;
 
 import java.time.LocalDate;
+import java.time.LocalDateTime;
 import java.util.List;
 
 public class CaseSpecifications {
@@ -20,7 +23,8 @@ public class CaseSpecifications {
                 .and(createdAfter(req.getFrom()))
                 .and(createdBefore(req.getTo()))
                 .and(hasOwnerName(req.getOwnerName()))
-                .and(hasRegion(req.getRegion()));
+                .and(hasRegion(req.getRegion()))
+                .and(hasRejectionReason(req.getRejectionReason()));
     }
     public static Specification<Case> buildForRegions(List<Long> regionIds, CaseSearchRequest req) {
         return Specification
@@ -111,5 +115,40 @@ public class CaseSpecifications {
 
     private static String like(String value) {
         return "%" + value.toLowerCase() + "%";
+    }
+    public static Specification<Case> forUser(String email) {
+        return (root, query, cb) -> {
+            query.distinct(true);
+            var ownerMatch = cb.equal(root.get("owner").get("email"), email);
+            var memberSub = query.subquery(Long.class);
+            var subRoot = memberSub.from(Case.class);
+            var users = subRoot.join("users", JoinType.INNER);
+            memberSub.select(subRoot.get("id"))
+                    .where(
+                            cb.equal(subRoot.get("id"), root.get("id")),
+                            cb.equal(users.get("email"), email)
+                    );
+            return cb.or(ownerMatch, cb.exists(memberSub));
+        };
+    }
+    private static Specification<Case> hasRejectionReason(CaseRejectionReason reason) {
+        return (root, query, cb) -> {
+            if (reason == null) return null;
+
+            var maxSub = query.subquery(LocalDateTime.class);
+            var maxRrs = maxSub.from(RejectionReasonStatus.class);
+            maxSub.select(cb.<LocalDateTime>greatest(maxRrs.get("timestamp")))
+                    .where(cb.equal(maxRrs.get("caseId"), root.get("id")));
+
+            var sub = query.subquery(Long.class);
+            var rrs = sub.from(RejectionReasonStatus.class);
+            sub.select(rrs.get("id"))
+                    .where(
+                            cb.equal(rrs.get("caseId"), root.get("id")),
+                            cb.equal(rrs.get("rejectionReason"), reason),
+                            cb.equal(rrs.<LocalDateTime>get("timestamp"), maxSub)
+                    );
+            return cb.exists(sub);
+        };
     }
 }

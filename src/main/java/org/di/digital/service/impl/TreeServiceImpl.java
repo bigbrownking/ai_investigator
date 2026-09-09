@@ -6,9 +6,13 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.tree.TreeDataResponse;
 import org.di.digital.dto.response.tree.TreeModuleResponse;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.AccessDeniedMessage;
+import org.di.digital.exception.message.IllegalStateMessage;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.TreeData;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.cases.TreeModuleType;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.TreeDataRepository;
 import org.di.digital.repository.cases.CaseRepository;
@@ -29,6 +33,7 @@ import java.util.List;
 import java.util.stream.Collectors;
 
 import static org.di.digital.util.requests.RequestUrlBuilder.buildModuleUrl;
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -61,7 +66,6 @@ public class TreeServiceImpl implements TreeService {
                 modules.add(module);
             } catch (Exception e) {
                 log.error("Failed to fetch module: {} for case: {}", moduleType, caseNumber, e);
-                // Сохраняем информацию об ошибке
                 saveErrorModule(caseEntity, moduleType, e.getMessage());
             }
         }
@@ -114,8 +118,8 @@ public class TreeServiceImpl implements TreeService {
         Case caseEntity = validateAndGetCase(caseNumber, userEmail);
         TreeData treeData = treeDataRepository
                 .findFirstByCaseEntityAndModuleTypeOrderByVersionDesc(caseEntity, moduleType)
-                .orElseThrow(() -> new NotFoundException(
-                        String.format("Module %s not found for case %s", moduleType, caseNumber)));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CHAT.localized(currentLang(), userEmail)));
+
 
         return mapToModuleResponse(treeData);
     }
@@ -147,7 +151,7 @@ public class TreeServiceImpl implements TreeService {
         log.info("Cleaning up old versions for case: {}, keeping: {} versions", caseNumber, keepVersions);
 
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         for (TreeModuleType moduleType : TreeModuleType.values()) {
             treeDataRepository.deleteOldVersions(caseEntity, moduleType, keepVersions);
@@ -178,7 +182,7 @@ public class TreeServiceImpl implements TreeService {
                     .block();
 
             if (jsonResponse == null) {
-                throw new IllegalStateException("API returned null response");
+                throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
             }
 
             // Валидация JSON
@@ -226,22 +230,22 @@ public class TreeServiceImpl implements TreeService {
 
     private void validateJson(String json) {
         if (json == null || json.trim().isEmpty()) {
-            throw new IllegalStateException("Received empty JSON response");
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
         }
 
         try {
             objectMapper.readTree(json);
         } catch (Exception e) {
-            throw new IllegalStateException("Invalid JSON format: " + e.getMessage());
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
         }
     }
 
     private Case validateAndGetCase(String caseNumber, String userEmail) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + userEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
 
         // Проверка прав доступа
         boolean isOwner = caseEntity.isOwner(user);
@@ -250,7 +254,7 @@ public class TreeServiceImpl implements TreeService {
                 .anyMatch(role -> "ADMIN".equals(role.getName()));
 
         if (!isOwner && !isMember && !isAdmin) {
-            throw new AccessDeniedException("Access denied to case: " + caseNumber);
+            throw new AccessDeniedException(AccessDeniedMessage.OWNER_ONLY.localized(currentLang()));
         }
 
         return caseEntity;
@@ -269,5 +273,9 @@ public class TreeServiceImpl implements TreeService {
                 .createdDate(treeData.getCreatedDate())
                 .updatedDate(treeData.getUpdatedDate())
                 .build();
+    }
+
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
     }
 }

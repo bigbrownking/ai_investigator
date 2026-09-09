@@ -6,12 +6,17 @@ import org.di.digital.dto.request.plan.AddPlanActionRequest;
 import org.di.digital.dto.request.plan.ManualStatusRequest;
 import org.di.digital.dto.response.plan.*;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.AccessDeniedMessage;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.*;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
 import org.di.digital.model.enums.plan.ApprovalLevel;
 import org.di.digital.model.enums.plan.PlanStatus;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.plan.CasePlan;
 import org.di.digital.model.plan.PlanEditHistory;
 import org.di.digital.model.plan.PlanNotification;
@@ -24,6 +29,7 @@ import org.di.digital.repository.plan.PlanNotificationRepository;
 import org.di.digital.repository.user.RegionRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.DocumentFormatterService;
 import org.di.digital.service.impl.core.NotificationService;
@@ -47,6 +53,7 @@ import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.time.temporal.ChronoUnit;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -55,6 +62,7 @@ import static org.di.digital.util.requests.RequestUrlBuilder.planGeneratorUrl;
 import static org.di.digital.util.requests.RequestUrlBuilder.planUpdateUrl;
 import static org.di.digital.util.requests.RequestBodyBuilder.manualStatusBody;
 import static org.di.digital.util.requests.RequestUrlBuilder.manualStatusUrl;
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -73,6 +81,7 @@ public class PlanServiceImpl implements PlanService {
     private final PlanActionWriter planActionWriter;
     private final UserUtil userUtil;
     private final PlanResponseAssembler assembler;
+    private final CaseAccessService caseAccessService;
 
     private final PlanMapper mapper;
 
@@ -85,10 +94,16 @@ public class PlanServiceImpl implements PlanService {
     @Override
     public CasePlanResponse generatePlan(String caseNumber, String mode, String email) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.ADD);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
-            String message = MessageConstant.NO_FILE_PROCESSED.format(caseNumber);
+            String message = MessageConstant.NO_FILE_PROCESSED.format(currentLang(), caseNumber);
             log.warn(message);
             logService.log(
                     String.format("No file processed for plan request in case %s", caseNumber),
@@ -200,7 +215,7 @@ public class PlanServiceImpl implements PlanService {
     public Map<String, Object> enrichPlanWithStatus(Map<String, Object> plan) {
         if (plan == null) return null;
 
-        Map<String, Object> result = new java.util.LinkedHashMap<>(plan);
+        Map<String, Object> result = new LinkedHashMap<>(plan);
 
         List<Map<String, Object>> actions = (List<Map<String, Object>>) result.get("actions");
         if (actions == null){
@@ -249,6 +264,14 @@ public class PlanServiceImpl implements PlanService {
                     caseNumber,
                     userEmail
             );
+            Case caseEntity = caseRepository.findByNumber(caseNumber)
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
+            User user = userRepository.findByEmail(userEmail)
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
+
+            userUtil.validateUserAccess(caseEntity, user);
+            caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.DOWNLOAD);
+
             CasePlanResponse response = getPlan(caseNumber, userEmail);
 
             return new ByteArrayResource(
@@ -263,13 +286,16 @@ public class PlanServiceImpl implements PlanService {
     @Transactional(readOnly = true)
     public CasePlanResponse getPlan(String caseNumber, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
+
+        userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.READ);
 
         if (userUtil.isRegAdmin(user) && caseEntity.getPlanStatus() == PlanStatus.PENDING) {
-            throw new AccessDeniedException("План ещё не согласован и недоступен для просмотра");
+            throw new AccessDeniedException(AccessDeniedMessage.PLAN_OUT_OF_APPROVE.localized(getCurrentLang()));
         }
 
         log.info("Returning plan for case: {}", caseNumber);
@@ -286,15 +312,15 @@ public class PlanServiceImpl implements PlanService {
     @Transactional
     public PlanSubmitResponse submitPlan(String caseNumber, String email) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        userUtil.validateUserAccess(caseEntity, user);
+        userUtil.validateOwnerAccess(caseEntity, user);
 
         if (caseEntity.getPlan() == null) {
-            throw new NotFoundException("План отсутствует");
+            throw new NotFoundException(NotFoundMessage.PLAN.localized(currentLang()));
         }
 
         Long regionId = caseEntity.getOwner().getRegion().getId();
@@ -351,7 +377,7 @@ public class PlanServiceImpl implements PlanService {
     @Transactional(readOnly = true)
     public List<ManagementPendingPlanDto> getManagementPendingPlans(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         List<Long> regionIds = regionRepository.findByAdminsContaining(user)
                 .stream()
@@ -396,10 +422,13 @@ public class PlanServiceImpl implements PlanService {
     public CasePlanResponse updatePlanField(String caseNumber, String email,
                                             int actionNumber, String key, Object value) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
+
+        userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.UPDATE);
 
         if ("номер".equals(key)) {
             throw new IllegalArgumentException("Нельзя изменить номер действия");
@@ -407,19 +436,16 @@ public class PlanServiceImpl implements PlanService {
 
         Map<String, Object> plan = caseEntity.getPlan();
         if (plan == null) {
-            throw new NotFoundException("План отсутствует");
+            throw new NotFoundException(NotFoundMessage.PLAN.localized(currentLang()));
         }
 
         List<Map<String, Object>> actions = (List<Map<String, Object>>) plan.get("actions");
-        if (actions == null) {
-            throw new NotFoundException("Список действий отсутствует");
-        }
 
         Map<String, Object> action = actions.stream()
                 .filter(a -> ((Number) a.get("номер")).intValue() == actionNumber)
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException(
-                        "Действие №" + actionNumber + " не найдено"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ACTION.localized(currentLang(), String.valueOf(actionNumber))));
+
 
         String oldValue = action.get(key) != null ? action.get(key).toString() : null;
 
@@ -530,10 +556,13 @@ public class PlanServiceImpl implements PlanService {
     @Override
     public List<PlanEditHistoryDto> getEditHistory(String caseNumber, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
+
+        userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.READ);
 
         return planEditHistoryRepository
                 .findByCaseEntityIdOrderByEditedAtDesc(caseEntity.getId())
@@ -563,9 +592,9 @@ public class PlanServiceImpl implements PlanService {
     @Override
     public void markOneRead(Long id, String email) {
         PlanNotification notification = planNotificationRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("Уведомление не найдено"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.NOTIFICATION.localized(currentLang(), id.toString())));
         if (!notification.getUserEmail().equals(email)) {
-            throw new AccessDeniedException("Нет доступа");
+            throw new AccessDeniedException(AccessDeniedMessage.USER_ONLY.localized(getCurrentLang()));
         }
         notification.setRead(true);
         planNotificationRepository.save(notification);
@@ -619,5 +648,9 @@ public class PlanServiceImpl implements PlanService {
         User approver = caseEntity.getPlanApprovedBy();
         if (approver == null) return null;
         return approver.getFio();
+    }
+
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
     }
 }

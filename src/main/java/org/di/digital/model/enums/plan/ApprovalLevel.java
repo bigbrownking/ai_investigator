@@ -2,9 +2,12 @@ package org.di.digital.model.enums.plan;
 
 import lombok.Getter;
 import lombok.RequiredArgsConstructor;
+import org.di.digital.exception.message.AccessDeniedMessage;
 import org.springframework.security.access.AccessDeniedException;
 
 import java.util.Arrays;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Getter
 @RequiredArgsConstructor
@@ -29,9 +32,7 @@ public enum ApprovalLevel {
         return Arrays.stream(values())
                 .filter(l -> l.professionId.equals(professionId))
                 .findFirst()
-                .orElseThrow(() -> new AccessDeniedException(
-                        "У вас нет прав для согласования плана"
-                ));
+                .orElseThrow(() -> new AccessDeniedException(AccessDeniedMessage.PLAN_APPROVE.localized(getCurrentLang())));
     }
 
     public boolean isFirstLevel() {

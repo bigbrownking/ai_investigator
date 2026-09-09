@@ -5,13 +5,18 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.AssessmentResult;
 import org.di.digital.dto.message.ClassificationResult;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.file.CaseFileStatusEnum;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.cases.CaseFileService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.di.digital.service.impl.queue.TaskQueueService;
@@ -20,6 +25,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -30,6 +37,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     private final UserRepository userRepository;
     private final TaskQueueService taskQueueService;
     private final NotificationService notificationService;
+    private final CaseAccessService caseAccessService;
     private final UserUtil userUtil;
 
     @Override
@@ -37,7 +45,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     public CaseFile markAsCompleted(Long caseFileId, String result, Long processingDurationSeconds,
                                     ClassificationResult classification, AssessmentResult assessment) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
-                .orElseThrow(() -> new NotFoundException("Файл не найден: " + caseFileId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), caseFileId.toString())));
 
         caseFile.setStatus(CaseFileStatusEnum.COMPLETED);
         caseFile.setCompletedAt(LocalDateTime.now());
@@ -64,11 +72,11 @@ public class CaseFileServiceImpl implements CaseFileService {
     @Override
     public CaseFile markAsFailed(Long caseFileId, String errorMessage, Long processingDurationSeconds) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
-                .orElseThrow(() -> new NotFoundException("Файл не найден: " + caseFileId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), caseFileId.toString())));
 
         caseFile.setStatus(CaseFileStatusEnum.FAILED);
         caseFile.setCompletedAt(LocalDateTime.now());
-        caseFile.setProcessingDurationSeconds(processingDurationSeconds);  // <-- новое
+        caseFile.setProcessingDurationSeconds(processingDurationSeconds);
 
         caseFileRepository.save(caseFile);
         taskQueueService.failTask(caseFileId, errorMessage);
@@ -78,7 +86,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     @Transactional
     public void retryFile(Long caseId, Long caseFileId, String email) {
         CaseFile caseFile = caseFileRepository.findById(caseFileId)
-                .orElseThrow(() -> new NotFoundException("Файл не найден: " + caseFileId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), email)));
 
         if (!CaseFileStatusEnum.FAILED.equals(caseFile.getStatus())) {
             throw new IllegalStateException("Повторная обработка доступна только для файлов со статусом ОШИБКА");
@@ -107,19 +115,24 @@ public class CaseFileServiceImpl implements CaseFileService {
     @Transactional
     public void setQualification(Long caseId, Long fileId, boolean isQualification, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.UPDATE);
 
         CaseFile file = caseEntity.getFiles().stream()
                 .filter(f -> f.getId().equals(fileId))
                 .findFirst()
-                .orElseThrow(() -> new NotFoundException("Файл не найден: " + fileId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), fileId.toString())));
 
         file.setQualification(isQualification);
         caseFileRepository.save(file);
 
         log.info("File {} in case {} marked as qualification={}", fileId, caseId, isQualification);
+    }
+
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
     }
 }

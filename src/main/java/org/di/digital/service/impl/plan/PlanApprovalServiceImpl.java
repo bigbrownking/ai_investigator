@@ -4,7 +4,10 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.plan.PlanApprovalHistoryDto;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.AccessDeniedMessage;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.plan.PlanApprovalHistory;
 import org.di.digital.model.enums.plan.ApprovalLevel;
 import org.di.digital.model.enums.log.LogAction;
@@ -18,12 +21,15 @@ import org.di.digital.service.LogService;
 import org.di.digital.service.plan.PlanApprovalService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.di.digital.util.mapper.PlanMapper;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDateTime;
 import java.util.List;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -34,6 +40,7 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
     private final UserRepository userRepository;
     private final PlanApprovalHistoryRepository historyRepository;
     private final LogService logService;
+    private final UserUtil userUtil;
     private final NotificationService notificationService;
     private final PlanMapper mapper;
 
@@ -43,10 +50,6 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
         User approver = loadUser(email);
         Case caseEntity = loadCase(caseNumber);
         ApprovalLevel lvl = resolveLevel(approver);
-
-        if (!lvl.isFirstLevel()) {
-            throw new AccessDeniedException("Для согласования используйте соответствующий эндпоинт");
-        }
 
         validateCurrentStatus(caseEntity, PlanStatus.PENDING, lvl.getLevel());
         validateRegionAccess(approver, caseEntity);
@@ -84,7 +87,7 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
         ApprovalLevel lvl = resolveLevel(approver);
 
         if (!lvl.isFinalLevel()) {
-            throw new AccessDeniedException("Финальное утверждение доступно только зам. департамента");
+            throw new AccessDeniedException(AccessDeniedMessage.PLAN_FINAL_APPROVE.localized(currentLang()));
         }
 
         validateFinalApproveStatus(caseEntity, lvl.getLevel());
@@ -112,7 +115,7 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
     @Transactional
     public void rejectPlan(String email, String caseNumber, String comment) {
         if (comment == null || comment.isBlank()) {
-            throw new IllegalArgumentException("Комментарий обязателен при отклонении");
+            throw new IllegalStateException("Комментарий обязателен при отклонении");
         }
 
         User approver = loadUser(email);
@@ -167,9 +170,7 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
         User user = loadUser(email);
         Case caseEntity = loadCase(caseNumber);
 
-        if (!caseEntity.getOwner().getEmail().equals(email)) {
-            throw new AccessDeniedException("Только следователь может отозвать план");
-        }
+        userUtil.validateOwnerAccess(caseEntity, user);
 
         PlanStatus current = caseEntity.getPlanStatus();
 
@@ -204,17 +205,17 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
 
     private User loadUser(String email) {
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CHAT.localized(currentLang(), email)));
     }
 
     private Case loadCase(String caseNumber) {
         return caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
     }
 
     private ApprovalLevel resolveLevel(User approver) {
         if (approver.getProfession() == null) {
-            throw new AccessDeniedException("У пользователя не назначена профессия");
+            throw new AccessDeniedException(AccessDeniedMessage.USER_WITHOUT_PROFESSION.localized(currentLang()));
         }
         return ApprovalLevel.fromProfession(approver.getProfession().getId());
     }
@@ -242,13 +243,13 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
 
     private void validateRegionAccess(User approver, Case c) {
         if (approver.getRegion() == null) {
-            throw new AccessDeniedException("У пользователя не назначен регион");
+            throw new AccessDeniedException(AccessDeniedMessage.USER_WITHOUT_REGION.localized(currentLang()));
         }
 
         User owner = c.getOwner();
         if (owner == null || owner.getRegion() == null
                 || !owner.getRegion().getId().equals(approver.getRegion().getId())) {
-            throw new AccessDeniedException("Дело не принадлежит вашему региону");
+            throw new AccessDeniedException(AccessDeniedMessage.CASE_OUT_OF_REGION.localized(currentLang()));
         }
     }
 
@@ -264,5 +265,9 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
                 .comment(comment)
                 .build();
         historyRepository.save(entry);
+    }
+
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
     }
 }

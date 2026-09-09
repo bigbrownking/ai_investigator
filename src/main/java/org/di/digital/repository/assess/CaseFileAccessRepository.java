@@ -15,6 +15,7 @@ import java.util.Set;
 public interface CaseFileAccessRepository extends JpaRepository<CaseFileAccess, Long> {
 
     Optional<CaseFileAccess> findByFileIdAndUserId(Long fileId, Long userId);
+    List<CaseFileAccess> findByFileIdInAndUserId(List<Long> fileIds, Long userId);
 
     List<CaseFileAccess> findByUserId(Long userId);
 
@@ -26,8 +27,25 @@ public interface CaseFileAccessRepository extends JpaRepository<CaseFileAccess, 
     void deleteByFileIdAndUserId(Long fileId, Long userId);
 
     @Modifying
-    @Query("delete from CaseFileAccess fa " +
-            "where fa.user.id = :userId and fa.file.caseEntity.id = :caseId")
+    @Query(value = """
+    delete from case_file_access_actions
+    where file_access_id in (
+        select cfa.id from case_file_access cfa
+        join case_files f on f.id = cfa.file_id
+        where cfa.user_id = :userId and f.case_id = :caseId
+    )
+    """, nativeQuery = true)
+    void deleteAllActionsByCaseAndUser(@Param("caseId") Long caseId,
+                                       @Param("userId") Long userId);
+
+    @Modifying
+    @Query(value = """
+    delete from case_file_access
+    where user_id = :userId
+    and file_id in (
+        select id from case_files where case_id = :caseId
+    )
+    """, nativeQuery = true)
     void deleteAllByCaseAndUser(@Param("caseId") Long caseId,
                                 @Param("userId") Long userId);
 

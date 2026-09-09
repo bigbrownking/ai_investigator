@@ -3,9 +3,14 @@ package org.di.digital.service.impl.interrogation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.cases.ReferenceDto;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChatMessage;
 import org.di.digital.model.enums.cases.MessageRole;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationCaseChat;
 import org.di.digital.model.user.User;
@@ -13,11 +18,15 @@ import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationCaseChatRepository;
 import org.di.digital.repository.user.UserRepository;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -28,20 +37,22 @@ public class InterrogationChatWriter {
     private final UserRepository userRepository;
     private final CaseChatMessageRepository chatMessageRepository;
     private final CaseInterrogationCaseChatRepository caseChatRepository;
+    private final CaseAccessService caseAccessService;
 
     @Transactional
     public PreparedCaseChat prepareCaseChat(Long caseId, Long interrogationId,
                                             String userEmail, String question) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.ADD);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.INTERROGATION.localized(currentLang(), interrogationId.toString())));
 
         Long messageId = createCaseChatMessages(interrogation, user, question);
         return new PreparedCaseChat(messageId, caseEntity.getNumber());
@@ -87,7 +98,7 @@ public class InterrogationChatWriter {
     public void updateAssistantMessage(Long messageId, String content,
                                        List<ReferenceDto> references) {
         CaseChatMessage message = chatMessageRepository.findById(messageId)
-                .orElseThrow(() -> new IllegalStateException("Message not found: " + messageId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.MESSAGE.localized(currentLang(), messageId.toString())));
         message.setContent(content);
         message.setReferences(references);
         message.setComplete(true);
@@ -95,4 +106,9 @@ public class InterrogationChatWriter {
     }
 
     public record PreparedCaseChat(Long messageId, String caseNumber) {}
+
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
+    }
+
 }

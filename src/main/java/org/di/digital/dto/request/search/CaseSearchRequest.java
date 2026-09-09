@@ -1,6 +1,7 @@
 package org.di.digital.dto.request.search;
 
 import lombok.*;
+import org.di.digital.model.enums.cases.CaseRejectionReason;
 
 import java.time.LocalDate;
 
@@ -17,4 +18,5 @@ public class CaseSearchRequest {
     private LocalDate to;
     private String ownerName;
     private String region;
+    private CaseRejectionReason rejectionReason;
 }

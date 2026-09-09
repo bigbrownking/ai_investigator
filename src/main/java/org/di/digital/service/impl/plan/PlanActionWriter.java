@@ -7,12 +7,18 @@ import org.di.digital.dto.request.plan.ManualStatusRequest;
 import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.plan.ManualStatusResponse;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
 import org.di.digital.model.enums.plan.ActionStatus;
 import org.di.digital.model.enums.plan.PlanStatus;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
+import org.di.digital.service.cases.CaseAccessService;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -23,6 +29,8 @@ import java.util.ArrayList;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -42,16 +50,15 @@ public class PlanActionWriter {
     @Transactional
     @SuppressWarnings("unchecked")
     public PlanActionResult persistAddAction(String caseNumber, String email, AddPlanActionRequest request) {
-        userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         Map<String, Object> plan = caseEntity.getPlan();
-        if (plan == null) throw new IllegalStateException("План отсутствует");
+        if (plan == null) throw new NotFoundException(NotFoundMessage.PLAN.localized(currentLang()));
 
         List<Map<String, Object>> actions = (List<Map<String, Object>>) plan.get("actions");
-        if (actions == null) throw new IllegalStateException("Список действий отсутствует");
 
         Map<String, Object> newAction = new LinkedHashMap<>();
         newAction.put("номер", 0);
@@ -80,7 +87,7 @@ public class PlanActionWriter {
                 }
             }
             if (insertIndex == -1) {
-                throw new RuntimeException("Действие №" + request.getInsertAfter() + " не найдено");
+                throw new NotFoundException(NotFoundMessage.PLAN.localized(currentLang(), String.valueOf(insertIndex)));
             }
             actions.add(insertIndex, newAction);
         } else {
@@ -105,20 +112,19 @@ public class PlanActionWriter {
     @Transactional
     @SuppressWarnings("unchecked")
     public PlanActionResult persistDeleteAction(String caseNumber, String email, int actionNumber) {
-        userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("Пользователь не найден: " + email));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         Map<String, Object> plan = caseEntity.getPlan();
-        if (plan == null) throw new IllegalStateException("План отсутствует");
+        if (plan == null) throw new NotFoundException(NotFoundMessage.PLAN.localized(currentLang()));
 
         List<Map<String, Object>> actions = (List<Map<String, Object>>) plan.get("actions");
-        if (actions == null) throw new IllegalStateException("Список действий отсутствует");
 
         boolean removed = actions.removeIf(a -> ((Number) a.get("номер")).intValue() == actionNumber);
         if (!removed) {
-            throw new RuntimeException("Действие №" + actionNumber + " не найдено");
+            throw new NotFoundException(NotFoundMessage.ACTION.localized(currentLang()));
         }
 
         renumber(actions);
@@ -144,9 +150,9 @@ public class PlanActionWriter {
     public ActionStatusPrep prepareActionStatus(String caseNumber, String email,
                                                 ManualStatusRequest request) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         if (caseEntity.getPlanStatus() != PlanStatus.APPROVED_L3) {
             throw new IllegalStateException(
@@ -154,10 +160,9 @@ public class PlanActionWriter {
         }
 
         Map<String, Object> plan = caseEntity.getPlan();
-        if (plan == null) throw new IllegalStateException("План отсутствует");
+        if (plan == null) throw new NotFoundException(NotFoundMessage.PLAN.localized(currentLang()));
 
         List<Map<String, Object>> actions = (List<Map<String, Object>>) plan.get("actions");
-        if (actions == null) throw new IllegalStateException("Список действий отсутствует");
 
         Map<String, Object> action = actions.stream()
                 .filter(a -> ((Number) a.get("номер")).intValue() == request.getActionNumber())
@@ -184,14 +189,12 @@ public class PlanActionWriter {
                                                   ManualStatusRequest request, String role,
                                                   Map<String, Object> aiResponse) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         Map<String, Object> plan = caseEntity.getPlan();
-        if (plan == null) throw new IllegalStateException("План отсутствует");
+        if (plan == null) throw new NotFoundException(NotFoundMessage.PLAN.localized(currentLang()));
 
         List<Map<String, Object>> actions = (List<Map<String, Object>>) plan.get("actions");
-        if (actions == null) throw new IllegalStateException("Список действий отсутствует");
-
         Map<String, Object> action = actions.stream()
                 .filter(a -> ((Number) a.get("номер")).intValue() == request.getActionNumber())
                 .findFirst()
@@ -243,4 +246,8 @@ public class PlanActionWriter {
 
     /** response — готовый DTO; plan — для syncPlanToAi вне транзакции. */
     public record PlanActionResult(CasePlanResponse response, Map<String, Object> plan) {}
+
+    private UserSettingsLanguage currentLang() {
+        return getCurrentLang();
+    }
 }

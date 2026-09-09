@@ -3,7 +3,9 @@ package org.di.digital.util.requests;
 import jakarta.servlet.http.HttpServletRequest;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.exception.message.AccessDeniedMessage;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.user.Appeal;
 import org.di.digital.model.user.Region;
 import org.di.digital.model.user.User;
@@ -49,6 +51,14 @@ public class UserUtil {
         }
         return null;
     }
+    public static UserSettingsLanguage getCurrentLang() {
+        try {
+            UserSettingsLanguage l = getCurrentUser().getSettings().getLanguage();
+            return l != null ? l : UserSettingsLanguage.KZ;
+        } catch (Exception e) {
+            return UserSettingsLanguage.KZ;
+        }
+    }
 
     public static HttpServletRequest getCurrentHttpRequest() {
         return ((ServletRequestAttributes) RequestContextHolder.currentRequestAttributes()).getRequest();
@@ -63,7 +73,7 @@ public class UserUtil {
                     caseEntity.getNumber(),
                     user.getEmail()
             );
-            throw new AccessDeniedException("У вас нет доступа к этому делу");
+            throw new AccessDeniedException(AccessDeniedMessage.USER_ONLY.localized(currentLang()));
         }
     }
 
@@ -77,38 +87,38 @@ public class UserUtil {
                     caseEntity.getNumber(),
                     user.getEmail()
             );
-            throw new AccessDeniedException("Только владелец дела может управлять участниками");
+            throw new AccessDeniedException(AccessDeniedMessage.OWNER_ONLY.localized(currentLang()));
         }
     }
 
     public void validateRegionAccess(User admin, Case caseEntity) {
         if (admin.getRegion() == null) {
-            throw new AccessDeniedException("У администратора нет региона");
+            throw new AccessDeniedException(AccessDeniedMessage.ADMIN_NO_REGION.localized(currentLang()));
         }
         User owner = caseEntity.getOwner();
         if (owner == null || owner.getRegion() == null) {
-            throw new AccessDeniedException("Дело не принадлежит вашему региону");
+            throw new AccessDeniedException(AccessDeniedMessage.USER_WITHOUT_REGION.localized(currentLang()));
         }
         boolean hasAccess = getAdminRegionIds(admin).contains(owner.getRegion().getId());
         if (!hasAccess) {
-            throw new AccessDeniedException("Дело не принадлежит вашему региону");
+            throw new AccessDeniedException(AccessDeniedMessage.CASE_OUT_OF_REGION.localized(currentLang()));
         }
     }
 
     public void validateUserRegionAccess(User admin, User user) {
         List<Long> regionIds = getAdminRegionIds(admin);
         if (regionIds.isEmpty()) {
-            throw new AccessDeniedException("У администратора нет регионов");
+            throw new AccessDeniedException(AccessDeniedMessage.ADMIN_NO_REGION.localized(currentLang()));
         }
         if (user.getRegion() == null || !regionIds.contains(user.getRegion().getId())) {
-            throw new AccessDeniedException("Этот пользователь не принадлежит вашему региону");
+            throw new AccessDeniedException(AccessDeniedMessage.USER_ONLY.localized(currentLang()));
         }
     }
 
     public void validateAppealRegionAccess(User admin, Appeal appeal) {
         List<Long> regionIds = getAdminRegionIds(admin);
         if (appeal.getRegion() == null || !regionIds.contains(appeal.getRegion().getId())) {
-            throw new AccessDeniedException("Это обращение не принадлежит вашему региону");
+            throw new AccessDeniedException(AccessDeniedMessage.APPEAL_OUT_OF_REGION.localized(currentLang()));
         }
     }
 
@@ -120,7 +130,7 @@ public class UserUtil {
     public List<Region> getAdminRegions(User admin) {
         List<Region> regions = regionRepository.findByAdminsContaining(admin);
         if (regions.isEmpty()) {
-            throw new IllegalStateException("У админа нет ответственных регионов");
+            throw new IllegalStateException(AccessDeniedMessage.ADMIN_NO_REGION.localized(currentLang()));
         }
         return regions;
     }
@@ -128,5 +138,8 @@ public class UserUtil {
     public boolean isRegAdmin(User user) {
         return user.getRoles().stream()
                 .anyMatch(r -> r.getName().equals(ROLE_REG_ADMIN));
+    }
+    private UserSettingsLanguage currentLang() {
+        return getCurrentLang();
     }
 }

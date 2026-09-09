@@ -2,6 +2,7 @@ package org.di.digital.service.export;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.di.digital.exception.NotFoundException;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -19,7 +20,7 @@ public class QualificationDocumentFormatter extends BaseDocumentFormatter {
 
     public byte[] generate(List<Map<String, Object>> sections) throws IOException {
         if (sections == null || sections.isEmpty()) {
-            throw new IllegalStateException("Квалификация пуста");
+            throw new NotFoundException("Квалификация пуста");
         }
 
         try (XWPFDocument doc = new XWPFDocument()) {

@@ -7,6 +7,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.TranscriptionResultMessage;
 import org.di.digital.dto.request.interrogation.CleanTranscriptRequest;
 import org.di.digital.dto.response.interrogation.CleanTranscriptResponse;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.enums.interrogation.QAStatusEnum;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
@@ -14,6 +16,8 @@ import org.di.digital.service.interrogation.CaseInterrogationReformulateService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Component
@@ -34,7 +38,7 @@ public class TranscriptionResultConsumer {
         try {
             CaseInterrogation interrogation = interrogationRepository
                     .findById(message.getInterrogationId())
-                    .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + message.getInterrogationId()));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.INTERROGATION.localized(getCurrentLang(), String.valueOf(message.getInterrogationId()))));
 
             boolean isOtherAudio = message.getFieldName() != null;
 

@@ -3,6 +3,8 @@ package org.di.digital.util.schedule;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.DocumentProcessingMessage;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.queue.TaskQueue;
@@ -18,6 +20,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.TimeUnit;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Component
@@ -60,7 +64,7 @@ public class RoundRobinScheduler {
                 task.getFileName(), task.getCaseFileId(), task.getUserEmail(), task.getCaseNumber());
 
         CaseFile caseFile = caseFileRepository.findById(task.getCaseFileId())
-                .orElseThrow(() -> new IllegalStateException("Файл не найден: " + task.getCaseFileId()));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(getCurrentLang(), String.valueOf(task.getCaseFileId()))));
 
         caseFile.setStatus(CaseFileStatusEnum.PENDING);
         caseFileRepository.save(caseFile);

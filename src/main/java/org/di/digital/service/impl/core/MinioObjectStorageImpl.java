@@ -139,55 +139,54 @@ public class MinioObjectStorageImpl implements MinioObjectStorage {
     }
 
     public byte[] presignedGetUrl(String objectName) {
-    try {
-        InputStream stream = minioClient.getObject(
-                GetObjectArgs.builder()
-                        .bucket(bucketName)
-                        .object(objectName)
-                        .build()
-        );
-        byte[] encryptedBytes = stream.readAllBytes();
-        stream.close();
+        try {
+            InputStream stream = minioClient.getObject(
+                    GetObjectArgs.builder()
+                            .bucket(bucketName)
+                            .object(objectName)
+                            .build()
+            );
+            byte[] encryptedBytes = stream.readAllBytes();
+            stream.close();
 
-        // 2. Если файл зашифрован или включен шифратор — расшифровываем
-        if (fileCipher.isEnabled() && fileCipher.isEncryptedName(objectName)) {
-            return fileCipher.decrypt(encryptedBytes);
+            // 2. Если файл зашифрован или включен шифратор — расшифровываем
+            if (fileCipher.isEnabled() && fileCipher.isEncryptedName(objectName)) {
+                return fileCipher.decrypt(encryptedBytes);
+            }
+
+            return encryptedBytes;
+        } catch (Exception e) {
+            log.error("Error fetching/decrypting file for preview: {}", objectName, e);
+            throw new IllegalStateException("Failed to prepare file preview", e);
         }
-        
-        return encryptedBytes;
-    } catch (Exception e) {
-        log.error("Error fetching/decrypting file for preview: {}", objectName, e);
-        throw new IllegalStateException("Failed to prepare file preview", e);
     }
-}
 
 
-@Override
-public String presignedGetUrl(String objectName, Map<String, String> headers) {
-    try {
-       if (fileCipher.isEnabled() && fileCipher.isEncryptedName(objectName)) {
-            log.warn("Presigned URL requested for encrypted object: {}. " +
-                     "Client won't be able to preview it directly. Use backend proxy endpoint instead.", objectName);
-            
-            return toPublicUrl("//files/preview?objectName=" + objectName);
+    @Override
+    public String presignedGetUrl(String objectName, Map<String, String> headers) {
+        try {
+            if (fileCipher.isEnabled() && fileCipher.isEncryptedName(objectName)) {
+                log.warn("Presigned URL requested for encrypted object: {}. " +
+                        "Client won't be able to preview it directly. Use backend proxy endpoint instead.", objectName);
+
+                return toPublicUrl("//files/preview?objectName=" + objectName);
+            }
+
+            String presignedUrl = minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
+                    .method(Method.GET)
+                    .bucket(bucketName)
+                    .object(objectName)
+                    .expiry(presignedUrlExpiryHours, TimeUnit.HOURS)
+                    .extraQueryParams(headers)
+                    .build());
+
+            return toPublicUrl(presignedUrl);
+        } catch (Exception e) {
+            log.error("Error generating presigned URL for: {}", objectName, e);
+            throw new IllegalStateException("Failed to generate presigned URL", e);
         }
-
-       String presignedUrl = minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
-                .method(Method.GET)
-                .bucket(bucketName)
-                .object(objectName)
-                .expiry(presignedUrlExpiryHours, TimeUnit.HOURS)
-                .extraQueryParams(headers)
-                .build());
-
-        return toPublicUrl(presignedUrl);
-    } catch (Exception e) {
-        log.error("Error generating presigned URL for: {}", objectName, e);
-        throw new IllegalStateException("Failed to generate presigned URL", e);
     }
-}
- 
-    
+
 
     private String toPublicUrl(String presignedUrl) {
         if (minioPublicUrl != null && !minioPublicUrl.isBlank()) {

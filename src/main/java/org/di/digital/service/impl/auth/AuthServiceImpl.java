@@ -6,6 +6,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.auth.*;
 import org.di.digital.dto.response.auth.JwtResponse;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.appeal.AppealStatus;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
@@ -31,6 +33,8 @@ import java.time.Duration;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.regex.Pattern;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -80,8 +84,7 @@ public class AuthServiceImpl implements AuthService {
         String raw = rsaDecryptor.decrypt(encryptedPassword);
         if (!PASSWORD_PATTERN.matcher(raw).matches()) {
             throw new IllegalStateException(
-                    "Пароль не соответствует требованиям: минимум 8 символов, " +
-                            "хотя бы одна заглавная буква, одна строчная, одна цифра и один спецсимвол"
+                   MessageConstant.PASSWORD_INVALID.format(currentLang())
             );
         }
         return raw;
@@ -93,13 +96,13 @@ public class AuthServiceImpl implements AuthService {
 
         if (userRepository.existsByEmail(request.getEmail())) {
             log.warn("Email already exists: {}", request.getEmail());
-            return "Email is already registered";
+            return MessageConstant.USER_ALREADY_REGISTERED.format(currentLang(), request.getEmail());
         }
 
         String rawPassword = request.getPassword();
 
         Role userRole = roleRepository.findByName("ADMIN")
-                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
 
         User user = User.builder()
                 .email(request.getEmail())
@@ -136,19 +139,19 @@ public class AuthServiceImpl implements AuthService {
 
         if (userRepository.existsByEmail(request.getEmail())) {
             log.warn("Email already exists: {}", request.getEmail());
-            return "Email is already registered";
+            return MessageConstant.USER_ALREADY_REGISTERED.format(currentLang(), request.getEmail());
         }
 
         String rawPassword = decryptAndValidatePassword(request.getPassword());
 
         Role userRole = roleRepository.findByName("USER")
-                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
 
         boolean isZamDep = false;
         Profession profession = null;
         if (request.getProfessionId() != null) {
             profession = professionRepository.findById(request.getProfessionId())
-                    .orElseThrow(() -> new NotFoundException("Профессия не найдена"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.PROFESSION.localized(currentLang(), request.getProfessionId().toString())));
             if (profession.getId() == 7) {
                 isZamDep = true;
             }
@@ -157,19 +160,19 @@ public class AuthServiceImpl implements AuthService {
         Region region = null;
         if (request.getRegionId() != null) {
             region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new NotFoundException("Регион не найден"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.REGION.localized(currentLang(), request.getRegionId().toString())));
         }
 
         Rank rank = null;
         if (request.getRankId() != null) {
             rank = rankRepository.findById(request.getRankId())
-                    .orElseThrow(() -> new NotFoundException("Звание не найдено"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.RANK.localized(currentLang(), request.getRankId().toString())));
         }
 
         Administration administration = null;
         if (request.getAdministrationId() != null && !isZamDep) {
             administration = administrationRepository.findById(request.getAdministrationId())
-                    .orElseThrow(() -> new NotFoundException("Управление не найдено"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.ADMINISTRATION.localized(currentLang(), request.getAdministrationId().toString())));
         }
 
         User user = User.builder()
@@ -234,30 +237,30 @@ public class AuthServiceImpl implements AuthService {
     public String signupRegAdmin(SignUpRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
             log.warn("Email already exists: {}", request.getEmail());
-            return "Email is already registered";
+            return MessageConstant.USER_ALREADY_REGISTERED.format(currentLang(), request.getEmail());
         }
 
         String rawPassword = decryptAndValidatePassword(request.getPassword());
 
         Role userRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
 
         Region region = null;
         if (request.getRegionId() != null) {
             region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new NotFoundException("Регион не найден"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.REGION.localized(currentLang(), request.getRegionId().toString())));
         }
 
         Profession profession = null;
         if (request.getProfessionId() != null) {
             profession = professionRepository.findById(request.getProfessionId())
-                    .orElseThrow(() -> new NotFoundException("Профессия не найдена"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.PROFESSION.localized(currentLang(), request.getProfessionId().toString())));
         }
 
         Administration administration = null;
         if (request.getAdministrationId() != null) {
             administration = administrationRepository.findById(request.getAdministrationId())
-                    .orElseThrow(() -> new NotFoundException("Управление не найдено"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.ADMINISTRATION.localized(currentLang(), request.getAdministrationId().toString())));
         }
 
         User user = User.builder()
@@ -297,20 +300,20 @@ public class AuthServiceImpl implements AuthService {
     @Override
     public JwtResponse login(LoginRequest request) {
         User user = userRepository.findByIin(request.getIin())
-                .orElseThrow(() -> new NotFoundException("Пользователь с таким ИИН не найден: " + request.getIin()));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), request.getIin())));
 
-        if (user.isDeleted()) throw new IllegalStateException("Данный аккаунт удален");
-        if (!user.isActive()) throw new IllegalStateException("Пользователь еще не был подтвержден админом");
+        if (user.isDeleted()) throw new IllegalStateException(MessageConstant.USER_ALREADY_DELETED.format(currentLang()));
+        if (!user.isActive()) throw new IllegalStateException(MessageConstant.USER_NOT_VERIFIED.format(currentLang()));
 
         if (isLocked(user)) {
             long minutesLeft = Duration.between(LocalDateTime.now(), user.getLockTime()).toMinutes() + 1;
-            throw new IllegalStateException("Аккаунт заблокирован из-за превышения числа попыток входа. Повторите через " + minutesLeft + " мин.");
+            throw new IllegalStateException(MessageConstant.ACCOUNT_LOCKED.format(currentLang(), minutesLeft));
         }
 
         String rawPassword = rsaDecryptor.decrypt(request.getPassword());
         if (!passwordEncoder.matches(rawPassword, user.getPassword())) {
             registerFailedAttempt(user);
-            throw new IllegalStateException("Вы ввели неправильный пароль");
+            throw new IllegalStateException(MessageConstant.PASSWORD_INCORRECT.format(currentLang()));
         }
 
         resetFailedAttempts(user);
@@ -390,13 +393,13 @@ public class AuthServiceImpl implements AuthService {
 
         if (!jwtTokenUtil.validateRefreshToken(refreshToken)) {
             log.error("Invalid refresh token");
-            throw new IllegalStateException("Invalid refresh token");
+            return null;
         }
 
         String username = jwtTokenUtil.getUsernameFromJwtToken(refreshToken);
 
         User user = userRepository.findByEmail(username)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + username));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), username)));
 
         String newAccessToken = jwtTokenUtil.generateTokenFromUsername(user.getEmail());
         String newRefreshToken = jwtTokenUtil.generateRefreshToken(user.getEmail());
@@ -415,7 +418,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public String forgotPassword(ForgotPasswordRequest request) {
         User user = userRepository.findByEmail(request.getEmail())
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), request.getEmail())));
 
         String token = UUID.randomUUID().toString();
         user.setResetToken(token);
@@ -436,20 +439,20 @@ public class AuthServiceImpl implements AuthService {
                 .orElseThrow(() -> new IllegalStateException("Неверный токен"));
 
         if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
-            throw new IllegalStateException("Срок действия ссылки истёк");
+            throw new IllegalStateException(MessageConstant.TOKEN_EXPIRED.format(currentLang()));
         }
 
         String rawPassword = decryptAndValidatePassword(request.getNewPassword());
 
         if (passwordEncoder.matches(rawPassword, user.getPassword())) {
-            throw new IllegalStateException("Новый пароль не должен совпадать с текущим");
+            throw new IllegalStateException(MessageConstant.PASSWORD_MUST_BE_CHANGED.format(currentLang()));
         }
 
         List<PasswordHistory> history = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
 
         for (PasswordHistory h : history) {
             if (passwordEncoder.matches(rawPassword, h.getPasswordHash())) {
-                throw new IllegalStateException("Этот пароль уже использовался ранее");
+                throw new IllegalStateException(MessageConstant.PASSWORD_ALREADY_USED.format(currentLang());
             }
         }
 
@@ -481,13 +484,13 @@ public class AuthServiceImpl implements AuthService {
         String rawNew = decryptAndValidatePassword(encryptedNewPassword);
 
         if (passwordEncoder.matches(rawNew, user.getPassword())) {
-            throw new IllegalStateException("Новый пароль не должен совпадать с текущим");
+            throw new IllegalStateException(MessageConstant.PASSWORD_MUST_BE_CHANGED.format(currentLang()));
         }
 
         List<PasswordHistory> history = passwordHistoryRepository.findByUserOrderByChangedAtDesc(user);
         for (PasswordHistory h : history) {
             if (passwordEncoder.matches(rawNew, h.getPasswordHash())) {
-                throw new IllegalStateException("Этот пароль уже использовался ранее");
+                throw new IllegalStateException(MessageConstant.PASSWORD_ALREADY_USED.format(currentLang()));
             }
         }
 
@@ -516,17 +519,21 @@ public class AuthServiceImpl implements AuthService {
 
         String jti = preAuthTokenUtil.jti(claims);
         if (jti == null) {
-            throw new IllegalStateException("Недействительный токен смены пароля");
+            throw new IllegalStateException(MessageConstant.TOKEN_INCORRECT.localized(currentLang()));
         }
 
         boolean firstUse = oneTimeTokenService.markUsed(jti, preAuthTokenUtil.expiresAt(claims));
         if (!firstUse) {
-            throw new IllegalStateException("Токен смены пароля уже был использован");
+            throw new IllegalStateException(MessageConstant.TOKEN_ALREADY_USED.localized(currentLang()));
         }
 
         User user = userRepository.findById(preAuthTokenUtil.userId(claims))
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), preAuthTokenUtil.userId(claims).toString())));
 
         return applyNewPassword(user, encryptedNewPassword);
+    }
+
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
     }
 }

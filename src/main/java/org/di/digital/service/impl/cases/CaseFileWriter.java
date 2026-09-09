@@ -4,12 +4,17 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.cases.CaseFileResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.*;
 import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
@@ -25,6 +30,8 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.*;
 import java.util.stream.Collectors;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -46,7 +53,7 @@ public class CaseFileWriter {
     @Transactional
     public CreatedCase createCaseShell(CreateCaseData data, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         if (caseRepository.existsByNumber(data.number())) {
             logService.log(String.format("Case already exists: %s", data.number()),
@@ -65,7 +72,6 @@ public class CaseFileWriter {
         newCase.addUser(user);
 
         Case saved = caseRepository.saveAndFlush(newCase);
-        //caseAccessService.grantFullAccess(saved, user);
 
         return new CreatedCase(saved.getId(), saved.getNumber());
     }
@@ -74,10 +80,10 @@ public class CaseFileWriter {
     public CaseResponse attachFilesToNewCase(Long caseId, String email, String language,
                                              List<UploadedFile> uploaded) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         List<CaseFile> newFiles = new ArrayList<>();
         for (UploadedFile uf : uploaded) {
             CaseFile caseFile = buildCaseFile(uf, language, false, user);
@@ -100,17 +106,18 @@ public class CaseFileWriter {
     @Transactional(readOnly = true)
     public AddFilesContext prepareAddFiles(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("user not found: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.ADD);
 
         if (Boolean.TRUE.equals(caseEntity.getIsFinalIndictmentDone())) {
             logService.log(String.format("Cannot upload files by %s user in case %s",
                             email, caseEntity.getNumber()),
                     LogLevel.ERROR, LogAction.FILE_UPLOAD, caseEntity.getNumber(), email);
             throw new IllegalStateException(
-                    MessageConstant.CANNOT_UPLOAD_FILE.format(caseEntity.getNumber()));
+                    MessageConstant.CANNOT_UPLOAD_FILE.format(currentLang(), caseEntity.getNumber()));
         }
 
         Set<String> existingNames = caseEntity.getFiles().stream()
@@ -125,10 +132,10 @@ public class CaseFileWriter {
                                                             String language, boolean isQualification,
                                                             List<UploadedFile> uploaded) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         List<CaseFile> existingFiles = new ArrayList<>(caseEntity.getFiles());
         Set<String> existingNames = existingFiles.stream()
@@ -216,4 +223,8 @@ public class CaseFileWriter {
     public record UploadedFile(
             String originalFileName, String storedFileName, String fileUrl,
             String contentType, Long fileSize, LocalDateTime uploadedAt, Integer pages) {}
+
+    private UserSettingsLanguage currentLang() {
+        return getCurrentLang();
+    }
 }

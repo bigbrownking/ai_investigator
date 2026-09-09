@@ -31,12 +31,6 @@ public class CaseQualificationController {
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamQualification(@RequestParam String caseNumber,
                                           Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            log.error("Unauthenticated access attempt to qualification stream");
-            SseEmitter emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalStateException("Authentication required"));
-            return emitter;
-        }
         log.info("Generating qualification for case: {} by user: {}",
                 caseNumber, authentication.getName());
         return qualificationService.generateQualification(caseNumber, authentication.getName());
@@ -63,19 +57,15 @@ public class CaseQualificationController {
 
     @GetMapping("/sections")
     public ResponseEntity<List<QualificationSectionDto>> getQualificationSections(
-            @RequestParam String caseNumber) {
-        return ResponseEntity.ok(qualificationService.getQualificationSections(caseNumber));
+            @RequestParam String caseNumber,
+            Authentication authentication) {
+        return ResponseEntity.ok(qualificationService.getQualificationSections(caseNumber, authentication.getName()));
     }
 
     @GetMapping(value = "/stream/section", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamSection(@RequestParam String caseNumber,
                                     @RequestParam int sectionId,
                                     Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            SseEmitter emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalStateException("Authentication required"));
-            return emitter;
-        }
         return qualificationService.generateQualificationSection(
                 caseNumber, authentication.getName(), sectionId);
     }
@@ -84,11 +74,6 @@ public class CaseQualificationController {
     public SseEmitter streamRephrase(@RequestParam String caseNumber,
                                      @RequestBody QualificationRephraseRequest request,
                                      Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            SseEmitter emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalStateException("Authentication required"));
-            return emitter;
-        }
         return qualificationService.generateQualificationPrompt(
                 caseNumber, authentication.getName(),
                 request.getStartSectionId(), request.getStartOffset(),
@@ -100,12 +85,9 @@ public class CaseQualificationController {
             @RequestParam String caseNumber,
             @RequestBody QualificationRephraseApplyRequest request,
             Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(401).build();
-        }
         log.info("Applying qualification rephrase for case: {} by user: {}",
                 caseNumber, authentication.getName());
-        return ResponseEntity.ok(qualificationService.applyRephrase(caseNumber, request));
+        return ResponseEntity.ok(qualificationService.applyRephrase(caseNumber,  authentication.getName(), request));
     }
 
     @PatchMapping("/sections")
@@ -113,11 +95,8 @@ public class CaseQualificationController {
             @RequestParam String caseNumber,
             @RequestBody QualificationSectionUpdateRequest request,
             Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(401).build();
-        }
         log.info("Updating qualification section {} for case: {} by user: {}",
                 request.getId(), caseNumber, authentication.getName());
-        return ResponseEntity.ok(qualificationService.updateSection(caseNumber, request));
+        return ResponseEntity.ok(qualificationService.updateSection(caseNumber,  authentication.getName(), request));
     }
 }

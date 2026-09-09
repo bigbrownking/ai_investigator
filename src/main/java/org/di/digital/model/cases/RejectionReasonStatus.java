@@ -41,7 +41,4 @@ public class RejectionReasonStatus{
     @CreatedDate
     @Column(name = "timestamp")
     private LocalDateTime timestamp;
-
-  
-
 }

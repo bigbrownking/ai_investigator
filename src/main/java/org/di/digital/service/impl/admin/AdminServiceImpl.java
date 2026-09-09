@@ -19,9 +19,13 @@ import org.di.digital.dto.response.user.UserDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.appeal.AppealStatus;
 import org.di.digital.model.enums.cases.MessageRole;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.support.Review;
 import org.di.digital.model.support.SupportTicket;
@@ -134,7 +138,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public CasePageResponse getUserCases(Long userId, int page, int size, CaseSearchRequest req) {
         userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
 
         Specification<Case> spec = CaseSpecifications.build(req)
                 .and(hasOwner(userId));
@@ -161,7 +165,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public CaseInterrogationFullResponse getInterrogationDetail(Long interrogationId) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new NotFoundException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.INTERROGATION.localized(currentLang(), interrogationId.toString())));
 
         User user = interrogation.getCaseEntity().getOwner();
 
@@ -172,7 +176,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public byte[] downloadInterrogation(Long interrogationId) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new NotFoundException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.INTERROGATION.localized(currentLang(), interrogationId.toString())));
         CaseInterrogationFullResponse data = interrogationMapper.toFullResponse(interrogation, interrogation.getCaseEntity().getOwner());
         return interrogationExportService.exportToDocx(data, interrogation.getCaseEntity().getOwner());
     }
@@ -267,7 +271,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public void activateUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
         user.setActive(true);
         userRepository.save(user);
         log.info("User {} activated by admin", userId);
@@ -276,7 +280,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public void deactivateUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
         user.setActive(false);
         userRepository.save(user);
         log.info("User {} deactivated by admin", userId);
@@ -287,23 +291,21 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void deleteUser(Long userId) {
         User user = userRepository.findById(userId)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
 
         if (user.isActive()) {
-            throw new IllegalStateException("Пользователь активен, сперва деактивируйте его");
+            throw new IllegalStateException(MessageConstant.USER_STILL_ACTIVE.format(currentLang(), user.getEmail()));
         }
 
         if (userRepository.isRegionAdmin(userId)) {
-            throw new IllegalStateException(
-                    "Пользователь является администратором региона, сначала назначьте другого админа");
+            throw new IllegalStateException(MessageConstant.USER_IS_REG_ADMIN.format(currentLang(), user.getEmail()));
         }
 
         User regionAdmin = null;
         if (user.getRegion() != null) {
             Long regionId = user.getRegion().getId();
             Long adminUserId = userRepository.findAdminUserIdByRegionId(regionId)
-                    .orElseThrow(() -> new IllegalStateException(
-                            "Админ региона не найден для региона " + regionId));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang())));
             regionAdmin = userRepository.getReferenceById(adminUserId);
         }
 
@@ -331,7 +333,7 @@ public class AdminServiceImpl implements AdminService {
         return regionRepository.findAll().stream()
                 .map(region -> RegionStatsDto.builder()
                         .regionId(region.getId())
-                        .regionName(localizationHelper.getLocalizedName(region, getCurrentUser().getSettings().getLanguage()))
+                        .regionName(localizationHelper.getLocalizedName(region, currentLang()))
                         .mapCode(region.getMapCode())
                         .totalUsers(userRepository.countByRegionId(region.getId()))
                         .activeUsers(userRepository.countByRegionIdAndActiveTrue(region.getId()))
@@ -346,11 +348,11 @@ public class AdminServiceImpl implements AdminService {
         Pageable pageable = PageRequest.of(page, size);
 
         Region region = regionRepository.findById(regionId)
-                .orElseThrow(() -> new NotFoundException("Регион не найден: " + regionId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.REGION.localized(currentLang(), regionId.toString())));
 
         RegionStatsDto stats = RegionStatsDto.builder()
                 .regionId(region.getId())
-                .regionName(localizationHelper.getLocalizedName(region, getCurrentUser().getSettings().getLanguage()))
+                .regionName(localizationHelper.getLocalizedName(region, currentLang()))
                 .mapCode(region.getMapCode())
                 .totalUsers(userRepository.countByRegionId(regionId))
                 .activeUsers(userRepository.countByRegionIdAndActiveTrue(regionId))
@@ -363,7 +365,7 @@ public class AdminServiceImpl implements AdminService {
 
         Page<CasePreviewResponse> cases = caseRepository.findByOwnerRegionId(regionId, pageable)
                 .map(caseMapper::toPreview);
-        caseRejectionEnricher.enrich(cases.getContent(), getCurrentUser().getSettings().getLanguage());
+        caseRejectionEnricher.enrich(cases.getContent(), currentLang());
 
         Page<AppealDto> appeals = appealRepository.findByRegionId(regionId, pageable)
                 .map(supportMapper::toAppealDto);
@@ -381,17 +383,17 @@ public class AdminServiceImpl implements AdminService {
     public CaseResponse getCaseDetail(Long caseId) {
         return caseRepository.findById(caseId)
                 .map(caseMapper::toResponse)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
     }
 
     @Override
     @Transactional
     public void approveAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new NotFoundException("Админ не найден"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
 
         Appeal appeal = appealRepository.findById(appealId)
-                .orElseThrow(() -> new NotFoundException("Обращение не найдено"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.APPEAL.localized(currentLang(), appealId.toString())));
 
         appeal.setStatus(AppealStatus.APPROVED);
         appeal.setReviewedBy(admin);
@@ -409,10 +411,10 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void rejectAppeal(Long appealId, Long adminId) {
         User admin = userRepository.findById(adminId)
-                .orElseThrow(() -> new NotFoundException("Админ не найден"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
 
         Appeal appeal = appealRepository.findById(appealId)
-                .orElseThrow(() -> new NotFoundException("Обращение не найдено"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.APPEAL.localized(currentLang(), appealId.toString())));
 
         appeal.setStatus(AppealStatus.REJECTED);
         appeal.setReviewedBy(admin);
@@ -426,7 +428,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public Page<LogDto> getUserLogs(String email, int page, int size) {
         userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         return logRepository.findByEmail(email, PageRequest.of(page, size))
                 .map(supportMapper::toLogDto);
     }
@@ -444,7 +446,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public SupportTicketDto getSupportTicketDetail(Long id) {
         SupportTicket ticket = supportTicketRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Тикет не найден: " + id));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.SUPPORT_TICKET.localized(currentLang(), id.toString())));
         return supportMapper.toSupportTicketDto(ticket);
     }
 
@@ -461,7 +463,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional(readOnly = true)
     public ReviewDto getReviewDetail(Long id) {
         Review review = reviewRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Рецензия не найдена: " + id));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.REVIEW.localized(currentLang(), id.toString())));
         return supportMapper.toReviewDto(review);
     }
 
@@ -469,10 +471,10 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void assignAdvancedUserRole(String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         Role role = roleRepository.findByName("ADVANCED_USER")
-                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
 
         user.getRoles().add(role);
 
@@ -489,16 +491,16 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void assignRegAdminRole(String email, List<String> regions) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         Role regAdminRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
 
         user.getRoles().add(regAdminRole);
 
         for (String regionName : regions) {
             Region reg = regionRepository.findByRuName(regionName)
-                    .orElseThrow(() -> new NotFoundException("Регион не найден: " + regionName));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.REGION.localized(currentLang(), regionName)));
 
             if (!reg.getAdmins().contains(user)) {
                 reg.getAdmins().add(user);
@@ -514,19 +516,17 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void removeRegAdminRole(String email, List<String> regions) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         Role regAdminRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new NotFoundException("Роль не найдена"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
 
         for (String regionName : regions) {
             Region reg = regionRepository.findByRuName(regionName)
-                    .orElseThrow(() -> new NotFoundException("Регион не найден: " + regionName));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.REGION.localized(currentLang(), regionName)));
 
             if (!reg.getAdmins().contains(user)) {
-                throw new IllegalStateException(
-                        "Пользователь " + email + " не является администратором региона " + regionName
-                );
+                throw new IllegalStateException(MessageConstant.USER_IS_NOT_REG_ADMIN.format(currentLang(), email));
             }
 
             reg.getAdmins().remove(user);
@@ -546,12 +546,12 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public void changeOwner(Long caseId, Long id) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено"));
-
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         User newOwner = userRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), id.toString())));
+
         if (!newOwner.isActive()) {
-            throw new IllegalStateException("Нельзя назначить неактивного пользователя владельцем");
+            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang(), newOwner.getEmail()));
         }
 
         User oldOwner = caseEntity.getOwner();
@@ -575,7 +575,7 @@ public class AdminServiceImpl implements AdminService {
     @Transactional
     public UserProfile updateUserProfile(Long id, UpdateProfileRequest request) {
         User user = userRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + id));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), id.toString())));
 
         if (request.getName() != null) {
             user.setName(request.getName());
@@ -591,25 +591,25 @@ public class AdminServiceImpl implements AdminService {
 
         if (request.getProfessionId() != null) {
             Profession profession = professionRepository.findById(request.getProfessionId())
-                    .orElseThrow(() -> new NotFoundException("Профессия не найдена"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.PROFESSION.localized(currentLang(), request.getProfessionId().toString())));
             user.setProfession(profession);
         }
 
         if (request.getRankId() != null) {
             Rank rank = rankRepository.findById(request.getRankId())
-                    .orElseThrow(() -> new NotFoundException("Звание на найдено"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.RANK.localized(currentLang(), request.getRankId().toString())));
             user.setRank(rank);
         }
 
         if (request.getAdministrationId() != null) {
             Administration administration = administrationRepository.findById(request.getAdministrationId())
-                    .orElseThrow(() -> new NotFoundException("Управление не найдено"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.ADMINISTRATION.localized(currentLang(), request.getAdministrationId().toString())));
             user.setAdministration(administration);
         }
 
         if (request.getRegionId() != null) {
             Region region = regionRepository.findById(request.getRegionId())
-                    .orElseThrow(() -> new NotFoundException("Регион не найден"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.REGION.localized(currentLang(), request.getRegionId().toString())));
             user.setRegion(region);
         }
 
@@ -621,7 +621,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public String getIndictment(Long caseId) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         return caseEntity.getIndictment();
     }
@@ -629,7 +629,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public String getQualification(Long caseId) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         return caseEntity.getQualification();
     }
@@ -637,7 +637,7 @@ public class AdminServiceImpl implements AdminService {
     @Override
     public CasePlanResponse getPlan(Long caseId) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         return CasePlanResponse.builder()
                 .planStatus(caseEntity.getPlanStatus())
@@ -656,6 +656,9 @@ public class AdminServiceImpl implements AdminService {
                 .stream()
                 .map(caseMapper::toRejectionReasonResponse)
                 .toList();
+    }
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
     }
 }
 

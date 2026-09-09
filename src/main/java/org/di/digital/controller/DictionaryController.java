@@ -20,6 +20,7 @@ import java.util.Arrays;
 import java.util.List;
 import java.util.stream.Collectors;
 
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 @RestController
@@ -34,123 +35,106 @@ public class DictionaryController {
     private final RankRepository rankRepository;
     private final DictionaryMapper mapper;
 
-    private UserSettingsLanguage currentLang() {
-        try {
-            UserSettingsLanguage l = getCurrentUser().getSettings().getLanguage();
-            return l != null ? l : UserSettingsLanguage.KZ;
-        } catch (Exception e) {
-            return UserSettingsLanguage.KZ;
-        }
+    private UserSettingsLanguage lang() {
+        return getCurrentLang();
     }
 
     @GetMapping("/languages")
     public ResponseEntity<List<String>> getLanguages() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 Arrays.stream(UserSettingsLanguage.values())
-                        .map(v -> v.localized(l))
+                        .map(v -> v.localized(lang()))
                         .collect(Collectors.toList()));
     }
 
     @GetMapping("/levels")
     public ResponseEntity<List<String>> getLevels() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 Arrays.stream(UserSettingsDetalizationLevel.values())
-                        .map(v -> v.localized(l))
+                        .map(v -> v.localized(lang()))
                         .collect(Collectors.toList()));
     }
 
     @GetMapping("/themes")
     public ResponseEntity<List<String>> getTheme() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 Arrays.stream(UserSettingsTheme.values())
-                        .map(v -> v.localized(l))
+                        .map(v -> v.localized(lang()))
                         .collect(Collectors.toList()));
     }
 
     @GetMapping("/interrogationRoles")
     public ResponseEntity<List<String>> getInterrogationRoles() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 Arrays.stream(InterrogationRole.values())
-                        .map(v -> v.localized(l))
+                        .map(v -> v.localized(lang()))
                         .collect(Collectors.toList()));
     }
 
     @GetMapping("/interrogationDocumentType")
     public ResponseEntity<List<String>> getInterrogationDocumentTypes() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 Arrays.stream(InterrogationDocType.values())
-                        .map(v -> v.localized(l))
+                        .map(v -> v.localized(lang()))
                         .collect(Collectors.toList()));
     }
 
     @GetMapping("/modules")
     public ResponseEntity<List<ModuleDto>> getModules() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 Arrays.stream(ModuleType.values())
                         .map(v -> ModuleDto.builder()
                                 .code(v.name())
-                                .name(v.localized(l))
+                                .name(v.localized(lang()))
                                 .build())
                         .collect(Collectors.toList()));
     }
 
     @GetMapping("/regions")
     public ResponseEntity<List<RegionDto>> getRegions() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 regionRepository.findAllByOrderByRuNameAsc().stream()
-                        .map(r -> mapper.toRegionDto(r, l))
+                        .map(r -> mapper.toRegionDto(r, lang()))
                         .collect(Collectors.toList()));
     }
 
     @GetMapping("/administrations")
     public ResponseEntity<List<AdministrationDto>> getAdministrations() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 administrationRepository.findAll().stream()
-                        .map(a -> mapper.toAdministrationDto(a, l))
+                        .map(a -> mapper.toAdministrationDto(a, lang()))
                         .collect(Collectors.toList()));
     }
 
     @GetMapping("/professions")
     public ResponseEntity<List<ProfessionDto>> getProfessions() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 professionRepository.findAllOrdered().stream()
-                        .map(p -> mapper.toProfessionDto(p, l))
+                        .map(p -> mapper.toProfessionDto(p, lang()))
                         .collect(Collectors.toList()));
     }
 
     @GetMapping("/professionsAdmin")
     public ResponseEntity<List<ProfessionDto>> getFullProfessions() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 professionRepository.findAllForAdmin().stream()
-                        .map(p -> mapper.toProfessionDto(p, l))
+                        .map(p -> mapper.toProfessionDto(p, lang()))
                         .collect(Collectors.toList()));
     }
 
     @GetMapping("/ranks")
     public ResponseEntity<List<RankDto>> getRanks() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 rankRepository.findAll().stream()
-                        .map(r -> mapper.toRankDto(r, l))
+                        .map(r -> mapper.toRankDto(r, lang()))
                         .collect(Collectors.toList()));
     }
     
     @GetMapping("/rejection-reasons")
     public ResponseEntity<List<String>> getRejectionReasons() {
-        UserSettingsLanguage l = currentLang();
         return ResponseEntity.ok(
                 Arrays.stream(CaseRejectionReason.values())
-                        .map(v -> v.localized(l))
+                        .map(v -> v.localized(lang()))
                         .collect(Collectors.toList()));
     }
 }

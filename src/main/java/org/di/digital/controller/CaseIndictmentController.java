@@ -31,14 +31,6 @@ public class CaseIndictmentController {
     @GetMapping(value = "/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     public SseEmitter streamIndictment(@RequestParam String caseNumber,
                                        Authentication authentication) {
-
-        if (authentication == null || !authentication.isAuthenticated()) {
-            log.error("Unauthenticated access attempt to indictment stream");
-            SseEmitter emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalStateException("Authentication required"));
-            return emitter;
-        }
-
         log.info("Generating indictment for case: {} by user: {}",
                 caseNumber, authentication.getName());
         return indictmentService.generateIndictment(caseNumber, authentication.getName());
@@ -48,14 +40,6 @@ public class CaseIndictmentController {
     public SseEmitter complete(
             @RequestParam String caseNumber,
             Authentication authentication) {
-
-        if (authentication == null || !authentication.isAuthenticated()) {
-            log.error("Unauthenticated access attempt to indictment complete");
-            SseEmitter emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalStateException("Authentication required"));
-            return emitter;
-        }
-
         log.info("Completing indictment for case: {} by user: {}",
                 caseNumber, authentication.getName());
         return indictmentService.completeIndictment(caseNumber, authentication.getName());
@@ -65,14 +49,6 @@ public class CaseIndictmentController {
     public SseEmitter streamSection(@RequestParam String caseNumber,
                                     @RequestParam int sectionId,
                                     Authentication authentication) {
-
-        if (authentication == null || !authentication.isAuthenticated()) {
-            log.error("Unauthenticated access attempt to indictment section");
-            SseEmitter emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalStateException("Authentication required"));
-            return emitter;
-        }
-
         log.info("Generating indictment section {} for case: {} by user: {}",
                 sectionId, caseNumber, authentication.getName());
         return indictmentService.generateIndictmentSection(
@@ -83,11 +59,6 @@ public class CaseIndictmentController {
     public SseEmitter streamRephrase(@RequestParam String caseNumber,
                                      @RequestBody IndictmentRephraseRequest request,
                                      Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            SseEmitter emitter = new SseEmitter();
-            emitter.completeWithError(new IllegalStateException("Authentication required"));
-            return emitter;
-        }
         return indictmentService.generateIndictmentPrompt(
                 caseNumber, authentication.getName(),
                 request.getStartSectionId(), request.getStartOffset(),
@@ -99,11 +70,9 @@ public class CaseIndictmentController {
             @RequestParam String caseNumber,
             @RequestBody IndictmentRephraseApplyRequest request,
             Authentication authentication) {
-        if (authentication == null || !authentication.isAuthenticated()) {
-            return ResponseEntity.status(401).build();
-        }
-        log.info("Applying rephrase for case: {} by user: {}", caseNumber, authentication.getName());
-        return ResponseEntity.ok(indictmentService.applyRephrase(caseNumber, request));
+        String email = authentication.getName();
+        log.info("Applying rephrase for case: {} by user: {}", caseNumber, email);
+        return ResponseEntity.ok(indictmentService.applyRephrase(caseNumber, email,request));
     }
 
     @GetMapping("/download")
@@ -126,8 +95,9 @@ public class CaseIndictmentController {
     }
 
     @GetMapping("/sections")
-    public ResponseEntity<List<IndictmentSectionDto>> getIndictmentSections(@RequestParam String caseNumber) {
-        return ResponseEntity.ok(indictmentService.getIndictmentSections(caseNumber));
+    public ResponseEntity<List<IndictmentSectionDto>> getIndictmentSections(@RequestParam String caseNumber,
+                                                                            Authentication authentication) {
+        return ResponseEntity.ok(indictmentService.getIndictmentSections(caseNumber, authentication.getName()));
     }
 
     @PatchMapping("/sections")
@@ -135,8 +105,9 @@ public class CaseIndictmentController {
             @RequestParam String caseNumber,
             @RequestBody IndictmentSectionUpdateRequest request,
             Authentication authentication) {
+        String email = authentication.getName();
         log.info("Updating indictment section {} for case: {} by user: {}",
-                request.getId(), caseNumber, authentication.getName());
-        return ResponseEntity.ok(indictmentService.updateSection(caseNumber, request));
+                request.getId(), caseNumber, email);
+        return ResponseEntity.ok(indictmentService.updateSection(caseNumber, email, request));
     }
 }

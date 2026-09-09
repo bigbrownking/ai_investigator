@@ -7,6 +7,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.consumer.figurant.FigurantSyncService;
 import org.di.digital.dto.request.cases.*;
 import org.di.digital.dto.request.interrogation.AddFigurantToCaseRequest;
+import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.FigurantResponse;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
@@ -139,10 +140,10 @@ public class CaseController {
     @GetMapping
     public ResponseEntity<List<CasePreviewResponse>> getUserCases(
             @RequestParam(required = false, defaultValue = "desc") String sort,
-            Authentication authentication
-    ) {
-        log.info("Getting all cases for user: {} with sort: {}", authentication.getName(), sort);
-        List<CasePreviewResponse> cases = caseService.getUserCases(authentication.getName(), sort);
+            @ModelAttribute CaseSearchRequest caseSearchRequest,
+            Authentication authentication) {
+        List<CasePreviewResponse> cases = caseService.getUserCases(
+                authentication.getName(), sort, caseSearchRequest);
         return ResponseEntity.ok(cases);
     }
 
@@ -399,29 +400,14 @@ public class CaseController {
         return ResponseEntity.ok().build();
     }
 
-    @GetMapping("/{caseId}/files/by-name")
-    public ResponseEntity<CaseFileResponse> getFileByName(
-            @PathVariable Long caseId,
-            @RequestParam String fileName,
-            Authentication authentication
-    ) {
-        log.info("Getting file {} from case: {} for user: {}",
-                fileName, caseId, authentication.getName());
-        CaseFileResponse response = caseService.getFileByName(caseId, fileName, authentication.getName());
-        return ResponseEntity.ok(response);
-    }
-
     @GetMapping("/{caseId}/status/history")
     public ResponseEntity<List<RejectionReasonResponse>> getRejectionReasonResponseHistory(
                 @PathVariable Long caseId,
                 Authentication authentication
     ){
-        log.info("Getting rejection reason history by user: {}",
-          authentication.getName());
+        log.info("Getting rejection reason history by user: {}", authentication.getName());
         return ResponseEntity.ok(
                 caseService.getRejectionReasonResponseHistory(caseId, authentication.getName())
         );
     }
-
-
 }

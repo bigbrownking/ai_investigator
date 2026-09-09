@@ -4,10 +4,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChangeCaseLanguageRequest;
 import org.di.digital.dto.request.cases.ReorderCaseFilesRequest;
+import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.FigurantResponse;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.cases.CaseMemberHistory;
@@ -21,13 +24,18 @@ import org.di.digital.model.enums.cases.CaseRejectionReason;
 import org.di.digital.model.enums.file.FileType;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.interrogation.CaseFigurant;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseMemberHistoryRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.cases.RejectionReasonStatusRepository;
+import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.user.UserRepository;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.LogService;
 import org.di.digital.service.core.MinioService;
@@ -42,6 +50,7 @@ import org.springframework.core.io.InputStreamResource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
+import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -56,7 +65,7 @@ import java.util.stream.Collectors;
 
 import static org.di.digital.util.requests.RequestUrlBuilder.deleteAllDocumentsUrl;
 import static org.di.digital.util.requests.RequestUrlBuilder.deleteDocumentUrl;
-import static org.di.digital.util.requests.UserUtil.getCurrentUser;
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -76,6 +85,7 @@ public class CaseServiceImpl implements CaseService {
     private final CaseFileWriter caseFileWriter;
     private final CaseWriter caseWriter;
     private final UserUtil userUtil;
+    private final CaseAccessService caseAccessService;
     private final CaseRejectionEnricher caseRejectionEnricher;
     private final CaseMemberHistoryRepository caseMemberHistoryRepository;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
@@ -93,10 +103,10 @@ public class CaseServiceImpl implements CaseService {
     @Transactional(readOnly = true)
     public Case getCaseEntityById(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
 
@@ -142,6 +152,12 @@ public class CaseServiceImpl implements CaseService {
         CaseResponse response = caseFileWriter.attachFilesToNewCase(
                 created.id(), email, request.getLanguage(), uploaded);
 
+        Case caseEntity = caseRepository.findById(created.id())
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), created.id().toString())));
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+        caseAccessService.grantFullAccess(caseEntity, user);
+
         log.info("Case created with id: {} for user: {}", created.id(), email);
         return response;
     }
@@ -165,16 +181,12 @@ public class CaseServiceImpl implements CaseService {
     @Override
     public CaseResponse changeCaseLanguage(Long caseId, ChangeCaseLanguageRequest request, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        userUtil.validateUserAccess(caseEntity, user);
-
-        if (!caseEntity.isOwner(user)) {
-            throw new AccessDeniedException("Только создатель дела может редактировать его");
-        }
+        userUtil.validateOwnerAccess(caseEntity, user);
 
         String fromLanguage = caseEntity.getLanguage();
         if (request.getLanguage() != null) {
@@ -211,8 +223,7 @@ public class CaseServiceImpl implements CaseService {
                     .retrieve()
                     .onStatus(
                             status -> status.value() == 409,
-                            response -> Mono.error(new IllegalStateException(
-                                    MessageConstant.WORKSPACE_ALREADY_EXISTS.format(newNumber))))
+                            response -> Mono.error(new IllegalStateException(MessageConstant.WORKSPACE_ALREADY_EXISTS.format(currentLang(), newNumber))))
                     .bodyToMono(String.class)
                     .block();
 
@@ -221,18 +232,17 @@ public class CaseServiceImpl implements CaseService {
         } catch (IllegalStateException e) {
             throw e;
         } catch (Exception e) {
-            log.warn(MessageConstant.WORKSPACE_RENAME_FAILED.format(oldNumber, newNumber) + ": "
-                    + e.getMessage());
+            log.warn(MessageConstant.WORKSPACE_RENAME_FAILED.format(currentLang(), oldNumber, newNumber));
         }
     }
 
     @Transactional(readOnly = true)
     public CaseResponse getCaseById(Long id, String email) {
         Case caseEntity = caseRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + id));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), id.toString())));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
 
@@ -242,10 +252,10 @@ public class CaseServiceImpl implements CaseService {
     @Transactional
     public GroupedCaseFileResponse recalculateToms(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
 
@@ -277,13 +287,13 @@ public class CaseServiceImpl implements CaseService {
     public GroupedCaseFileResponse getGroupedCaseFilesById(Long id, String email) {
 
         Case caseEntity = caseRepository.findById(id)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), id.toString())));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.READ);
         Map<Integer, List<CaseFile>> grouped = caseEntity.getFiles().stream()
                 .sorted(Comparator
                         .comparing(CaseFile::getTom, Comparator.nullsLast(Integer::compareTo))
@@ -299,7 +309,7 @@ public class CaseServiceImpl implements CaseService {
                     Integer tom = entry.getKey();
                     List<CaseFile> tomFiles = entry.getValue();
 
-                    int[] pageCounter = { 1 };
+                    int[] pageCounter = {1};
 
                     List<CaseFileResponse> files = tomFiles.stream()
                             .map(f -> {
@@ -352,15 +362,22 @@ public class CaseServiceImpl implements CaseService {
     }
 
     @Transactional(readOnly = true)
-    public List<CasePreviewResponse> getUserCases(String email, String sort) {
+    public List<CasePreviewResponse> getUserCases(String email, String sort,
+                                                  CaseSearchRequest req) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        List<CasePreviewResponse> previews = caseRepository.findPreviewsForUser(email);
+        Specification<Case> spec = CaseSpecifications.build(req);
+
+        List<CasePreviewResponse> previews = caseRepository.findAll(spec)
+                .stream()
+                .map(mapper::toPreview)
+                .collect(Collectors.toList());
 
         caseRejectionEnricher.enrich(previews, user.getSettings().getLanguage());
 
-        Comparator<CasePreviewResponse> cmp = Comparator.comparing(CasePreviewResponse::getCreatedDate,
+        Comparator<CasePreviewResponse> cmp = Comparator.comparing(
+                CasePreviewResponse::getCreatedDate,
                 "asc".equalsIgnoreCase(sort)
                         ? Comparator.nullsLast(Comparator.naturalOrder())
                         : Comparator.nullsLast(Comparator.reverseOrder()));
@@ -371,11 +388,10 @@ public class CaseServiceImpl implements CaseService {
     @Override
     public void updateCaseStatus(Long caseId, boolean status, String email, CaseRejectionReason reason) {
         log.info("Updating status for case: {} to {} by user: {} with reason: {}", caseId, status, email, reason);
-
         String caseNumber = caseWriter.updateStatus(caseId, status, email);
-        
-        
-        User user = userRepository.findByEmail(email).orElse(null);
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
         RejectionReasonStatus rejection = RejectionReasonStatus.builder()
                 .caseId(caseId)
                 .userId(user.getId())
@@ -421,12 +437,13 @@ public class CaseServiceImpl implements CaseService {
     public GroupedCaseFileResponse reorderCaseFiles(Long caseId, ReorderCaseFilesRequest request,
                                                     String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.UPDATE);
 
         List<Long> fileIds = request.getFileIds();
 
@@ -523,19 +540,20 @@ public class CaseServiceImpl implements CaseService {
     @Transactional(readOnly = true)
     public InputStreamResource downloadFile(Long caseId, String originalFileName, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new RuntimeException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
 
-        String caseNumber = caseEntity.getNumber();
         CaseFile caseFile = caseEntity.getFiles().stream()
                 .filter(f -> f.getOriginalFileName().equals(originalFileName))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("File not found: " + originalFileName));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), originalFileName)));
 
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DOWNLOAD);
+        String caseNumber = caseEntity.getNumber();
         logService.log(
                 String.format("Downloaded %s file from case %s", caseFile.getOriginalFileName(), caseNumber),
                 LogLevel.INFO,
@@ -550,15 +568,14 @@ public class CaseServiceImpl implements CaseService {
     @Transactional
     public CaseUserResponse addUserToCase(Long caseId, Long id, String currentUserEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), currentUserEmail)));
 
         userUtil.validateOwnerAccess(caseEntity, currentUser);
-
         User userToAdd = userRepository.findById(id)
-                .orElseThrow(() -> new RuntimeException("User not found: " + id));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), id.toString())));
 
         String email = userToAdd.getEmail();
         if (caseEntity.hasUser(userToAdd)) {
@@ -569,12 +586,14 @@ public class CaseServiceImpl implements CaseService {
                     LogAction.USER_ADD,
                     caseEntity.getNumber(),
                     currentUserEmail);
-            throw new IllegalStateException("Следователь уже есть в деле!");
+            throw new IllegalStateException(IllegalStateMessage.ALREADY_EXISTS.localized(currentLang(), email));
         }
 
         String caseNumber = caseEntity.getNumber();
         caseEntity.addUser(userToAdd);
         Case savedCase = caseRepository.save(caseEntity);
+
+        caseAccessService.grantInitialAccess(caseEntity, userToAdd, null);
 
         recordMemberHistory(caseNumber, userToAdd, currentUser, CaseMemberAction.ADD);
 
@@ -594,13 +613,12 @@ public class CaseServiceImpl implements CaseService {
     @Transactional(readOnly = true)
     public List<CaseMemberHistoryDto> getMemberHistory(Long caseId, String currentUserEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), caseId.toString())));
 
         User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), currentUserEmail)));
 
         userUtil.validateOwnerAccess(caseEntity, currentUser);
-
         return caseMemberHistoryRepository
                 .findByCaseNumberOrderByTimestampDesc(caseEntity.getNumber())
                 .stream()
@@ -622,7 +640,6 @@ public class CaseServiceImpl implements CaseService {
 
     @Override
     public List<UserSuggestionResponse> searchUsers(String query) {
-
         return userRepository.searchAllUsers(query)
                 .stream()
                 .map(user -> UserSuggestionResponse.builder()
@@ -642,10 +659,10 @@ public class CaseServiceImpl implements CaseService {
     @Transactional
     public FigurantResponse addFigurantToCase(Long caseId, AddFigurantToCaseRequest request, String currentUserEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), currentUserEmail)));
 
         userUtil.validateUserAccess(caseEntity, currentUser);
 
@@ -695,15 +712,15 @@ public class CaseServiceImpl implements CaseService {
     @Transactional
     public void removeUserFromCase(Long caseId, Long userId, String currentUserEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), currentUserEmail)));
 
         userUtil.validateOwnerAccess(caseEntity, currentUser);
 
         User userToRemove = userRepository.findById(userId)
-                .orElseThrow(() -> new RuntimeException("User not found with id: " + userId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
 
         if (caseEntity.isOwner(userToRemove)) {
             logService.log(
@@ -747,10 +764,10 @@ public class CaseServiceImpl implements CaseService {
     @Transactional
     public void removeFigurantFromCase(Long caseId, Long figurantId, String currentUserEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), currentUserEmail)));
 
         userUtil.validateUserAccess(caseEntity, currentUser);
 
@@ -776,10 +793,10 @@ public class CaseServiceImpl implements CaseService {
     @Transactional(readOnly = true)
     public List<CaseUserResponse> getCaseUsers(Long caseId, String currentUserEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), currentUserEmail)));
 
         userUtil.validateUserAccess(caseEntity, currentUser);
 
@@ -791,10 +808,10 @@ public class CaseServiceImpl implements CaseService {
     @Override
     public List<FigurantResponse> getCaseFigurants(Long caseId, String currentUserEmail) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found with id: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User currentUser = userRepository.findByEmail(currentUserEmail)
-                .orElseThrow(() -> new RuntimeException("User not found: " + currentUserEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), currentUserEmail)));
 
         userUtil.validateUserAccess(caseEntity, currentUser);
 
@@ -806,7 +823,7 @@ public class CaseServiceImpl implements CaseService {
     @Transactional
     public void updateCaseActivity(String caseNumber, String activityType) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new RuntimeException("Case not found: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         caseEntity.updateActivity(activityType);
         caseRepository.save(caseEntity);
@@ -835,7 +852,7 @@ public class CaseServiceImpl implements CaseService {
     @Transactional(readOnly = true)
     public Optional<FigurantResponse> findFigurantByNumber(Long caseId, String documentType, String number, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new RuntimeException("Case not found"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         return caseEntity.getFigurants().stream()
                 .filter(f -> number.equals(f.getNumber()) && documentType.equals(f.getDocumentType()))
@@ -974,33 +991,15 @@ public class CaseServiceImpl implements CaseService {
 
     @Override
     @Transactional(readOnly = true)
-    public CaseFileResponse getFileByName(Long caseId, String fileName, String email) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
-
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
-
-        userUtil.validateUserAccess(caseEntity, user);
-
-        CaseFile caseFile = caseFileRepository
-                .findByOriginalFileNameAndCaseEntityId(fileName, caseId)
-                .orElseThrow(() -> new NotFoundException("Файл не найден: " + fileName));
-
-        return mapper.toFileResponse(caseFile);
-    }
-
-    @Override
-    @Transactional(readOnly = true)
     public List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-
+        caseAccessService.require(caseEntity, user, CaseModule.CASE, CaseAction.READ);
         List<RejectionReasonResponse> result = rejectionReasonStatusRepository
                 .findAllByCaseIdOrderByTimestampDesc(caseId)
                 .stream()
@@ -1013,5 +1012,9 @@ public class CaseServiceImpl implements CaseService {
                 LogLevel.INFO, LogAction.CASE_STATUS_CHANGED, null, email);
 
         return result;
+    }
+
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
     }
 }

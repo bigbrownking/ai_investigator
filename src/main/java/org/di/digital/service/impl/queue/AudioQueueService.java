@@ -4,6 +4,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.AudioProcessingMessage;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.springframework.amqp.core.Message;
 import org.springframework.amqp.core.MessageBuilder;
 import org.springframework.amqp.core.MessageDeliveryMode;
@@ -11,6 +12,8 @@ import org.springframework.amqp.core.MessageProperties;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Service
 @RequiredArgsConstructor
@@ -45,7 +48,7 @@ public class AudioQueueService {
                     payload.getOriginalFileName(), payload.getInterrogationId());
 
         } catch (Exception e) {
-            throw new IllegalStateException("Failed to send audio message to RabbitMQ", e);
+            throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(getCurrentLang()));
         }
     }
 }

@@ -3,17 +3,23 @@ package org.di.digital.service.impl.interrogation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.interrogation.CaseInterrogationApplicationFileResponse;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationApplicationFile;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.requests.UserUtil;
@@ -23,32 +29,27 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.*;
 import java.util.stream.Collectors;
 
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class ApplicationFileWriter {
 
     private final CaseInterrogationRepository caseInterrogationRepository;
-    private final UserRepository userRepository;
     private final TaskQueueService taskQueueService;
     private final LogService logService;
     private final InterrogationMapper mapper;
-    private final UserUtil userUtil;
+    private final InterrogationAuthService interrogationAuthService;
 
     // ---- Фаза 1: валидация + собрать контекст для загрузки ----
     @Transactional(readOnly = true)
     public UploadContext prepare(Long caseId, Long interrogationId, String email) {
-        CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new IllegalStateException("Interrogation not found: " + interrogationId));
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+        InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(caseId, interrogationId, email,
+                CaseModule.DOCUMENTS, CaseAction.ADD);
 
+        CaseInterrogation interrogation = ctx.interrogation();
         Case caseEntity = interrogation.getCaseEntity();
-        userUtil.validateUserAccess(caseEntity, user);
-
-        if (!caseEntity.getId().equals(caseId)) {
-            throw new IllegalStateException("Допрос не принадлежит делу: " + caseId);
-        }
 
         Set<String> existingInInterrogation = interrogation.getApplicationFiles().stream()
                 .map(CaseInterrogationApplicationFile::getOriginalFileName)
@@ -71,7 +72,7 @@ public class ApplicationFileWriter {
             List<UploadedFile> uploaded) {
 
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new IllegalStateException("Interrogation not found: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.INTERROGATION.localized(currentLang(), interrogationId.toString())));
         Case caseEntity = interrogation.getCaseEntity();
 
         // перечитываем актуальные множества внутри транзакции (могли измениться)
@@ -156,4 +157,8 @@ public class ApplicationFileWriter {
             String originalFileName, String storedFileName, String fileUrl,
             String contentType, Long fileSize, java.time.LocalDateTime uploadedAt,
             String displayName, Integer pages) {}
+
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
+    }
 }

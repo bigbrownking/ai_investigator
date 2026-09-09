@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.consumer.figurant.FigurantSyncService;
 import org.di.digital.consumer.plan.PlanSyncService;
 import org.di.digital.dto.message.ProcessingResultMessage;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.repository.cases.CaseFileRepository;
@@ -12,6 +14,8 @@ import org.di.digital.service.cases.CaseFileService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Component
@@ -30,7 +34,7 @@ public class ProcessingResultConsumer {
                 message.getStatus(), message.getCaseFileId(), message.getCaseNumber());
         try {
             CaseFile caseFile = caseFileRepository.findById(message.getCaseFileId())
-                    .orElseThrow(() -> new IllegalStateException("Файл не найден: " + message.getCaseFileId()));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(getCurrentLang(), String.valueOf(message.getCaseFileId()))));
 
             switch (message.getStatus()) {
                 case PENDING -> handlePending(message, caseFile);

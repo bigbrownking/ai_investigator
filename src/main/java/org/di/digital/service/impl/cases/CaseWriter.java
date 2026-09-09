@@ -3,20 +3,28 @@ package org.di.digital.service.impl.cases;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
 import org.di.digital.model.enums.MessageConstant;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 
 @Slf4j
@@ -27,25 +35,27 @@ public class CaseWriter {
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final LogService logService;
+    private final CaseAccessService caseAccessService;
     private final CaseMapper mapper;
     private final UserUtil userUtil;
 
     @Transactional(readOnly = true)
     public String authorizeForFileWipe(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found with id: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DELETE);
         return caseEntity.getNumber();
     }
 
     @Transactional(readOnly = true)
     public String authorizeOwnerForDelete(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateOwnerAccess(caseEntity, user);
         return caseEntity.getNumber();
     }
@@ -53,14 +63,10 @@ public class CaseWriter {
     @Transactional
     public String updateStatus(Long caseId, boolean status, String email) {
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found"));
-        //validateUserAccess(caseEntity, user);
-//        if (!caseEntity.isOwner(user)) {
-//            throw new org.springframework.security.access.AccessDeniedException(
-//                    "Только создатель дела может изменять его статус");
-//        }
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
         caseEntity.setStatus(status);
         caseRepository.save(caseEntity);
         return caseEntity.getNumber();
@@ -69,9 +75,9 @@ public class CaseWriter {
     @Transactional(readOnly = true)
     public EditPrecheck prepareEdit(Long caseId, String email, String newNumber) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
         if (!caseEntity.isOwner(user)) {
             throw new org.springframework.security.access.AccessDeniedException(
@@ -83,7 +89,7 @@ public class CaseWriter {
         if (numberChanges && caseRepository.existsByNumber(newNumber)) {
             logService.log(String.format("Case already exists: %s", newNumber),
                     LogLevel.ERROR, LogAction.CASE_UPDATED, newNumber, email);
-            throw new IllegalStateException(MessageConstant.WORKSPACE_ALREADY_EXISTS.format(newNumber));
+            throw new IllegalStateException(MessageConstant.WORKSPACE_ALREADY_EXISTS.format(currentLang(), newNumber));
         }
         return new EditPrecheck(oldNumber, numberChanges);
     }
@@ -92,7 +98,7 @@ public class CaseWriter {
     public CaseResponse applyEdit(Long caseId, String newNumber, String newTitle,
                                   boolean numberChanges, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         if (numberChanges) caseEntity.setNumber(newNumber);
         if (newTitle != null) caseEntity.setTitle(newTitle);
         Case saved = caseRepository.save(caseEntity);
@@ -102,12 +108,13 @@ public class CaseWriter {
         return mapper.toResponse(saved);
     }
 
-    public record EditPrecheck(String oldNumber, boolean numberChanges) {}
+    public record EditPrecheck(String oldNumber, boolean numberChanges) {
+    }
 
     @Transactional
     public void wipeAttachedFiles(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         String caseNumber = caseEntity.getNumber();
 
         caseEntity.removeAllAttachedFiles();
@@ -120,7 +127,7 @@ public class CaseWriter {
     @Transactional
     public void deleteCaseRecord(Long caseId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         String caseNumber = caseEntity.getNumber();
 
         caseRepository.delete(caseEntity);
@@ -131,18 +138,20 @@ public class CaseWriter {
     @Transactional(readOnly = true)
     public FileToDelete resolveFileForDeletion(Long caseId, String fileName, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("User not found: " + email));
-        userUtil.validateUserAccess(caseEntity, user);
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         CaseFile file = caseEntity.getFiles().stream()
                 .filter(f -> f.getOriginalFileName().equals(fileName))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("File not found: " + fileName));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), fileName)));
+
+        userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DELETE);
 
         if (CaseFileStatusEnum.PROCESSING.equals(file.getStatus())) {
-            String message = MessageConstant.CANNOT_DELETE_FILE.format(caseEntity.getNumber());
+            String message = MessageConstant.CANNOT_DELETE_FILE.format(currentLang(), caseEntity.getNumber());
             logService.log(String.format("Cannot delete processing file in case %s", caseEntity.getNumber()),
                     LogLevel.ERROR, LogAction.FILE_DELETE, caseEntity.getNumber(), email);
             throw new IllegalStateException(message);
@@ -156,11 +165,16 @@ public class CaseWriter {
     @Transactional
     public void removeFileRecord(Long caseId, Long fileId, String email) {
         Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
         caseEntity.getFiles().removeIf(f -> f.getId().equals(fileId));
         caseRepository.save(caseEntity);
     }
 
     public record FileToDelete(Long id, String fileUrl, String originalFileName,
-                               String caseNumber, boolean wasCompleted) {}
+                               String caseNumber, boolean wasCompleted) {
+    }
+
+    private UserSettingsLanguage currentLang() {
+        return getCurrentLang();
+    }
 }

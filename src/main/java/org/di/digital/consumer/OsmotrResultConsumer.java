@@ -5,6 +5,8 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.OsmotrResultMessage;
 import org.di.digital.dto.response.osmotr.OsmotrDataItemDto;
 import org.di.digital.dto.response.osmotr.OsmotrReportResponse;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.enums.osmotr.OsmotrProcessingStatus;
 import org.di.digital.model.osmotr.OsmotrResult;
 import org.di.digital.model.osmotr.OsmotrResultSegment;
@@ -19,6 +21,7 @@ import org.springframework.transaction.annotation.Transactional;
 import java.util.UUID;
 
 import static java.util.Base64.getDecoder;
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Component
@@ -48,7 +51,7 @@ public class OsmotrResultConsumer {
     @Transactional
     public void handleResult(OsmotrResultMessage message) {
         OsmotrResult result = osmotrResultRepository.findById(message.getFileId())
-                .orElseThrow(() -> new IllegalStateException("OsmotrResult not found: " + message.getFileId()));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.OSMOTR.localized(getCurrentLang(), String.valueOf(message.getFileId()))));
 
         result.setSessionId(message.getSessionId());
         result.setStatus(message.getStatus());

@@ -1,6 +1,8 @@
 package org.di.digital.repository.fl;
 
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.fl.FLDocument;
 import org.di.digital.model.fl.FLRecord;
 import org.di.digital.model.fl.IssueOrganizationEnum;
@@ -14,6 +16,8 @@ import java.time.format.DateTimeFormatter;
 import java.time.format.DateTimeParseException;
 import java.util.List;
 import java.util.Locale;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Repository
@@ -33,7 +37,7 @@ public class FLRecordRepository {
         String iin = flJdbcTemplate.queryForObject(docSql,
                 (rs, rowNum) -> rs.getString("iin"), documentNumber);
 
-        if (iin.isEmpty()) throw new IllegalStateException("Человека с этим документов не найдено: " + documentNumber);
+        if (iin.isEmpty()) throw new NotFoundException(NotFoundMessage.FL.localized(getCurrentLang(), documentNumber));
 
         return findByIin(iin, language);
     }

@@ -3,6 +3,8 @@ package org.di.digital.service.impl.qualification;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.qualification.CaseQualification;
 import org.di.digital.repository.cases.CaseRepository;
@@ -15,6 +17,8 @@ import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Map;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -101,7 +105,7 @@ public class QualificationWriter {
 
     private CaseQualification getOrCreate(String caseNumber) {
         Case entity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new IllegalStateException("Case not found: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(getCurrentLang(), caseNumber)));
         return caseQualificationRepository.findByCaseEntityNumber(caseNumber)
                 .orElseGet(() -> CaseQualification.builder().caseEntity(entity).build());
     }

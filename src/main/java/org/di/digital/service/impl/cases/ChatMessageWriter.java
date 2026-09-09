@@ -3,10 +3,13 @@ package org.di.digital.service.impl.cases;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.cases.ReferenceDto;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChat;
 import org.di.digital.model.cases.CaseChatMessage;
 import org.di.digital.model.enums.cases.MessageRole;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseChatRepository;
@@ -16,6 +19,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -55,7 +60,7 @@ public class ChatMessageWriter {
     public void updateAssistantMessage(Long messageId, String content,
                                        List<ReferenceDto> references) {
         CaseChatMessage message = chatMessageRepository.findById(messageId)
-                .orElseThrow(() -> new IllegalStateException("Message not found: " + messageId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.MESSAGE.localized(currentLang(), messageId.toString())));
 
         message.setContent(content);
         message.setReferences(references);
@@ -71,9 +76,9 @@ public class ChatMessageWriter {
         return caseChatRepository.findByCaseIdAndUserId(caseId, userId)
                 .orElseGet(() -> {
                     Case c = caseRepository.findById(caseId)
-                            .orElseThrow(() -> new IllegalStateException("Case not found: " + caseId));
+                            .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
                     User u = userRepository.findById(userId)
-                            .orElseThrow(() -> new IllegalStateException("User not found: " + userId));
+                            .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
                     CaseChat newChat = CaseChat.builder()
                             .caseEntity(c).user(u).active(true).build();
                     log.info("Creating new chat for case {} and user {}", caseId, u.getEmail());
@@ -84,10 +89,15 @@ public class ChatMessageWriter {
     @Transactional
     public void clearChatHistory(Long caseId, Long userId) {
         CaseChat chat = caseChatRepository.findByCaseIdAndUserId(caseId, userId)
-                .orElseThrow(() -> new IllegalStateException("Chat not found for case: " + caseId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CHAT.localized(currentLang())));
         chatMessageRepository.deleteAllByChatId(chat.getId());
         chat.getMessages().clear();
         caseChatRepository.save(chat);
         log.info("Cleared chat history for case {} and user {}", caseId, userId);
     }
+
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
+    }
+
 }

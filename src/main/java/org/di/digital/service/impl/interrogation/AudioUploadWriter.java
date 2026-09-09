@@ -5,10 +5,15 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.AudioProcessingMessage;
 import org.di.digital.dto.response.interrogation.OtherAudioResponse;
 import org.di.digital.dto.response.interrogation.QAResponse;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
 import org.di.digital.model.enums.interrogation.QAStatusEnum;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.interrogation.*;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseRepository;
@@ -16,6 +21,7 @@ import org.di.digital.repository.interrogation.CaseInterrogationAudioRecordRepos
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.LogService;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.impl.queue.AudioQueueService;
 import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.requests.UserUtil;
@@ -25,42 +31,33 @@ import org.springframework.transaction.annotation.Transactional;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
 
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class AudioUploadWriter {
-
-    private final CaseRepository caseRepository;
-    private final UserRepository userRepository;
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final CaseInterrogationAudioRecordRepository audioRecordRepository;
     private final AudioQueueService audioQueueService;
     private final LogService logService;
     private final InterrogationMapper mapper;
-    private final UserUtil userUtil;
+    private final InterrogationAuthService interrogationAuthService;
 
-    // ---- Фаза 1: валидация + timeGuard + получить fio/caseNumber для MinIO-пути ----
     @Transactional(readOnly = true)
     public AudioUploadContext validateForQaUpload(Long caseId, Long interrogationId, Long qaId,
                                                   String email, InterrogationTimeGuard timeGuard) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
-        userUtil.validateUserAccess(caseEntity, user);
-
-        CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
-                .filter(i -> i.getId().equals(interrogationId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+        InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(caseId, interrogationId, email,
+                CaseModule.INTERROGATION, CaseAction.UPDATE);
+        CaseInterrogation interrogation = ctx.interrogation();
+        Case caseEntity = interrogation.getCaseEntity();
 
         timeGuard.assertCanRecord(interrogation, LocalDateTime.now());
 
-        // проверяем существование QA заранее, чтобы не грузить файл впустую
         interrogation.getQaList().stream()
                 .filter(q -> q.getId().equals(qaId))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("QA не найден: " + qaId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.QA.localized(currentLang(), qaId.toString())));
 
         return new AudioUploadContext(caseEntity.getNumber(), interrogation.getFio(),
                 interrogation.getLanguage());
@@ -69,16 +66,10 @@ public class AudioUploadWriter {
     @Transactional(readOnly = true)
     public AudioUploadContext validateForOtherUpload(Long caseId, Long interrogationId, Long otherAudioId,
                                                      String email, InterrogationTimeGuard timeGuard) {
-        Case caseEntity = caseRepository.findById(caseId)
-                .orElseThrow(() -> new IllegalStateException("Дело не найдено: " + caseId));
-        User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new IllegalStateException("Пользователь не найден: " + email));
-        userUtil.validateUserAccess(caseEntity, user);
-
-        CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
-                .filter(i -> i.getId().equals(interrogationId))
-                .findFirst()
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+        InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(caseId, interrogationId, email,
+                CaseModule.INTERROGATION, CaseAction.UPDATE);
+        CaseInterrogation interrogation = ctx.interrogation();
+        Case caseEntity = interrogation.getCaseEntity();
 
         timeGuard.assertCanRecord(interrogation, LocalDateTime.now());
 
@@ -86,24 +77,23 @@ public class AudioUploadWriter {
             interrogation.getOtherAudios().stream()
                     .filter(o -> o.getId().equals(otherAudioId))
                     .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Аудио не найдено: " + otherAudioId));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.AUDIO.localized(currentLang(), otherAudioId.toString())));
         }
 
         return new AudioUploadContext(caseEntity.getNumber(), interrogation.getFio(),
                 interrogation.getLanguage());
     }
 
-    // ---- Фаза 3 (QA): сохранить record, отправить в очередь, вернуть DTO ----
     @Transactional
     public QAResponse persistQaAudio(Long interrogationId, Long qaId, String audioUrl,
                                      String originalFileName, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.INTERROGATION.localized(currentLang(), interrogationId.toString())));
 
         CaseInterrogationQA qa = interrogation.getQaList().stream()
                 .filter(q -> q.getId().equals(qaId))
                 .findFirst()
-                .orElseThrow(() -> new IllegalStateException("QA не найден: " + qaId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.QA.localized(currentLang(), qaId.toString())));
 
         qa.setStatus(QAStatusEnum.TRANSCRIBING);
 
@@ -145,14 +135,14 @@ public class AudioUploadWriter {
                                                 String fieldName, String audioUrl,
                                                 String originalFileName, String language, String email) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new IllegalStateException("Допрос не найден: " + interrogationId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.INTERROGATION.localized(currentLang(), interrogationId.toString())));
 
         CaseInterrogationOtherAudio otherAudio;
         if (otherAudioId != null) {
             otherAudio = interrogation.getOtherAudios().stream()
                     .filter(o -> o.getId().equals(otherAudioId))
                     .findFirst()
-                    .orElseThrow(() -> new IllegalStateException("Аудио не найдено: " + otherAudioId));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.AUDIO.localized(currentLang(), otherAudioId.toString())));
             otherAudio.setStatus(QAStatusEnum.TRANSCRIBING);
         } else {
             int orderIndex = interrogation.getOtherAudios().size();
@@ -201,4 +191,8 @@ public class AudioUploadWriter {
     }
 
     public record AudioUploadContext(String caseNumber, String fio, String language) {}
+
+    private UserSettingsLanguage currentLang() {
+        return getCurrentLang();
+    }
 }

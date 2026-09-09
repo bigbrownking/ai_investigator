@@ -5,6 +5,7 @@ import org.di.digital.dto.request.interrogation.AddFigurantToCaseRequest;
 import org.di.digital.dto.request.cases.CreateCaseRequest;
 import org.di.digital.dto.request.cases.EditCaseRequest;
 import org.di.digital.dto.request.cases.ReorderCaseFilesRequest;
+import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.cases.Case;
@@ -20,7 +21,7 @@ import java.util.Optional;
 
 public interface CaseService {
     Case getCaseEntityById(Long caseId, String email);
-    List<CasePreviewResponse> getUserCases(String username, String sort);
+    List<CasePreviewResponse> getUserCases(String username, String sort, CaseSearchRequest request);
     CaseResponse editCase(Long caseId, EditCaseRequest request, String email);
     CaseResponse changeCaseLanguage(Long caseId, ChangeCaseLanguageRequest request, String email);
     CaseResponse getCaseById(Long id, String email);
@@ -50,9 +51,6 @@ public interface CaseService {
     void updateCaseActivity(String caseNumber, String activityType);
     void deleteAllFiles(Long caseId, String currentEmail);
     void deleteCaseById(Long id, String currentEmail);
-
-    CaseFileResponse getFileByName(Long caseId, String fileName, String email);
-
     List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId, String email);
     
 

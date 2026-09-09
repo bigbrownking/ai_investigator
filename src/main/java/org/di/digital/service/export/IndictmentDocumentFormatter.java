@@ -2,6 +2,8 @@ package org.di.digital.service.export;
 
 import lombok.extern.slf4j.Slf4j;
 import org.apache.poi.xwpf.usermodel.XWPFDocument;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.springframework.stereotype.Service;
 
 import java.io.IOException;
@@ -9,6 +11,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Pattern;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -55,7 +59,7 @@ public class IndictmentDocumentFormatter extends BaseDocumentFormatter {
 
     public byte[] generate(List<Map<String, Object>> sections) throws IOException {
         if (sections == null || sections.isEmpty()) {
-            throw new IllegalStateException("Обвинительный акт пуст");
+            throw new NotFoundException(NotFoundMessage.INDICTMENT.localized(getCurrentLang()));
         }
 
         try (XWPFDocument doc = new XWPFDocument()) {

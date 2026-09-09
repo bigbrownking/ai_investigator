@@ -7,6 +7,8 @@ import org.di.digital.dto.response.cases.QueryResponse;
 import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.dto.response.chat.CaseChatMessageDto;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChat;
 import org.di.digital.model.cases.CaseChatMessage;
@@ -14,11 +16,15 @@ import org.di.digital.model.enums.*;
 import org.di.digital.model.enums.cases.CaseActivityType;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseChatRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.cases.ChatService;
 import org.di.digital.service.LogService;
@@ -41,6 +47,8 @@ import java.util.concurrent.CompletableFuture;
 import static org.di.digital.util.requests.RequestBodyBuilder.generalChatBody;
 import static org.di.digital.util.requests.RequestUrlBuilder.generalChatUrl;
 import static org.di.digital.util.requests.RequestUrlBuilder.qualificationChatUrl;
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
+
 @Slf4j
 @Service
 @RequiredArgsConstructor
@@ -55,6 +63,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatMessageWriter chatMessageWriter;
     private final WebClient.Builder webClientBuilder;
     private final SseTypingEmitter sseTypingEmitter;
+    private final CaseAccessService caseAccessService;
     private final UserUtil userUtil;
 
     @Value("${model.host}")
@@ -87,7 +96,7 @@ public class ChatServiceImpl implements ChatService {
                         .block();
 
                 if (response == null || response.getResponse() == null) {
-                    throw new IllegalStateException("Пустой ответ от сервиса");
+                    throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
                 }
 
                 emitter.send(SseEmitter.event().name("message").data(response.getResponse()));
@@ -110,13 +119,14 @@ public class ChatServiceImpl implements ChatService {
     public void streamCaseChatResponseWithHistory(String caseNumber, ChatRequest request,
                                                   String userEmail, SseEmitter emitter) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.ADD);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
-            String message = MessageConstant.NO_FILE_PROCESSED.format(caseNumber);
+            String message = MessageConstant.NO_FILE_PROCESSED.format(currentLang(), caseNumber);
             log.warn(message);
             try {
                 emitter.send(SseEmitter.event().name("error").data(message));
@@ -153,7 +163,7 @@ public class ChatServiceImpl implements ChatService {
                         .block();
 
                 if (response == null || response.getResponse() == null) {
-                    throw new IllegalStateException("Пустой ответ от сервиса");
+                    throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
                 }
 
                 emitter.send(SseEmitter.event().name("message").data(response.getResponse()));
@@ -187,16 +197,18 @@ public class ChatServiceImpl implements ChatService {
     public CaseChatHistoryResponse getChatHistoryByCaseNumber(String caseNumber, String userEmail,
                                                               int page, int size) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.READ);
         return getChatHistory(caseEntity.getId(), user.getId(), page, size);
     }
 
     @Transactional(readOnly = true)
     public CaseChatHistoryResponse getChatHistory(Long caseId, Long userId, int page, int size) {
-        CaseChat chat = caseChatRepository.findByCaseIdAndUserId(caseId, userId).orElse(null);
+        CaseChat chat = caseChatRepository.findByCaseIdAndUserId(caseId, userId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CHAT.localized(currentLang())));
         if (chat == null) {
             return CaseChatHistoryResponse.builder().messages(List.of()).totalMessages(0).build();
         }
@@ -220,10 +232,11 @@ public class ChatServiceImpl implements ChatService {
     @Transactional
     public void clearChatHistoryByCaseNumber(String caseNumber, String userEmail) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new NotFoundException("Дело не найдено: " + caseNumber));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
         User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new NotFoundException("Пользователь не найден: " + userEmail));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.DELETE);
 
         chatMessageWriter.clearChatHistory(caseEntity.getId(), user.getId());
 
@@ -234,5 +247,9 @@ public class ChatServiceImpl implements ChatService {
                 caseNumber,
                 userEmail
         );
+    }
+
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
     }
 }

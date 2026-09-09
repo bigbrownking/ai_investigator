@@ -4,11 +4,18 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.user.UpdateProfileRequest;
 import org.di.digital.dto.request.user.UserSettingsRequest;
+import org.di.digital.dto.response.access.MyAccessDto;
 import org.di.digital.dto.response.user.UserProfile;
+import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseModule;
 import org.di.digital.service.UserService;
+import org.di.digital.service.cases.CaseAccessService;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.Map;
+import java.util.Set;
 
 @RestController
 @Slf4j
@@ -18,7 +25,8 @@ public class UserController {
     private final UserService userService;
 
     @GetMapping("/me")
-    public ResponseEntity<UserProfile> getMyProfile(Authentication authentication) {
+    public ResponseEntity<UserProfile> getMyProfile(
+            Authentication authentication) {
         String email = authentication.getName();
         log.info("Fetching profile for {}", email);
         return ResponseEntity.ok(userService.getUserProfile(email));
