@@ -3,6 +3,7 @@ package org.di.digital.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChangeOwnerRequest;
+import org.di.digital.dto.request.cases.ChangeParticipantsRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
@@ -164,6 +165,18 @@ public class RegAdminController {
         regAdminService.changeOwner(userDetails.getId(), caseId, request.getUserId());
         return ResponseEntity.ok().build();
     }
+
+    @PatchMapping("/cases/{caseId}/participants")
+    public ResponseEntity<Void> updateParticipants(
+            @PathVariable Long caseId,
+            @RequestBody UpdateParticipantsRequest request,
+            Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+        regAdminService.updateParticipants(userDetails.getId(), caseId, request.getParticipantIds());
+        return ResponseEntity.ok().build();
+    }
+    
 
     @GetMapping("/users/search")
     public ResponseEntity<List<UserSuggestionResponse>> searchUsers(

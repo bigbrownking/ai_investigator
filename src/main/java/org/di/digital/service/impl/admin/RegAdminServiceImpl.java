@@ -392,4 +392,38 @@ public class RegAdminServiceImpl implements RegAdminService {
     private UserSettingsLanguage currentLang(){
         return getCurrentLang();
     }
+
+    @Override
+    @Transactional
+    public void updateParticipants(Long adminId, Long caseId, List<Long> participantIds) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        userUtil.validateRegionAccess(admin, caseEntity);
+
+        List<User> newParticipants = userRepository.findAllById(participantIds);
+
+        for (User user : newParticipants) {     
+            if (!user.isActive()) {
+                throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang()));
+            }
+            userUtil.validateUserRegionAccess(admin, user);
+        }
+
+        Set<User> currentUsers = new java.util.HashSet<>(caseEntity.getUsers());
+        for (User current : currentUsers) {
+            caseEntity.removeUser(current);
+        }
+
+        for (User newUser : newParticipants) {
+            caseEntity.addUser(newUser);
+        }
+
+        caseRepository.save(caseEntity);
+
+        log.info("Админ {} успешно обновил участников для дела {}", adminId, caseId);
+    }
 }
