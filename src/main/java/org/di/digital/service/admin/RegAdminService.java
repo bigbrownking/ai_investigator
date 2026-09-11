@@ -43,8 +43,10 @@ public interface RegAdminService {
     void changeOwner(Long adminId, Long caseId, Long id);
     List<UserSuggestionResponse> searchUsers(Long adminId, String query);
 
-    void updateParticipants(Long adminId, Long caseId, List<Long> participantIds);
+    void addParticipant(Long adminId, Long caseId, Long userId);
 
+    void removeParticipant(Long adminId, Long caseId, Long userId);
+    
     String getMyRegionIndictment(Long adminId, Long caseId);
 
     String getMyRegionQualification(Long adminId, Long caseId);

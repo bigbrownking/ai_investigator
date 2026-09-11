@@ -166,17 +166,23 @@ public class RegAdminController {
         return ResponseEntity.ok().build();
     }
 
-    @PatchMapping("/cases/{caseId}/participants")
-    public ResponseEntity<Void> updateParticipants(
+    @PostMapping("/cases/{caseId}/participants/{userId}")
+    public ResponseEntity<Void> addParticipant(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
             @PathVariable Long caseId,
-            @RequestBody UpdateParticipantsRequest request,
-            Authentication authentication) {
-        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-
-        regAdminService.updateParticipants(userDetails.getId(), caseId, request.getParticipantIds());
+            @PathVariable Long userId) {
+        regAdminService.addParticipant(userDetails.getId(), caseId, userId);
         return ResponseEntity.ok().build();
     }
-    
+
+    @DeleteMapping("/cases/{caseId}/participants/{userId}")
+    public ResponseEntity<Void> removeParticipant(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @PathVariable Long caseId,
+            @PathVariable Long userId) {
+        regAdminService.removeParticipant(userDetails.getId(), caseId, userId);
+        return ResponseEntity.ok().build();
+    }
 
     @GetMapping("/users/search")
     public ResponseEntity<List<UserSuggestionResponse>> searchUsers(

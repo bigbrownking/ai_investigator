@@ -395,7 +395,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
     @Override
     @Transactional
-    public void updateParticipants(Long adminId, Long caseId, List<Long> participantIds) {
+    public void addParticipant(Long adminId, Long caseId, Long userId) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
 
@@ -404,26 +404,38 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         userUtil.validateRegionAccess(admin, caseEntity);
 
-        List<User> newParticipants = userRepository.findAllById(participantIds);
+        User userToAdd = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
 
-        for (User user : newParticipants) {     
-            if (!user.isActive()) {
-                throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang()));
-            }
-            userUtil.validateUserRegionAccess(admin, user);
+        if (!userToAdd.isActive()) {
+            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang()));
         }
+        userUtil.validateUserRegionAccess(admin, userToAdd);
 
-        Set<User> currentUsers = new java.util.HashSet<>(caseEntity.getUsers());
-        for (User current : currentUsers) {
-            caseEntity.removeUser(current);
+        if (!caseEntity.hasUser(userToAdd)) {
+            caseEntity.addUser(userToAdd);
+            caseRepository.save(caseEntity);
+            log.info("Админ {} добавил участника {} в дело {}", adminId, userId, caseId);
         }
-
-        for (User newUser : newParticipants) {
-            caseEntity.addUser(newUser);
-        }
-
-        caseRepository.save(caseEntity);
-
-        log.info("Админ {} успешно обновил участников для дела {}", adminId, caseId);
     }
-}
+
+    @Override
+    @Transactional
+    public void removeParticipant(Long adminId, Long caseId, Long userId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        userUtil.validateRegionAccess(admin, caseEntity);
+
+        User userToRemove = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
+
+        if (caseEntity.hasUser(userToRemove)) {
+            caseEntity.removeUser(userToRemove);
+            caseRepository.save(caseEntity);
+            log.info("Админ {} удалил участника {} из дела {}", adminId, userId, caseId);
+        }
+    }
