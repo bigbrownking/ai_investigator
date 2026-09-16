@@ -3,6 +3,7 @@ package org.di.digital.controller;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChangeOwnerRequest;
+import org.di.digital.dto.request.cases.ChangeParticipantsRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
@@ -162,6 +163,24 @@ public class RegAdminController {
             Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         regAdminService.changeOwner(userDetails.getId(), caseId, request.getUserId());
+        return ResponseEntity.ok().build();
+    }
+
+    @PostMapping("/cases/{caseId}/participants/{userId}")
+    public ResponseEntity<Void> addParticipant(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @PathVariable Long caseId,
+            @PathVariable Long userId) {
+        regAdminService.addParticipant(userDetails.getId(), caseId, userId);
+        return ResponseEntity.ok().build();
+    }
+
+    @DeleteMapping("/cases/{caseId}/participants/{userId}")
+    public ResponseEntity<Void> removeParticipant(
+            @AuthenticationPrincipal UserDetailsImpl userDetails,
+            @PathVariable Long caseId,
+            @PathVariable Long userId) {
+        regAdminService.removeParticipant(userDetails.getId(), caseId, userId);
         return ResponseEntity.ok().build();
     }
 

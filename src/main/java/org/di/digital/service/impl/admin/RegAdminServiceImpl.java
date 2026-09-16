@@ -392,4 +392,50 @@ public class RegAdminServiceImpl implements RegAdminService {
     private UserSettingsLanguage currentLang(){
         return getCurrentLang();
     }
-}
+
+    @Override
+    @Transactional
+    public void addParticipant(Long adminId, Long caseId, Long userId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        userUtil.validateRegionAccess(admin, caseEntity);
+
+        User userToAdd = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
+
+        if (!userToAdd.isActive()) {
+            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang()));
+        }
+        userUtil.validateUserRegionAccess(admin, userToAdd);
+
+        if (!caseEntity.hasUser(userToAdd)) {
+            caseEntity.addUser(userToAdd);
+            caseRepository.save(caseEntity);
+            log.info("Админ {} добавил участника {} в дело {}", adminId, userId, caseId);
+        }
+    }
+
+    @Override
+    @Transactional
+    public void removeParticipant(Long adminId, Long caseId, Long userId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        userUtil.validateRegionAccess(admin, caseEntity);
+
+        User userToRemove = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
+
+        if (caseEntity.hasUser(userToRemove)) {
+            caseEntity.removeUser(userToRemove);
+            caseRepository.save(caseEntity);
+            log.info("Админ {} удалил участника {} из дела {}", adminId, userId, caseId);
+        }
+    }
