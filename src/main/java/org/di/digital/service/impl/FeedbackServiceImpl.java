@@ -10,9 +10,11 @@ import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.CaseFile;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
 import org.di.digital.model.enums.dictionary.ModuleType;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.support.*;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.user.UserRepository;
@@ -58,7 +60,6 @@ public class FeedbackServiceImpl implements FeedbackService {
     private int maxFilesPerModule;
 
     private static final DateTimeFormatter DATE_FMT = DateTimeFormatter.ofPattern("yyyy-MM-dd");
-
 
 
     @Override
@@ -129,7 +130,7 @@ public class FeedbackServiceImpl implements FeedbackService {
                 ModuleType module = ModuleType.from(itemReq.getModule());
 
                 if (module != null && !seenModules.add(module.name())) {
-                    throw new IllegalArgumentException("Модуль указан дважды: " + module.name());
+                    throw new IllegalStateException(MessageConstant.MODULE_USED_NOT_ONCE.format(currentLang(), module.name()));
                 }
 
                 boolean hasMessage = itemReq.getMessage() != null && !itemReq.getMessage().isBlank();
@@ -146,9 +147,7 @@ public class FeedbackServiceImpl implements FeedbackService {
                 if (!hasMessage && !hasFile) continue;
 
                 if (files.size() > maxFilesPerModule) {
-                    throw new IllegalArgumentException(String.format(
-                            "Модуль \"%s\": превышен лимит файлов (%d из %d максимум).",
-                            module != null ? module.name() : "?", files.size(), maxFilesPerModule));
+                    throw new IllegalStateException(String.format(MessageConstant.FILE_HAS_TOO_MUCH_PAGES.format(currentLang(), maxPagesPerFile)));
                 }
 
                 ReviewItem item = ReviewItem.builder()
@@ -169,12 +168,11 @@ public class FeedbackServiceImpl implements FeedbackService {
                         }
 
                         if (pages != null && pages > maxPagesPerFile) {
-                            throw new IllegalArgumentException(String.format(
-                                    "Файл \"%s\" содержит %d страниц. Максимум — %d страниц на файл.",
-                                    file.getOriginalFilename(), pages, maxPagesPerFile));
+                            throw new IllegalStateException(String.format(MessageConstant.FILE_HAS_TOO_MUCH_PAGES.format(currentLang(), maxPagesPerFile)));
                         }
 
-                        CaseFile uploaded = minioService.uploadFile(file, folder, false);                        uploadedUrls.add(uploaded.getFileUrl());
+                        CaseFile uploaded = minioService.uploadFile(file, folder, false);
+                        uploadedUrls.add(uploaded.getFileUrl());
 
                         ReviewItemFile itemFile = ReviewItemFile.builder()
                                 .fileUrl(uploaded.getFileUrl())
@@ -182,7 +180,7 @@ public class FeedbackServiceImpl implements FeedbackService {
                                 .contentType(uploaded.getContentType())
                                 .build();
 
-                         item.addFile(itemFile);
+                        item.addFile(itemFile);
                     }
                 }
 
@@ -190,14 +188,15 @@ public class FeedbackServiceImpl implements FeedbackService {
             }
 
             if (review.getItems().isEmpty()) {
-                throw new IllegalArgumentException("Рецензия пустая: не заполнен ни один модуль");
+                throw new IllegalStateException(MessageConstant.REVIEW_EMPTY.format(currentLang(), email));
             }
 
         } catch (RuntimeException e) {
             for (String url : uploadedUrls) {
                 try {
                     minioService.deleteFile(url);
-                } catch (Exception ignored) {}
+                } catch (Exception ignored) {
+                }
             }
             throw e;
         }
@@ -214,5 +213,9 @@ public class FeedbackServiceImpl implements FeedbackService {
                 email
         );
         return mapper.toReviewDto(saved);
+    }
+
+    private UserSettingsLanguage currentLang() {
+        return getCurrentLang();
     }
 }

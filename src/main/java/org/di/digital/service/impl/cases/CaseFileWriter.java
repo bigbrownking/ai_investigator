@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.cases.CaseFileResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
@@ -41,7 +42,7 @@ public class CaseFileWriter {
     private static final int MAX_PAGES_PER_TOM = 180;
 
     private final CaseRepository caseRepository;
-    private final CaseAccessService caseAccessService;
+   // private final CaseAccessService caseAccessService;
     private final UserRepository userRepository;
     private final CaseFileRepository caseFileRepository;
     private final TaskQueueService taskQueueService;
@@ -58,7 +59,7 @@ public class CaseFileWriter {
         if (caseRepository.existsByNumber(data.number())) {
             logService.log(String.format("Case already exists: %s", data.number()),
                     LogLevel.ERROR, LogAction.CASE_CREATED, data.number(), user.getEmail());
-            throw new IllegalStateException("Дело уже создано, пожалуйста проинформируйте создателя дела.");
+            throw new IllegalStateException(IllegalStateMessage.ALREADY_EXISTS.localized(currentLang(), data.number()));
         }
 
         Case newCase = Case.builder()
@@ -110,7 +111,7 @@ public class CaseFileWriter {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.ADD);
+       // caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.ADD);
 
         if (Boolean.TRUE.equals(caseEntity.getIsFinalIndictmentDone())) {
             logService.log(String.format("Cannot upload files by %s user in case %s",

@@ -113,4 +113,26 @@ public interface CaseRepository extends JpaRepository<Case, Long>, JpaSpecificat
     long countAudioInterrogations(@Param("ids") List<Long> ids);
     @Query("select coalesce(sum(case when c.status = true then 1 else 0 end),0) from Case c where c.id in :ids")
     long countActive(@Param("ids") List<Long> ids);
+
+    @Query("""
+    select case when count(c) > 0 then true else false end
+    from Case c
+    where c.id = :caseId
+      and c.owner.id = :userId
+    """)
+    boolean isOwner(
+            @Param("caseId") Long caseId,
+            @Param("userId") Long userId
+    );
+    @Query("""
+    select case when count(c) > 0 then true else false end
+    from Case c
+    left join c.users u
+    where c.id = :caseId
+      and (c.owner.id = :userId or u.id = :userId)
+    """)
+    boolean hasUserAccess(
+            @Param("caseId") Long caseId,
+            @Param("userId") Long userId
+    );
 }

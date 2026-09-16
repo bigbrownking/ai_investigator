@@ -63,7 +63,7 @@ public class ChatServiceImpl implements ChatService {
     private final ChatMessageWriter chatMessageWriter;
     private final WebClient.Builder webClientBuilder;
     private final SseTypingEmitter sseTypingEmitter;
-    private final CaseAccessService caseAccessService;
+  //  private final CaseAccessService caseAccessService;
     private final UserUtil userUtil;
 
     @Value("${model.host}")
@@ -123,7 +123,7 @@ public class ChatServiceImpl implements ChatService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.ADD);
+      //  caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.ADD);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
             String message = MessageConstant.NO_FILE_PROCESSED.format(currentLang(), caseNumber);
@@ -201,7 +201,7 @@ public class ChatServiceImpl implements ChatService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.READ);
+       // caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.READ);
         return getChatHistory(caseEntity.getId(), user.getId(), page, size);
     }
 
@@ -236,7 +236,7 @@ public class ChatServiceImpl implements ChatService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.DELETE);
+      //  caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.DELETE);
 
         chatMessageWriter.clearChatHistory(caseEntity.getId(), user.getId());
 

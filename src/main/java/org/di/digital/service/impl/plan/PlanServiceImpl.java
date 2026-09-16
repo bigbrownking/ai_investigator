@@ -7,6 +7,7 @@ import org.di.digital.dto.request.plan.ManualStatusRequest;
 import org.di.digital.dto.response.plan.*;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.exception.message.AccessDeniedMessage;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.*;
@@ -81,7 +82,7 @@ public class PlanServiceImpl implements PlanService {
     private final PlanActionWriter planActionWriter;
     private final UserUtil userUtil;
     private final PlanResponseAssembler assembler;
-    private final CaseAccessService caseAccessService;
+   // private final CaseAccessService caseAccessService;
 
     private final PlanMapper mapper;
 
@@ -100,7 +101,7 @@ public class PlanServiceImpl implements PlanService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.ADD);
+      //  caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.ADD);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
             String message = MessageConstant.NO_FILE_PROCESSED.format(currentLang(), caseNumber);
@@ -119,8 +120,7 @@ public class PlanServiceImpl implements PlanService {
                 || caseEntity.getPlanStatus() == PlanStatus.APPROVED_L1
                 || caseEntity.getPlanStatus() == PlanStatus.APPROVED_L2
                 || caseEntity.getPlanStatus() == PlanStatus.APPROVED_L3)) {
-            throw new IllegalStateException(
-                    "Нельзя перегенерировать план при статусе: " + caseEntity.getPlanStatus().getDescription());
+            throw new IllegalStateException(MessageConstant.PLAN_REGENERATE.format(currentLang(), caseEntity.getPlanStatus().getDescription()));
         }
 
         MultiValueMap<String, Object> body = planBody(caseNumber, mode);
@@ -135,7 +135,7 @@ public class PlanServiceImpl implements PlanService {
                 .block();
 
         if (response == null) {
-            throw new IllegalStateException("AI вернул пустой ответ для плана дела: " + caseNumber);
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
         }
         Map<String, Object> planTitleInfo = (Map<String, Object>) response.get("plan_title_info");
         if (planTitleInfo != null) {
@@ -270,7 +270,7 @@ public class PlanServiceImpl implements PlanService {
                     .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
 
             userUtil.validateUserAccess(caseEntity, user);
-            caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.DOWNLOAD);
+         //   caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.DOWNLOAD);
 
             CasePlanResponse response = getPlan(caseNumber, userEmail);
 
@@ -292,7 +292,7 @@ public class PlanServiceImpl implements PlanService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.READ);
+       // caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.READ);
 
         if (userUtil.isRegAdmin(user) && caseEntity.getPlanStatus() == PlanStatus.PENDING) {
             throw new AccessDeniedException(AccessDeniedMessage.PLAN_OUT_OF_APPROVE.localized(getCurrentLang()));
@@ -428,10 +428,10 @@ public class PlanServiceImpl implements PlanService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.UPDATE);
+       // caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.UPDATE);
 
         if ("номер".equals(key)) {
-            throw new IllegalArgumentException("Нельзя изменить номер действия");
+            throw new IllegalArgumentException(MessageConstant.PLAN_ACTION_NUMBER_EDIT.localized(currentLang(), key));
         }
 
         Map<String, Object> plan = caseEntity.getPlan();
@@ -543,12 +543,11 @@ public class PlanServiceImpl implements PlanService {
                     .block();
         } catch (Exception e) {
             log.error("Failed to call manual_status on AI for case {}: {}", caseNumber, e.getMessage(), e);
-            throw new IllegalStateException(
-                    "Не удалось обновить статус через AI-сервис для дела " + caseNumber, e);
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
         }
 
         if (aiResponse == null || !Boolean.TRUE.equals(aiResponse.get("success"))) {
-            throw new IllegalStateException("AI не подтвердил изменение статуса для дела: " + caseNumber);
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
         }
 
         return planActionWriter.applyActionStatus(caseNumber, email, request, prep.role(), aiResponse);
@@ -562,7 +561,7 @@ public class PlanServiceImpl implements PlanService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.READ);
+       // caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.READ);
 
         return planEditHistoryRepository
                 .findByCaseEntityIdOrderByEditedAtDesc(caseEntity.getId())
@@ -610,15 +609,15 @@ public class PlanServiceImpl implements PlanService {
 
         if (isRegAdmin) {
             if (status != PlanStatus.APPROVED_L1 && status != PlanStatus.APPROVED_L2) {
-                throw new IllegalStateException("Редактирование недоступно при статусе: " + status.getDescription());
+                throw new IllegalStateException(MessageConstant.PLAN_EDIT_CONSTRAINT.format(currentLang(), status.getDescription()));
             }
         } else if (isAdvancedUser) {
             if (status != PlanStatus.PENDING) {
-                throw new IllegalStateException("Редактирование недоступно при статусе: " + status.getDescription());
+                throw new IllegalStateException(MessageConstant.PLAN_EDIT_CONSTRAINT.format(currentLang(), status.getDescription()));
             }
         } else {
             if (status != PlanStatus.DRAFT) {
-                throw new IllegalStateException("Редактирование недоступно при статусе: " + status.getDescription());
+                throw new IllegalStateException(MessageConstant.PLAN_EDIT_CONSTRAINT.format(currentLang(), status.getDescription()));
             }
         }
     }

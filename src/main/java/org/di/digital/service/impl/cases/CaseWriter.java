@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.AccessDeniedMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
@@ -21,6 +22,7 @@ import org.di.digital.service.LogService;
 import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.requests.UserUtil;
+import org.springframework.security.access.AccessDeniedException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -35,7 +37,7 @@ public class CaseWriter {
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final LogService logService;
-    private final CaseAccessService caseAccessService;
+   // private final CaseAccessService caseAccessService;
     private final CaseMapper mapper;
     private final UserUtil userUtil;
 
@@ -46,7 +48,7 @@ public class CaseWriter {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DELETE);
+       // caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DELETE);
         return caseEntity.getNumber();
     }
 
@@ -80,8 +82,7 @@ public class CaseWriter {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
         if (!caseEntity.isOwner(user)) {
-            throw new org.springframework.security.access.AccessDeniedException(
-                    "Только создатель дела может редактировать его");
+            throw new AccessDeniedException(AccessDeniedMessage.OWNER_ONLY.localized(currentLang()));
         }
 
         String oldNumber = caseEntity.getNumber();
@@ -148,7 +149,7 @@ public class CaseWriter {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), fileName)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DELETE);
+       // caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DELETE);
 
         if (CaseFileStatusEnum.PROCESSING.equals(file.getStatus())) {
             String message = MessageConstant.CANNOT_DELETE_FILE.format(currentLang(), caseEntity.getNumber());

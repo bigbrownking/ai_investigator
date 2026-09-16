@@ -68,7 +68,7 @@ public class QualificationServiceImpl implements QualificationService {
     private final UserRepository userRepository;
     private final WebClient.Builder webClientBuilder;
     private final QualificationWriter qualificationWriter;
-    private final CaseAccessService caseAccessService;
+   // private final CaseAccessService caseAccessService;
     private final UserUtil userUtil;
 
     private final SseHeartbeatUtil heartbeatUtil;
@@ -145,7 +145,7 @@ public class QualificationServiceImpl implements QualificationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.ADD);
+      //  caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.ADD);
 
         if (!entity.isAtLeastOneFileProcessed()) {
             String message = MessageConstant.NO_FILE_PROCESSED.format(currentLang(), caseNumber);
@@ -196,7 +196,7 @@ public class QualificationServiceImpl implements QualificationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.UPDATE);
+      //  caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.UPDATE);
 
         String language = entity.getLanguage();
 
@@ -257,7 +257,7 @@ public class QualificationServiceImpl implements QualificationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.UPDATE);
+     //   caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.UPDATE);
 
         List<Map<String, Object>> sections = entity.getQualificationSections();
         if (sections == null || sections.isEmpty()) {
@@ -321,7 +321,7 @@ public class QualificationServiceImpl implements QualificationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.UPDATE);
+       // caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.UPDATE);
 
 
         if (entity.getQualificationSections() == null && entity.getQualification() != null) {
@@ -392,7 +392,7 @@ public class QualificationServiceImpl implements QualificationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.UPDATE);
+      //  caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.UPDATE);
 
         if (entity.getQualificationSections() == null && entity.getQualification() != null) {
             throw new IllegalStateException(MessageConstant.OLD_QUALIFICATION.localized(currentLang()));
@@ -429,7 +429,7 @@ public class QualificationServiceImpl implements QualificationService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.READ);
+       // caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.READ);
 
         if (entity.getQualificationSections() != null) {
             return toDtoList(entity.getQualificationSections());
@@ -458,7 +458,7 @@ public class QualificationServiceImpl implements QualificationService {
             User user = userRepository.findByEmail(userEmail)
                     .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
             userUtil.validateUserAccess(entity, user);
-            caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.DOWNLOAD);
+         //   caseAccessService.require(entity, user, CaseModule.QUALIFICATION, CaseAction.DOWNLOAD);
 
             List<Map<String, Object>> sections = entity.getQualificationSections();
 

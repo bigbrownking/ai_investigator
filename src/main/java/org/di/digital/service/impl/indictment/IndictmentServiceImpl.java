@@ -7,6 +7,7 @@ import org.di.digital.dto.request.indictment.IndictmentRephraseApplyRequest;
 import org.di.digital.dto.request.indictment.IndictmentSectionUpdateRequest;
 import org.di.digital.dto.response.indictment.IndictmentSectionDto;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.cases.CaseActivityType;
@@ -74,7 +75,7 @@ public class IndictmentServiceImpl implements IndictmentService {
     private final UserRepository userRepository;
     private final WebClient.Builder webClientBuilder;
     private final IndictmentWriter indictmentWriter;
-    private final CaseAccessService caseAccessService;
+    //private final CaseAccessService caseAccessService;
 
     private final UserUtil userUtil;
     private final SseHeartbeatUtil heartbeatUtil;
@@ -167,7 +168,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.ADD);
+      //  caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.ADD);
 
         String language = entity.getLanguage();
 
@@ -201,7 +202,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                     .block();
 
             if (responseJson == null || responseJson.isBlank()) {
-                throw new IllegalStateException("Пустой ответ от сервиса");
+                throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), caseNumber));
             }
 
             indictmentWriter.saveIndictmentRaw(caseNumber, responseJson, false);
@@ -231,7 +232,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.ADD);
+      //  caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.ADD);
 
         String language = entity.getLanguage();
 
@@ -301,7 +302,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
+      //  caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
 
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(currentLang(), caseNumber);
@@ -324,7 +325,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                     .block();
 
             if (responseJson == null || responseJson.isBlank()) {
-                throw new IllegalStateException("Пустой ответ от сервиса");
+                throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
             }
 
             indictmentWriter.saveSingleSection(caseNumber, responseJson);
@@ -349,7 +350,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
+       // caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
 
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(currentLang(), caseNumber);
@@ -362,7 +363,7 @@ public class IndictmentServiceImpl implements IndictmentService {
 
         List<Map<String, Object>> sections = entity.getIndictmentSections();
         if (sections == null || sections.isEmpty()) {
-            emitter.completeWithError(new NotFoundException("Секции акта не найдены: " + caseNumber));
+            emitter.completeWithError(new NotFoundException(NotFoundMessage.SECTION.localized(currentLang(), caseNumber)));
             return;
         }
 
@@ -385,7 +386,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                     .block();
 
             if (responseJson == null || responseJson.isBlank()) {
-                throw new IllegalStateException("Пустой ответ от сервиса");
+                throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
             }
 
             var node = mapper.readTree(responseJson);
@@ -420,10 +421,10 @@ public class IndictmentServiceImpl implements IndictmentService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
+      //  caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
 
         if (entity.getIndictmentSections() == null && entity.getIndictment() != null) {
-            throw new IllegalStateException("Ваш обвинительный акт старого образца, сгенерируйте заново");
+            throw new IllegalStateException(MessageConstant.OLD_INDICTMENT.format(currentLang(), caseNumber));
         }
         if (entity.getIndictmentSections() == null) {
             throw new NotFoundException(NotFoundMessage.INDICTMENT.localized(currentLang(), caseNumber));
@@ -442,9 +443,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         int endIdx = indexOfSection(sections, endSectionId);
         if (startIdx < 0) throw new NotFoundException(NotFoundMessage.SECTION.localized(currentLang(), String.valueOf(startIdx)));
         if (endIdx < 0)throw new NotFoundException(NotFoundMessage.SECTION.localized(currentLang(), String.valueOf(endIdx)));
-
-        if (startIdx > endIdx) throw new IllegalStateException(
-                "Начальная секция идёт позже конечной: start=" + startSectionId + ", end=" + endSectionId);
+        if (startIdx > endIdx) throw new IllegalStateException(IllegalStateMessage.INVALID_STATE.localized(currentLang()));
 
         if (startIdx == endIdx) {
             Map<String, Object> s = sections.get(startIdx);
@@ -493,10 +492,10 @@ public class IndictmentServiceImpl implements IndictmentService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
+       // caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
 
         if (entity.getIndictmentSections() == null && entity.getIndictment() != null) {
-            throw new IllegalStateException("Ваш обвинительный акт старого образца, сгенерируйте заново");
+            throw new IllegalStateException(MessageConstant.OLD_INDICTMENT.format(currentLang(), caseNumber));
         }
         if (entity.getIndictmentSections() == null) {
             throw new NotFoundException(NotFoundMessage.INDICTMENT.localized(currentLang(), caseNumber));
@@ -535,7 +534,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(entity, user);
-        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.READ);
+     //   caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.READ);
 
         if (entity.getIndictmentSections() != null) {
             return toDtoList(entity.getIndictmentSections());
@@ -565,7 +564,7 @@ public class IndictmentServiceImpl implements IndictmentService {
             User user = userRepository.findByEmail(userEmail)
                     .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
             userUtil.validateUserAccess(entity, user);
-            caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.DOWNLOAD);
+          //  caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.DOWNLOAD);
 
             List<Map<String, Object>> sections = entity.getIndictmentSections();
 
@@ -610,8 +609,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         int endIdx = indexOfSection(sections, endSectionId);
         if (startIdx < 0) throw new NotFoundException(NotFoundMessage.SECTION.localized(currentLang(), String.valueOf(startIdx)));
         if (endIdx < 0) throw new NotFoundException(NotFoundMessage.SECTION.localized(currentLang(), String.valueOf(endIdx)));
-        if (startIdx > endIdx) throw new IllegalStateException(
-                "Начальная секция идёт позже конечной: start=" + startSectionId + ", end=" + endSectionId);
+        if (startIdx > endIdx) throw new IllegalStateException(IllegalStateMessage.INVALID_STATE.localized(currentLang()));
 
         if (startIdx == endIdx) {
             String text = (String) sections.get(startIdx).get("text");
@@ -635,8 +633,7 @@ public class IndictmentServiceImpl implements IndictmentService {
 
     private void checkRange(String text, int start, int end) {
         if (text == null || start < 0 || end > text.length() || start > end) {
-            throw new IllegalStateException("Некорректные позиции: start=" + start
-                    + ", end=" + end + ", length=" + (text == null ? "null" : text.length()));
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
         }
     }
 

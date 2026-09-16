@@ -27,6 +27,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.settings WHERE u.email = :email")
     Optional<User> findByEmailWithSettings(@Param("email") String email);
 
+    @Query("SELECT u.email FROM User u JOIN u.roles r WHERE u.active = true AND u.deleted = false AND r.name <> 'ADMIN'")
+    List<String> findAllActiveNonAdminEmails();
+
     boolean existsByEmail(String email);
 
     Page<User> findByRegionId(Long regionId, Pageable pageable);

@@ -4,11 +4,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.interrogation.*;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.dto.request.interrogation.AddInterrogationRequest;
 import org.di.digital.dto.request.interrogation.EditAudioTranscribedTextRequest;
 import org.di.digital.dto.request.interrogation.UpdateProtocolFieldRequest;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.cases.MessageRole;
 import org.di.digital.model.enums.interrogation.CaseInterrogationStatusEnum;
 import org.di.digital.model.enums.interrogation.InterrogationLimitProfile;
@@ -79,7 +81,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final InterrogationCreateWriter interrogationWriter;
     private final AudioUploadWriter audioUploadWriter;
     private final ApplicationFileWriter applicationFileWriter;
-    private final CaseAccessService caseAccessService;
+    //private final CaseAccessService caseAccessService;
     private final InterrogationAuthService interrogationAuthService;
 
     @Value("${files.max-pages-per-file}")
@@ -100,7 +102,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.INTERROGATION, CaseAction.READ);
+      //  caseAccessService.require(caseEntity, user, CaseModule.INTERROGATION, CaseAction.READ);
 
         return caseEntity.getInterrogations().stream()
                 .filter(i -> role.equals("Все") || (i.getRole() != null && i.getRole().equalsIgnoreCase(role)))
@@ -307,7 +309,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 }
             }
             case "technical" -> protocol.setTechnical(request.getValue());
-            default -> throw new IllegalArgumentException("Unknown field: " + request.getField());
+            default -> throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang(), request.getField()));
         }
     }
 
@@ -365,7 +367,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             case "additionalText" -> interrogation.setAdditionalText(request.getValue());
             case "application" -> interrogation.setApplication(request.getValue());
 
-            default -> throw new IllegalArgumentException("Unknown field: " + request.getField());
+            default -> throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang()));
         }
     }
 
@@ -536,8 +538,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
         if ("start".equals(action)) {
             if (!Boolean.TRUE.equals(interrogation.getCategoryConfirmed())) {
-                throw new IllegalStateException(
-                        "Категория допроса не подтверждена — запуск таймера недоступен");
+                throw new IllegalStateException(MessageConstant.INTERROGATION_CATEGORY_NOT_CONFIRMED.localized(currentLang()));
             }
 
             boolean resumingAfterBreak = false;
@@ -547,7 +548,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Duration passed = Duration.between(interrogation.getBreakStartedAt(), now);
                 if (passed.compareTo(CaseInterrogation.MANDATORY_BREAK) < 0) {
                     long left = CaseInterrogation.MANDATORY_BREAK.minus(passed).toMinutes();
-                    throw new IllegalStateException("Перерыв ещё не завершён. Осталось: " + left + " мин.");
+                    throw new IllegalStateException(MessageConstant.INTERROGATION_BREAK_STILL.format(currentLang(), left));
                 }
 
                 interrogation.setOnBreak(false);
@@ -586,13 +587,13 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                     || interrogation.getStatus() == CaseInterrogationStatusEnum.COMPLETED;
 
             if (isNotRunning) {
-                throw new IllegalStateException("Таймер не запущен");
+                throw new IllegalStateException(MessageConstant.INTERROGATION_TIMER_NOT_STARTED.format(currentLang()));
             }
 
             CaseInterrogationTimerSession lastSession = interrogation.getTimerSessions().stream()
                     .filter(s -> s.getPausedAt() == null)
                     .max(Comparator.comparing(CaseInterrogationTimerSession::getStartedAt))
-                    .orElseThrow(() -> new NotFoundException("Нет активной сессии таймера для паузы"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.TIMER_SESSSION.localized(currentLang())));
 
             lastSession.setPausedAt(now);
 
@@ -605,7 +606,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             interrogation.setIsPaused(true);
         } else {
             log.warn("Unknown action: {}", action);
-            throw new IllegalArgumentException("Unknown action: " + action);
+            throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang()));
         }
 
         CaseInterrogation saved = caseInterrogationRepository.save(interrogation);
@@ -651,9 +652,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 for (ApplicationFileWriter.UploadedFile u : uploaded) {
                     minioService.deleteFile(u.fileUrl());
                 }
-                throw new IllegalStateException(
-                        String.format("Файл \"%s\" содержит %d страниц. Максимум — %d страниц на файл.",
-                                originalName, pages, maxPagesPerFile));
+                throw new IllegalStateException(MessageConstant.FILE_HAS_TOO_MUCH_PAGES.format(currentLang(), maxPagesPerFile));
             }
 
             CaseInterrogationApplicationFile appFile;
@@ -689,7 +688,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         CaseInterrogationApplicationFile file = interrogation.getApplicationFiles().stream()
                 .filter(f -> f.getId().equals(fileId))
                 .findFirst()
-                .orElseThrow(() -> new NotFoundException("Файл не найден: " + fileId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), String.valueOf(fileId))));
 
         minioService.deleteFile(file.getFileUrl());
         interrogation.getApplicationFiles().remove(file);
@@ -747,7 +746,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                                                            InterrogationSpecialGround ground,
                                                            String groundNote, String email) {
         if (ground == null) {
-            throw new IllegalStateException("Категория не выбрана");
+            throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang()));
         }
         InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(caseId, interrogationId, email,
                 CaseModule.INTERROGATION, CaseAction.UPDATE);
@@ -755,7 +754,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
         if (Boolean.TRUE.equals(interrogation.getCategoryConfirmed())
                 && interrogation.getStartedAt() != null) {
-            throw new IllegalStateException("Категория уже подтверждена, допрос запущен");
+            throw new IllegalStateException(MessageConstant.INTERROGATION_CATEGORY_CONFIRMED.format(currentLang()));
         }
         InterrogationLimitProfile profile = ground.isSpecial()
                 ? InterrogationLimitProfile.SPECIAL
@@ -790,12 +789,11 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         LocalDateTime now = LocalDateTime.now();
 
         if (Boolean.TRUE.equals(interrogation.getOnBreak())) {
-            throw new IllegalStateException(
-                    "Идёт обязательный перерыв — продолжение доступно после его завершения");
+            throw new IllegalStateException(MessageConstant.INTERROGATION_MUST_BREAK.format(currentLang()));
         }
 
         if (interrogation.getStatus() == CaseInterrogationStatusEnum.COMPLETED) {
-            throw new IllegalStateException("Допрос уже завершён");
+            throw new IllegalStateException(MessageConstant.INTERROGATION_ENDED.format(currentLang()));
         }
 
         interrogation.setContinuousOverrideConfirmed(true);

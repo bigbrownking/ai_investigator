@@ -7,6 +7,7 @@ import org.di.digital.exception.NotFoundException;
 import org.di.digital.exception.message.AccessDeniedMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.plan.PlanApprovalHistory;
 import org.di.digital.model.enums.plan.ApprovalLevel;
@@ -115,7 +116,7 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
     @Transactional
     public void rejectPlan(String email, String caseNumber, String comment) {
         if (comment == null || comment.isBlank()) {
-            throw new IllegalStateException("Комментарий обязателен при отклонении");
+            throw new IllegalStateException(MessageConstant.PLAN_COMMENT.format(currentLang()));
         }
 
         User approver = loadUser(email);
@@ -175,13 +176,12 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
         PlanStatus current = caseEntity.getPlanStatus();
 
         if (current == PlanStatus.APPROVED_L3) {
-            throw new IllegalStateException("Утверждённый план нельзя отозвать");
+            throw new IllegalStateException(MessageConstant.PLAN_APPROVED_WITHDRAW.format(currentLang()));
         }
         if (current != PlanStatus.PENDING
                 && current != PlanStatus.APPROVED_L1
                 && current != PlanStatus.APPROVED_L2) {
-            throw new IllegalStateException(
-                    "Отзыв невозможен при статусе: " + current.getDescription());
+            throw new IllegalStateException(MessageConstant.PLAN_WITHDRAW.format(currentLang(), current.getDescription()));
         }
 
         caseEntity.setPlanStatus(PlanStatus.WITHDRAWN);
@@ -222,22 +222,14 @@ public class PlanApprovalServiceImpl implements PlanApprovalService {
 
     private void validateCurrentStatus(Case c, PlanStatus required, int level) {
         if (c.getPlanStatus() != required) {
-            throw new IllegalStateException(String.format(
-                    "Для уровня %d требуется статус '%s', текущий статус: '%s'",
-                    level, required.getDescription(), c.getPlanStatus().getDescription()
-            ));
+            throw new IllegalStateException(String.format(MessageConstant.PLAN_LEVEL_1.format(currentLang(), level, required.getDescription(), c.getPlanStatus().getDescription())));
         }
     }
     private void validateFinalApproveStatus(Case c, int level) {
         PlanStatus status = c.getPlanStatus();
         if (status != PlanStatus.APPROVED_L1 && status != PlanStatus.APPROVED_L2) {
             throw new IllegalStateException(String.format(
-                    "Для уровня %d требуется статус '%s' или '%s', текущий статус: '%s'",
-                    level,
-                    PlanStatus.APPROVED_L1.getDescription(),
-                    PlanStatus.APPROVED_L2.getDescription(),
-                    status.getDescription()
-            ));
+                    MessageConstant.PLAN_LEVEL_2.format(currentLang(),level, PlanStatus.APPROVED_L1.getDescription(), PlanStatus.APPROVED_L2.getDescription(), status.getDescription())));
         }
     }
 

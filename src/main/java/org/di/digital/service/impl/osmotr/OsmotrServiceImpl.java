@@ -11,8 +11,10 @@ import org.di.digital.dto.response.osmotr.OsmotrResultDto;
 import org.di.digital.dto.response.osmotr.OsmotrResultSegmentDto;
 import org.di.digital.dto.response.osmotr.OsmotrSubmitDecisionsResponse;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.osmotr.OsmotrProcessingStatus;
 import org.di.digital.model.enums.permission.CaseAction;
 import org.di.digital.model.enums.permission.CaseModule;
@@ -60,7 +62,7 @@ public class OsmotrServiceImpl implements OsmotrService {
     private final PdfSplitter pdfSplitter;
     private final OsmotrMapper mapper;
     private final UserUtil userUtil;
-    private final CaseAccessService caseAccessService;
+   // private final CaseAccessService caseAccessService;
 
     @Value("${model.host}")
     private String osmotrHost;
@@ -76,7 +78,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.ADD);
+      //  caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.ADD);
 
         String originalFileName = file.getOriginalFilename();
         byte[] fileBytes = file.getBytes();
@@ -156,7 +158,7 @@ public class OsmotrServiceImpl implements OsmotrService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.READ);
+     //   caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.READ);
 
         return osmotrResultRepository.findByCaseNumber(caseNumber).stream()
                 .map(result -> {
@@ -174,7 +176,7 @@ public class OsmotrServiceImpl implements OsmotrService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.READ);
+     //   caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.READ);
 
 
         return osmotrResultRepository.findById(resultId)
@@ -202,7 +204,7 @@ public class OsmotrServiceImpl implements OsmotrService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.UPDATE);
+      //  caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.UPDATE);
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.OSMOTR.localized(currentLang(), resultId.toString())));
@@ -286,7 +288,7 @@ public class OsmotrServiceImpl implements OsmotrService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.DOWNLOAD);
+      //  caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.DOWNLOAD);
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.OSMOTR.localized(currentLang(), resultId.toString())));
@@ -299,7 +301,7 @@ public class OsmotrServiceImpl implements OsmotrService {
         try (InputStream is = minioService.downloadFile(segment.getFileUrl())) {
             return is.readAllBytes();
         } catch (Exception e) {
-            throw new IllegalStateException("Ошибка скачивания сегмента: " + segmentId, e);
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), resultId.toString()));
         }
     }
 
@@ -309,7 +311,7 @@ public class OsmotrServiceImpl implements OsmotrService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.UPDATE);
+     //   caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.UPDATE);
 
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
@@ -331,7 +333,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                     try (InputStream is = minioService.downloadFile(s.getFileUrl())) {
                         return is.readAllBytes();
                     } catch (Exception e) {
-                        throw new IllegalStateException("Ошибка скачивания сегмента: " + s.getId(), e);
+                        throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), resultId.toString()));
                     }
                 }).toList());
     }
@@ -342,13 +344,13 @@ public class OsmotrServiceImpl implements OsmotrService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.DOWNLOAD);
+      //  caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.DOWNLOAD);
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.OSMOTR.localized(currentLang(), resultId.toString())));
 
         if (result.getSessionId() == null) {
-            throw new IllegalStateException("Осмотр ещё не обработан: " + resultId);
+            throw new IllegalStateException(MessageConstant.OSMOTR_PROCESSING.format(currentLang(),  resultId.toString()));
         }
 
         String fileName = fileType + ".docx";
@@ -360,12 +362,11 @@ public class OsmotrServiceImpl implements OsmotrService {
                 return is.readAllBytes();
             } catch (Exception e) {
                 log.error("Failed to read generated file {}: {}", objectPath, e.getMessage(), e);
-                throw new IllegalStateException("Ошибка чтения файла: " + fileName, e);
+                throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), resultId.toString()));
             }
         }
 
-        throw new IllegalStateException(
-                "Файл '" + fileType + "' не был сгенерирован для этого осмотра: " + objectPath);
+        throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), resultId.toString()));
     }
 
     @Transactional(readOnly = true)
@@ -375,7 +376,7 @@ public class OsmotrServiceImpl implements OsmotrService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.READ);
+     //   caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.READ);
 
         if (query == null || query.isBlank()) {
             return List.of();

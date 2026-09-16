@@ -389,7 +389,7 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .toList();
     }
 
-    private UserSettingsLanguage currentLang(){
+    private UserSettingsLanguage currentLang() {
         return getCurrentLang();
     }
 
@@ -439,3 +439,4 @@ public class RegAdminServiceImpl implements RegAdminService {
             log.info("Админ {} удалил участника {} из дела {}", adminId, userId, caseId);
         }
     }
+}

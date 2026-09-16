@@ -3,6 +3,7 @@ package org.di.digital.security.jwt;
 import io.jsonwebtoken.Claims;
 import io.jsonwebtoken.Jwts;
 import io.jsonwebtoken.security.Keys;
+import org.di.digital.model.enums.MessageConstant;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 
@@ -13,6 +14,8 @@ import java.time.LocalDateTime;
 import java.time.ZoneId;
 import java.util.Date;
 import java.util.UUID;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Component
 public class PreAuthTokenUtil {
@@ -96,7 +99,7 @@ public class PreAuthTokenUtil {
     public Claims validatePasswordReset(String token) {
         Claims c = parse(token);
         if (!isPreAuth(c) || !"PASSWORD_RESET".equals(scope(c))) {
-            throw new IllegalStateException("Недействительный токен смены пароля");
+            throw new IllegalStateException(MessageConstant.TOKEN_INCORRECT.format(getCurrentLang(), token));
         }
         return c;
     }

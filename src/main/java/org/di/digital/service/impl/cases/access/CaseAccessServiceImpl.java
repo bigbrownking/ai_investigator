@@ -8,8 +8,10 @@ import org.di.digital.dto.response.access.FileGrantDto;
 import org.di.digital.dto.response.access.MyAccessDto;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.exception.message.AccessDeniedMessage;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.*;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.permission.CaseAction;
 import org.di.digital.model.enums.permission.CaseModule;
 import org.di.digital.model.enums.permission.DocumentAccessScope;
@@ -93,7 +95,7 @@ public class CaseAccessServiceImpl implements CaseAccessService {
             CaseFile file = caseFileRepository.findById(grant.fileId())
                     .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang())));
             if (!file.getCaseEntity().getId().equals(caseEntity.getId())) {
-                throw new IllegalStateException("Файл не принадлежит делу");
+                throw new IllegalStateException(MessageConstant.FILE_NOT_BELONG_TO_CASE.localized(currentLang(), file.getId().toString()));
             }
             CaseFileAccess fa = fileAccessRepository
                     .findByFileIdAndUserId(file.getId(), user.getId())
@@ -213,7 +215,7 @@ public class CaseAccessServiceImpl implements CaseAccessService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
 
         if (caseEntity.isOwner(target)) {
-            throw new IllegalStateException("Нельзя изменить доступ владельца дела");
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
         }
 
         CaseUserAccess access = accessRepository
@@ -260,7 +262,7 @@ public class CaseAccessServiceImpl implements CaseAccessService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
 
         if (caseEntity.isOwner(target)) {
-            throw new IllegalStateException("Нельзя отозвать доступ владельца дела");
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
         }
 
         revokeAll(caseId, userId);

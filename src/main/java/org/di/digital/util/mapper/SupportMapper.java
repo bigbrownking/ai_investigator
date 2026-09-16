@@ -67,8 +67,8 @@ public class SupportMapper {
                         .id(p.getId())
                         .originalFileName(p.getOriginalFileName())
                         .contentType(p.getContentType())
-                        .previewUrl(fileUrls.preview(p.getFileUrl()))
-                        .downloadUrl(fileUrls.download(p.getFileUrl(), p.getOriginalFileName()))
+                        .previewUrl(fileUrls.preview(p.getFileUrl(), p.getOriginalFileName(), p.getContentType()))
+                        .downloadUrl(fileUrls.download(p.getFileUrl(), p.getOriginalFileName(), p.getContentType()))
                         .build())
                 .toList();
 
@@ -107,8 +107,8 @@ public class SupportMapper {
                 .map(f -> ReviewFileDto.builder()
                         .originalFileName(f.getOriginalFileName())
                         .contentType(f.getContentType())
-                        .previewUrl(fileUrls.preview(f.getFileUrl()))
-                        .downloadUrl(fileUrls.download(f.getFileUrl(), f.getOriginalFileName()))
+                        .previewUrl(fileUrls.preview(f.getFileUrl(), f.getOriginalFileName(), f.getContentType()))
+                        .downloadUrl(fileUrls.download(f.getFileUrl(), f.getOriginalFileName(), f.getContentType()))
                         .build())
                 .collect(Collectors.toList());
 

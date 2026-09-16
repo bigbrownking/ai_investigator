@@ -3,7 +3,9 @@ package org.di.digital.service.impl.interrogation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.interrogation.InterrogationTimeStatusResponse;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.interrogation.InterrogationLimitProfile;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.interrogation.CaseInterrogationTimerSession;
 import org.springframework.stereotype.Component;
@@ -12,6 +14,8 @@ import java.time.Duration;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.temporal.ChronoUnit;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Component
@@ -128,24 +132,24 @@ public class InterrogationTimeGuard {
 
         Duration daily = dailyElapsed(i, now);
         if (daily.compareTo(p.dailyMax) >= 0) {
-            throw new IllegalStateException(
-                    "Достигнута предельная общая продолжительность допроса за день — дальнейшее проведение недопустимо");
+            throw new IllegalStateException(MessageConstant.INTERROGATION_MAX.format(currentLang()));
         }
 
         if (Boolean.TRUE.equals(i.getOnBreak()) && i.getBreakStartedAt() != null) {
             Duration passed = Duration.between(i.getBreakStartedAt(), now);
             if (passed.compareTo(CaseInterrogation.MANDATORY_BREAK) < 0) {
                 long minutesLeft = CaseInterrogation.MANDATORY_BREAK.minus(passed).toMinutes();
-                throw new IllegalStateException(
-                        "Возобновление допроса недоступно до истечения перерыва. Осталось: " + minutesLeft + " мин.");
+                throw new IllegalStateException(MessageConstant.INTERROGATION_BREAK_STILL.format(currentLang(),  minutesLeft));
             }
         }
 
         Duration cont = continuousElapsed(i, now);
         if (cont.compareTo(p.continuousMax) >= 0 && !Boolean.TRUE.equals(i.getContinuousOverrideConfirmed())) {
-            throw new IllegalStateException(
-                    "Достигнута предельная непрерывная продолжительность допроса — требуется перерыв "
-                            + "либо подтверждение оснований для продолжения");
+            throw new IllegalStateException(MessageConstant.INTERROGATION_NEED_TO_STOP.format(currentLang()));
         }
+    }
+
+    private UserSettingsLanguage currentLang() {
+        return getCurrentLang();
     }
 }

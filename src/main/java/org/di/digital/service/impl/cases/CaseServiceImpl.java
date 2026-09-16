@@ -85,7 +85,7 @@ public class CaseServiceImpl implements CaseService {
     private final CaseFileWriter caseFileWriter;
     private final CaseWriter caseWriter;
     private final UserUtil userUtil;
-    private final CaseAccessService caseAccessService;
+   // private final CaseAccessService caseAccessService;
     private final CaseRejectionEnricher caseRejectionEnricher;
     private final CaseMemberHistoryRepository caseMemberHistoryRepository;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
@@ -156,7 +156,7 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), created.id().toString())));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
-        caseAccessService.grantFullAccess(caseEntity, user);
+        //caseAccessService.grantFullAccess(caseEntity, user);
 
         log.info("Case created with id: {} for user: {}", created.id(), email);
         return response;
@@ -293,7 +293,7 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.READ);
+        //caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.READ);
         Map<Integer, List<CaseFile>> grouped = caseEntity.getFiles().stream()
                 .sorted(Comparator
                         .comparing(CaseFile::getTom, Comparator.nullsLast(Integer::compareTo))
@@ -367,7 +367,8 @@ public class CaseServiceImpl implements CaseService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        Specification<Case> spec = CaseSpecifications.build(req);
+        Specification<Case> spec = CaseSpecifications.build(req)
+                .and(CaseSpecifications.hasOwner(user.getId()));
 
         List<CasePreviewResponse> previews = caseRepository.findAll(spec)
                 .stream()
@@ -443,7 +444,7 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.UPDATE);
+        //caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.UPDATE);
 
         List<Long> fileIds = request.getFileIds();
 
@@ -451,7 +452,7 @@ public class CaseServiceImpl implements CaseService {
                 .collect(Collectors.toMap(CaseFile::getId, f -> f));
 
         if (fileIds.size() != fileMap.size() || !fileMap.keySet().containsAll(fileIds)) {
-            throw new IllegalArgumentException("File IDs do not match case files");
+            throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang()));
         }
 
         List<CaseFile> orderedFiles = fileIds.stream()
@@ -552,7 +553,7 @@ public class CaseServiceImpl implements CaseService {
                 .findFirst()
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), originalFileName)));
 
-        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DOWNLOAD);
+        //caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DOWNLOAD);
         String caseNumber = caseEntity.getNumber();
         logService.log(
                 String.format("Downloaded %s file from case %s", caseFile.getOriginalFileName(), caseNumber),
@@ -593,7 +594,7 @@ public class CaseServiceImpl implements CaseService {
         caseEntity.addUser(userToAdd);
         Case savedCase = caseRepository.save(caseEntity);
 
-        caseAccessService.grantInitialAccess(caseEntity, userToAdd, null);
+        //caseAccessService.grantInitialAccess(caseEntity, userToAdd, null);
 
         recordMemberHistory(caseNumber, userToAdd, currentUser, CaseMemberAction.ADD);
 
@@ -678,7 +679,7 @@ public class CaseServiceImpl implements CaseService {
                     LogAction.FIGURANT_ADDED,
                     caseEntity.getNumber(),
                     currentUserEmail);
-            throw new IllegalStateException("Фигурант уже есть в деле");
+            throw new IllegalStateException(IllegalStateMessage.ALREADY_EXISTS.localized(currentLang(), request.getFio() + " " + request.getNumber()));
         }
 
         CaseFigurant figurant = CaseFigurant.builder()
@@ -695,7 +696,7 @@ public class CaseServiceImpl implements CaseService {
         CaseFigurant saved = savedCase.getFigurants().stream()
                 .filter(f -> f.getFio().equals(request.getFio()) && f.getNumber().equals(request.getNumber()))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Failed to retrieve saved figurant"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FIGURANT.localized(currentLang(), request.getFio() + " " + request.getNumber())));
 
         log.info("Figurant {} added to case {} by {}", request.getFio(), caseId, currentUserEmail);
         logService.log(
@@ -730,7 +731,7 @@ public class CaseServiceImpl implements CaseService {
                     LogAction.USER_DELETE,
                     caseEntity.getNumber(),
                     currentUserEmail);
-            throw new IllegalStateException("Нельзя удалить владельца");
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
         }
 
         if (!caseEntity.hasUser(userToRemove)) {
@@ -741,7 +742,7 @@ public class CaseServiceImpl implements CaseService {
                     LogAction.USER_DELETE,
                     caseEntity.getNumber(),
                     currentUserEmail);
-            throw new IllegalStateException("Пользователь не участник в деле");
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
         }
         String caseNumber = caseEntity.getNumber();
 
@@ -774,7 +775,7 @@ public class CaseServiceImpl implements CaseService {
         CaseFigurant figurant = caseEntity.getFigurants().stream()
                 .filter(f -> f.getId().equals(figurantId))
                 .findFirst()
-                .orElseThrow(() -> new RuntimeException("Figurant not found with id: " + figurantId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FIGURANT.localized(currentLang(), String.valueOf(figurantId))));
 
         caseEntity.removeFigurant(figurant);
         caseRepository.save(caseEntity);
@@ -967,9 +968,7 @@ public class CaseServiceImpl implements CaseService {
                 for (CaseFileWriter.UploadedFile u : uploaded) {
                     minioService.deleteFile(u.fileUrl());
                 }
-                throw new IllegalArgumentException(
-                        String.format("Файл \"%s\" содержит %d страниц. Максимум — %d страниц на файл.",
-                                originalName, pages, maxPagesPerFile));
+                throw new IllegalStateException(MessageConstant.FILE_HAS_TOO_MUCH_PAGES.format(currentLang(), maxPagesPerFile));
             }
 
             CaseFile caseFile;
@@ -999,7 +998,7 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CASE, CaseAction.READ);
+        //caseAccessService.require(caseEntity, user, CaseModule.CASE, CaseAction.READ);
         List<RejectionReasonResponse> result = rejectionReasonStatusRepository
                 .findAllByCaseIdOrderByTimestampDesc(caseId)
                 .stream()

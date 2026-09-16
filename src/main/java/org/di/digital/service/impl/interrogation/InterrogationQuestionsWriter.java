@@ -34,7 +34,7 @@ public class InterrogationQuestionsWriter {
     private final UserRepository userRepository;
     private final CaseInterrogationChatRepository caseInterrogationChatRepository;
     private final CaseChatMessageRepository chatMessageRepository;
-    private final CaseAccessService caseAccessService;
+  //  private final CaseAccessService caseAccessService;
     private final UserUtil userUtil;
 
     @Transactional
@@ -45,7 +45,7 @@ public class InterrogationQuestionsWriter {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.ADD);
+      //  caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.ADD);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))

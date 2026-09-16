@@ -37,7 +37,7 @@ public class InterrogationChatWriter {
     private final UserRepository userRepository;
     private final CaseChatMessageRepository chatMessageRepository;
     private final CaseInterrogationCaseChatRepository caseChatRepository;
-    private final CaseAccessService caseAccessService;
+   // private final CaseAccessService caseAccessService;
 
     @Transactional
     public PreparedCaseChat prepareCaseChat(Long caseId, Long interrogationId,
@@ -47,7 +47,7 @@ public class InterrogationChatWriter {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.ADD);
+      //  caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.ADD);
 
         CaseInterrogation interrogation = caseEntity.getInterrogations().stream()
                 .filter(i -> i.getId().equals(interrogationId))

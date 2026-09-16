@@ -3,9 +3,12 @@ package org.di.digital.service.impl.interrogation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.permission.CaseAction;
 import org.di.digital.model.enums.permission.CaseModule;
+import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
@@ -23,7 +26,7 @@ public class InterrogationAuthService {
 
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final UserRepository userRepository;
-    private final CaseAccessService caseAccessService;
+  //  private final CaseAccessService caseAccessService;
     private final UserUtil userUtil;
 
     public record AuthorizedInterrogation(CaseInterrogation interrogation, User user) {}
@@ -32,16 +35,20 @@ public class InterrogationAuthService {
                                                     String email,
                                                     CaseModule module, CaseAction action) {
         CaseInterrogation interrogation = caseInterrogationRepository.findById(interrogationId)
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.INTERROGATION.localized(getCurrentLang(), interrogationId.toString())));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.INTERROGATION.localized(currentLang(), interrogationId.toString())));
         User user = userRepository.findByEmail(email)
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(getCurrentLang(), email)));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(interrogation.getCaseEntity(), user);
-        caseAccessService.require(interrogation.getCaseEntity(), user, module, action);
+      //  caseAccessService.require(interrogation.getCaseEntity(), user, module, action);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
-            throw new IllegalStateException("Допрос не принадлежит делу: " + caseId);
+            throw new IllegalStateException(MessageConstant.INTERROGATION_NOT_BELONG_TO_CASE.format(currentLang(), caseId));
         }
         return new AuthorizedInterrogation(interrogation, user);
+    }
+
+    private UserSettingsLanguage currentLang(){
+        return getCurrentLang();
     }
 }

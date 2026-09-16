@@ -217,9 +217,7 @@ public class AuthServiceImpl implements AuthService {
             region.getAdmins().forEach(admin ->
                     notificationService.sendNotificationToUser(
                             admin.getEmail(),
-                            "Новый пользователь хочет зарегистрироваться в вашем регионе: "
-                                    + request.getName() + " " + request.getSurname()
-                    )
+                            MessageConstant.NEW_USER_APPEAL.format(currentLang(), request.getName(), request.getSurname()))
             );
         }
         logService.log(
@@ -231,8 +229,6 @@ public class AuthServiceImpl implements AuthService {
         );
         return "User registered successfully";
     }
-
-
     @Override
     public String signupRegAdmin(SignUpRequest request) {
         if (userRepository.existsByEmail(request.getEmail())) {
@@ -436,7 +432,7 @@ public class AuthServiceImpl implements AuthService {
     @Transactional
     public String resetPassword(ResetPasswordRequest request) {
         User user = userRepository.findByResetToken(request.getToken())
-                .orElseThrow(() -> new IllegalStateException("Неверный токен"));
+                .orElseThrow(() -> new IllegalStateException(MessageConstant.TOKEN_INCORRECT.format(currentLang(), request.getToken())));
 
         if (user.getResetTokenExpiry().isBefore(LocalDateTime.now())) {
             throw new IllegalStateException(MessageConstant.TOKEN_EXPIRED.format(currentLang()));
@@ -452,7 +448,7 @@ public class AuthServiceImpl implements AuthService {
 
         for (PasswordHistory h : history) {
             if (passwordEncoder.matches(rawPassword, h.getPasswordHash())) {
-                throw new IllegalStateException(MessageConstant.PASSWORD_ALREADY_USED.format(currentLang());
+                throw new IllegalStateException(MessageConstant.PASSWORD_ALREADY_USED.format(currentLang()));
             }
         }
 

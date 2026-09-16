@@ -10,6 +10,7 @@ import org.di.digital.dto.response.interrogation.ContradictionDto;
 import org.di.digital.dto.response.interrogation.ContradictionResponse;
 import org.di.digital.dto.response.interrogation.InterrogationQuestionsResponse;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChatMessage;
@@ -69,7 +70,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
     private final CaseInterrogationContradictionWriter contradictionWriter;
     private final CaseInterrogationContradictionRepository contradictionRepository;
     private final WebClient.Builder webClientBuilder;
-    private final CaseAccessService caseAccessService;
+    //private final CaseAccessService caseAccessService;
     private final UserUtil userUtil;
 
     @Value("${model.host}")
@@ -109,7 +110,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                     .block();
 
             if (response == null || response.getQuestions() == null) {
-                throw new IllegalStateException("Пустой ответ от сервиса");
+                throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
             }
 
             List<String> questions = response.getQuestions();
@@ -172,7 +173,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                         .block();
 
                 if (response == null || response.getResponse() == null) {
-                    throw new IllegalStateException("Пустой ответ от сервиса");
+                    throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
                 }
 
                 emitter.send(SseEmitter.event().name("message").data(response.getResponse()));
@@ -211,7 +212,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.READ);
+       // caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.READ);
 
         CaseInterrogationChat chat = caseInterrogationChatRepository
                 .findByInterrogationId(interrogationId).orElse(null);
@@ -253,7 +254,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.DELETE);
+       // caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.DELETE);
 
         String caseNumber = caseEntity.getNumber();
         CaseInterrogationChat chat = caseInterrogationChatRepository.findByInterrogationId(interrogationId)
@@ -279,7 +280,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.UPDATE);
+       // caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.UPDATE);
 
         CaseChatMessage message = chatMessageRepository.findById(messageId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.MESSAGE.localized(currentLang(), messageId.toString())));
@@ -319,7 +320,8 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
                     .post()
                     .uri(url)
                     .contentType(MediaType.APPLICATION_JSON)
-                    .bodyValue(interrogationContradictionBody(prep.fio(), prep.answer(), prep.language()))                    .retrieve()
+                    .bodyValue(interrogationContradictionBody(prep.fio(), prep.answer(), prep.language()))
+                    .retrieve()
                     .bodyToMono(ContradictionResponse.class)
                     .block();
 
@@ -414,7 +416,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.READ);
+      //  caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.READ);
 
         CaseInterrogationCaseChat chat = caseInterrogationCaseChatRepository
                 .findByInterrogationIdAndUserId(interrogationId, user.getId())
@@ -451,7 +453,7 @@ public class CaseInterrogationChatServiceImpl implements CaseInterrogationChatSe
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.DELETE);
+       // caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.DELETE);
 
         CaseInterrogationCaseChat chat = caseInterrogationCaseChatRepository
                 .findByInterrogationIdAndUserId(interrogationId, user.getId())
