@@ -37,7 +37,7 @@ public class CaseWriter {
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final LogService logService;
-   // private final CaseAccessService caseAccessService;
+    private final CaseAccessService caseAccessService;
     private final CaseMapper mapper;
     private final UserUtil userUtil;
 
@@ -48,7 +48,7 @@ public class CaseWriter {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-       // caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DELETE);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DELETE);
         return caseEntity.getNumber();
     }
 
@@ -149,7 +149,7 @@ public class CaseWriter {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), fileName)));
 
         userUtil.validateUserAccess(caseEntity, user);
-       // caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DELETE);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DELETE);
 
         if (CaseFileStatusEnum.PROCESSING.equals(file.getStatus())) {
             String message = MessageConstant.CANNOT_DELETE_FILE.format(currentLang(), caseEntity.getNumber());

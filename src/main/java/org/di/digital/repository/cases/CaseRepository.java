@@ -135,4 +135,6 @@ public interface CaseRepository extends JpaRepository<Case, Long>, JpaSpecificat
             @Param("caseId") Long caseId,
             @Param("userId") Long userId
     );
+    @Query("select distinct c from Case c left join fetch c.owner left join fetch c.users")
+    List<Case> findAllWithOwnerAndUsers();
 }

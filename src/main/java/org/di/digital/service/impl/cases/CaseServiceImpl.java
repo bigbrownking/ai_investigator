@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChangeCaseLanguageRequest;
 import org.di.digital.dto.request.cases.ReorderCaseFilesRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
+import org.di.digital.dto.response.access.FileGrantDto;
 import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.FigurantResponse;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
@@ -61,6 +62,7 @@ import reactor.core.publisher.Mono;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.function.Predicate;
 import java.util.stream.Collectors;
 
 import static org.di.digital.util.requests.RequestUrlBuilder.deleteAllDocumentsUrl;
@@ -85,7 +87,7 @@ public class CaseServiceImpl implements CaseService {
     private final CaseFileWriter caseFileWriter;
     private final CaseWriter caseWriter;
     private final UserUtil userUtil;
-   // private final CaseAccessService caseAccessService;
+    private final CaseAccessService caseAccessService;
     private final CaseRejectionEnricher caseRejectionEnricher;
     private final CaseMemberHistoryRepository caseMemberHistoryRepository;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
@@ -156,7 +158,7 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), created.id().toString())));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
-        //caseAccessService.grantFullAccess(caseEntity, user);
+        caseAccessService.grantFullAccess(caseEntity, user);
 
         log.info("Case created with id: {} for user: {}", created.id(), email);
         return response;
@@ -187,6 +189,7 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateOwnerAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.CASE, CaseAction.UPDATE);
 
         String fromLanguage = caseEntity.getLanguage();
         if (request.getLanguage() != null) {
@@ -293,7 +296,10 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        //caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.READ);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.READ);
+
+        Predicate<CaseFile> visible = f -> caseAccessService.canAccessFile(f, user, CaseAction.READ);
+
         Map<Integer, List<CaseFile>> grouped = caseEntity.getFiles().stream()
                 .sorted(Comparator
                         .comparing(CaseFile::getTom, Comparator.nullsLast(Integer::compareTo))
@@ -311,27 +317,28 @@ public class CaseServiceImpl implements CaseService {
 
                     int[] pageCounter = {1};
 
-                    List<CaseFileResponse> files = tomFiles.stream()
-                            .map(f -> {
-                                CaseFileResponse dto = mapper.toFileResponse(f);
-                                int pages = f.getPages() == null ? 0 : f.getPages();
+                    List<CaseFileResponse> files = new ArrayList<>();
+                    for (CaseFile f : tomFiles) {
+                        CaseFileResponse dto = mapper.toFileResponse(f);
+                        int pages = f.getPages() == null ? 0 : f.getPages();
 
-                                if (pages > 0) {
-                                    f.setStartPage(pageCounter[0]);
-                                    f.setEndPage(pageCounter[0] + pages - 1);
-                                    dto.setStartPage(pageCounter[0]);
-                                    dto.setEndPage(pageCounter[0] + pages - 1);
-                                    pageCounter[0] += pages;
-                                } else {
-                                    f.setStartPage(null);
-                                    f.setEndPage(null);
-                                    dto.setStartPage(null);
-                                    dto.setEndPage(null);
-                                }
+                        if (pages > 0) {
+                            f.setStartPage(pageCounter[0]);
+                            f.setEndPage(pageCounter[0] + pages - 1);
+                            dto.setStartPage(pageCounter[0]);
+                            dto.setEndPage(pageCounter[0] + pages - 1);
+                            pageCounter[0] += pages;
+                        } else {
+                            f.setStartPage(null);
+                            f.setEndPage(null);
+                            dto.setStartPage(null);
+                            dto.setEndPage(null);
+                        }
 
-                                return dto;
-                            })
-                            .toList();
+                        if (visible.test(f)) {
+                            files.add(dto);
+                        }
+                    }
 
                     caseFileRepository.saveAll(tomFiles);
 
@@ -344,6 +351,7 @@ public class CaseServiceImpl implements CaseService {
                             .totalPages(totalPages)
                             .build();
                 })
+                .filter(t -> t.getTotalFiles() > 0)
                 .toList();
 
         int totalPages = toms.stream()
@@ -390,9 +398,13 @@ public class CaseServiceImpl implements CaseService {
     public void updateCaseStatus(Long caseId, boolean status, String email, CaseRejectionReason reason) {
         log.info("Updating status for case: {} to {} by user: {} with reason: {}", caseId, status, email, reason);
         String caseNumber = caseWriter.updateStatus(caseId, status, email);
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
+        caseAccessService.require(caseEntity, user, CaseModule.CASE, CaseAction.UPDATE);
         RejectionReasonStatus rejection = RejectionReasonStatus.builder()
                 .caseId(caseId)
                 .userId(user.getId())
@@ -444,7 +456,7 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        //caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.UPDATE);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.UPDATE);
 
         List<Long> fileIds = request.getFileIds();
 
@@ -547,13 +559,13 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DOWNLOAD);
 
         CaseFile caseFile = caseEntity.getFiles().stream()
                 .filter(f -> f.getOriginalFileName().equals(originalFileName))
                 .findFirst()
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), originalFileName)));
 
-        //caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.DOWNLOAD);
         String caseNumber = caseEntity.getNumber();
         logService.log(
                 String.format("Downloaded %s file from case %s", caseFile.getOriginalFileName(), caseNumber),
@@ -594,7 +606,7 @@ public class CaseServiceImpl implements CaseService {
         caseEntity.addUser(userToAdd);
         Case savedCase = caseRepository.save(caseEntity);
 
-        //caseAccessService.grantInitialAccess(caseEntity, userToAdd, null);
+        caseAccessService.grantInitialAccess(caseEntity, userToAdd, null);
 
         recordMemberHistory(caseNumber, userToAdd, currentUser, CaseMemberAction.ADD);
 
@@ -608,6 +620,49 @@ public class CaseServiceImpl implements CaseService {
                 caseNumber,
                 currentUserEmail);
         return mapper.toUserResponse(userToAdd, savedCase);
+    }
+
+    @Override
+    @Transactional
+    public CaseUserResponse addSogToCase(Long caseId, Long userId, List<FileGrantDto> fileGrants, String currentUserEmail) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        User currentUser = userRepository.findByEmail(currentUserEmail)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), currentUserEmail)));
+
+        userUtil.validateOwnerAccess(caseEntity, currentUser);
+
+        User sogUser = userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
+
+        String caseNumber = caseEntity.getNumber();
+        String email = sogUser.getEmail();
+
+        if (caseEntity.isOwner(sogUser)) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
+        }
+        if (caseEntity.hasUser(sogUser)) {
+            logService.log(
+                    String.format("User '%s' already added to case №%s by user %s", email, caseNumber, currentUserEmail),
+                    LogLevel.ERROR, LogAction.USER_ADD, caseNumber, currentUserEmail);
+            throw new IllegalStateException(IllegalStateMessage.ALREADY_EXISTS.localized(currentLang(), email));
+        }
+
+        caseEntity.addUser(sogUser);
+        Case savedCase = caseRepository.save(caseEntity);
+
+        caseAccessService.grantSogAccess(savedCase, sogUser, fileGrants);
+
+        recordMemberHistory(caseNumber, sogUser, currentUser, CaseMemberAction.ADD_SOG);
+
+        log.info("SOG member {} added to case {} by {} ({} files granted)",
+                email, caseId, currentUserEmail, fileGrants == null ? 0 : fileGrants.size());
+        logService.log(
+                String.format("SOG member '%s' added to case №%s by user %s", email, caseNumber, currentUserEmail),
+                LogLevel.INFO, LogAction.USER_ADD, caseNumber, currentUserEmail);
+
+        return mapper.toUserResponse(sogUser, savedCase);
     }
 
     @Override
@@ -800,6 +855,7 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), currentUserEmail)));
 
         userUtil.validateUserAccess(caseEntity, currentUser);
+        caseAccessService.require(caseEntity, currentUser, CaseModule.CASE, CaseAction.READ);
 
         return caseEntity.getUsers().stream()
                 .map(user -> mapper.toUserResponse(user, caseEntity))
@@ -998,7 +1054,8 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-        //caseAccessService.require(caseEntity, user, CaseModule.CASE, CaseAction.READ);
+        caseAccessService.require(caseEntity, user, CaseModule.CASE, CaseAction.READ);
+
         List<RejectionReasonResponse> result = rejectionReasonStatusRepository
                 .findAllByCaseIdOrderByTimestampDesc(caseId)
                 .stream()
@@ -1012,7 +1069,56 @@ public class CaseServiceImpl implements CaseService {
 
         return result;
     }
+    @Override
+    @Transactional(readOnly = true)
+    public CaseFileResponse getFileByName(Long caseId, String fileName, String email) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        userUtil.validateUserAccess(caseEntity, user);
+
+        CaseFile file = findFileByName(caseEntity.getFiles(), fileName)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), fileName)));
+
+         caseAccessService.requireFile(file, user, CaseAction.READ);
+
+        return mapper.toFileResponse(file);
+    }
+    private Optional<CaseFile> findFileByName(List<CaseFile> files, String rawName) {
+        if (rawName == null || rawName.isBlank() || files == null) return Optional.empty();
+
+        String target = normalizeName(rawName);
+        String targetNoExt = stripExtension(target);
+
+        Optional<CaseFile> exact = files.stream()
+                .filter(f -> rawName.equals(f.getOriginalFileName()) || rawName.equals(f.getStoredFileName()))
+                .findFirst();
+        if (exact.isPresent()) return exact;
+
+        Optional<CaseFile> normalized = files.stream()
+                .filter(f -> target.equals(normalizeName(f.getOriginalFileName()))
+                        || target.equals(normalizeName(f.getStoredFileName())))
+                .findFirst();
+        if (normalized.isPresent()) return normalized;
+
+        return files.stream()
+                .filter(f -> targetNoExt.equals(stripExtension(normalizeName(f.getOriginalFileName()))))
+                .findFirst();
+    }
+
+    private static String normalizeName(String name) {
+        if (name == null) return "";
+        String n = java.text.Normalizer.normalize(name, java.text.Normalizer.Form.NFC);
+        return n.trim().replaceAll("\\s+", " ").toLowerCase(Locale.ROOT);
+    }
+
+    private static String stripExtension(String name) {
+        int dot = name.lastIndexOf('.');
+        return dot > 0 ? name.substring(0, dot) : name;
+    }
     private UserSettingsLanguage currentLang(){
         return getCurrentLang();
     }

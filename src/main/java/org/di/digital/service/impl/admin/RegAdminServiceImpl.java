@@ -8,10 +8,7 @@ import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.AppealDto;
 import org.di.digital.dto.response.admin.RegionStatsDto;
-import org.di.digital.dto.response.cases.CaseListResponse;
-import org.di.digital.dto.response.cases.CasePageResponse;
-import org.di.digital.dto.response.cases.CaseResponse;
-import org.di.digital.dto.response.cases.RejectionReasonResponse;
+import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
@@ -53,6 +50,7 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
@@ -121,6 +119,22 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .map(caseMapper::toListResponse);
 
         return caseMapper.build(spec, casePage);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CaseUserResponse> getCaseUsers(Long adminId, Long caseId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        userUtil.validateRegionAccess(admin, caseEntity);
+
+        return caseEntity.getUsers().stream()
+                .map(user -> caseMapper.toUserResponse(user, caseEntity))
+                .toList();
     }
 
     @Override

@@ -13,6 +13,7 @@ import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.*;
 import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseMemberType;
 import org.di.digital.model.enums.permission.CaseModule;
 import org.di.digital.model.enums.permission.DocumentAccessScope;
 import org.di.digital.model.enums.settings.UserSettingsLanguage;
@@ -42,6 +43,16 @@ public class CaseAccessServiceImpl implements CaseAccessService {
     private final PermissionMapper permissionMapper;
     private final UserRepository userRepository;
     private final CaseRepository caseRepository;
+
+    private static final Map<CaseModule, Set<CaseAction>> SOG_PERMISSIONS = Map.of(
+            CaseModule.CASE,          EnumSet.of(CaseAction.READ),
+            CaseModule.INTERROGATION, EnumSet.of(CaseAction.READ, CaseAction.ADD),
+            CaseModule.CHAT,          EnumSet.allOf(CaseAction.class),
+            CaseModule.DOCUMENTS,     EnumSet.of(CaseAction.READ, CaseAction.DOWNLOAD)
+    );
+
+    private static final Set<CaseAction> SOG_FILE_ACTIONS =
+            EnumSet.of(CaseAction.READ, CaseAction.DOWNLOAD);
 
     @Transactional
     public void grantInitialAccess(Case caseEntity, User user, List<FileGrantDto> fileGrants) {
@@ -288,6 +299,50 @@ public class CaseAccessServiceImpl implements CaseAccessService {
         grantFiles(caseEntity, target, request.getFileGrants());
 
         log.info("File access updated for user {} in case {} by {}", target.getEmail(), caseId, ownerEmail);
+    }
+
+    @Override
+    @Transactional
+    public void grantSogAccess(Case caseEntity, User user, List<FileGrantDto> fileGrants) {
+        CaseUserAccess access = accessRepository
+                .findByCaseEntityIdAndUserId(caseEntity.getId(), user.getId())
+                .orElseGet(() -> CaseUserAccess.builder()
+                        .caseEntity(caseEntity)
+                        .user(user)
+                        .permissions(new HashSet<>())
+                        .build());
+
+        Set<CasePermission> perms = new HashSet<>();
+        SOG_PERMISSIONS.forEach((module, actions) -> actions.forEach(action ->
+                perms.add(CasePermission.builder().module(module).action(action).build())));
+
+        access.setPermissions(perms);
+        access.setDocumentScope(DocumentAccessScope.RESTRICTED);
+        access.setMemberType(CaseMemberType.SOG);
+        accessRepository.save(access);
+
+        fileAccessRepository.deleteAllActionsByCaseAndUser(caseEntity.getId(), user.getId());
+        fileAccessRepository.deleteAllByCaseAndUser(caseEntity.getId(), user.getId());
+
+        if (fileGrants != null && !fileGrants.isEmpty()) {
+            List<FileGrantDto> limited = fileGrants.stream()
+                    .map(g -> {
+                        Set<CaseAction> actions = EnumSet.noneOf(CaseAction.class);
+                        if (g.actions() != null) actions.addAll(g.actions());
+                        actions.retainAll(SOG_FILE_ACTIONS);
+                        if (actions.isEmpty()) actions.add(CaseAction.READ);
+                        return new FileGrantDto(g.fileId(), actions);
+                    })
+                    .toList();
+            grantFiles(caseEntity, user, limited);
+        }
+    }
+
+    @Override
+    public boolean isSog(Case caseEntity, User user) {
+        return accessRepository.findByCaseEntityIdAndUserId(caseEntity.getId(), user.getId())
+                .map(a -> a.getMemberType() == CaseMemberType.SOG)
+                .orElse(false);
     }
 
     private UserSettingsLanguage currentLang(){

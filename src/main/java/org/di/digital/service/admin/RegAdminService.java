@@ -8,6 +8,7 @@ import org.di.digital.dto.response.admin.AppealDto;
 import org.di.digital.dto.response.admin.RegionStatsDto;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.CaseUserResponse;
 import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
@@ -27,6 +28,8 @@ public interface RegAdminService {
     Page<UserProfile> getMyRegionUsers(Long adminId, int page, int size, UserSearchRequest userSearchRequest);
 
     CasePageResponse getUserCases(Long adminId, Long userId, int page, int size, CaseSearchRequest caseSearchRequest);
+    List<CaseUserResponse> getCaseUsers(Long adminId, Long caseId);
+
 
     CasePageResponse getMyRegionCases(Long adminId, int page, int size, CaseSearchRequest caseSearchRequest);
 

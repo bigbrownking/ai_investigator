@@ -28,4 +28,6 @@ public interface CaseAccessService {
     void grantAccess(Long caseId, Long userId, GrantAccessRequest request, String ownerEmail);
     void revokeAccess(Long caseId, Long userId, String ownerEmail);
     void updateFileAccess(Long caseId, Long userId, UpdateFileAccessRequest request, String ownerEmail);
+    void grantSogAccess(Case caseEntity, User user, List<FileGrantDto> fileGrants);
+    boolean isSog(Case caseEntity, User user);
 }

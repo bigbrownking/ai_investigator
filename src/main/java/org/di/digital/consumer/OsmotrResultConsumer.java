@@ -98,8 +98,7 @@ public class OsmotrResultConsumer {
                         String segmentUrl = minioService.uploadOsmotrFile(segmentBytes, result.getCaseNumber(), segmentFileName, "segments");
 
                         result.addSegment(OsmotrResultSegment.builder()
-                                .title(item.getDocId())
-                                .startPage(item.getStartPage())
+                                .title(item.getTitle() != null ? item.getTitle() : item.getDocId())                                .startPage(item.getStartPage())
                                 .endPage(item.getEndPage())
                                 .inspectionText(item.getInspectionText())
                                 .evidenceNeeded(item.getNeeded())

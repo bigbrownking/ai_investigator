@@ -16,4 +16,5 @@ public class CaseUserResponse {
     private String surname;
     private String fathername;
     private boolean isOwner;
+    private boolean isSog;
 }

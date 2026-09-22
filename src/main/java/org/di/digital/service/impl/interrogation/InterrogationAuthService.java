@@ -26,7 +26,7 @@ public class InterrogationAuthService {
 
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final UserRepository userRepository;
-  //  private final CaseAccessService caseAccessService;
+    private final CaseAccessService caseAccessService;
     private final UserUtil userUtil;
 
     public record AuthorizedInterrogation(CaseInterrogation interrogation, User user) {}
@@ -40,7 +40,7 @@ public class InterrogationAuthService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(interrogation.getCaseEntity(), user);
-      //  caseAccessService.require(interrogation.getCaseEntity(), user, module, action);
+        caseAccessService.require(interrogation.getCaseEntity(), user, module, action);
 
         if (!interrogation.getCaseEntity().getId().equals(caseId)) {
             throw new IllegalStateException(MessageConstant.INTERROGATION_NOT_BELONG_TO_CASE.format(currentLang(), caseId));

@@ -6,11 +6,7 @@ import org.di.digital.dto.request.search.*;
 import org.di.digital.dto.request.user.UpdateProfileRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.*;
-import org.di.digital.dto.response.cases.CaseListResponse;
-import org.di.digital.dto.response.cases.CasePageResponse;
-import org.di.digital.dto.response.cases.CasePreviewResponse;
-import org.di.digital.dto.response.cases.CaseResponse;
-import org.di.digital.dto.response.cases.RejectionReasonResponse;
+import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
@@ -68,6 +64,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.stream.Collectors;
 
 import static org.di.digital.repository.search.CaseSpecifications.hasOwner;
 import static org.di.digital.util.requests.UserUtil.*;
@@ -148,6 +145,16 @@ public class AdminServiceImpl implements AdminService {
                 .map(caseMapper::toListResponse);
 
         return caseMapper.build(spec, casePage);
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public List<CaseUserResponse> getCaseUsers(Long caseId) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        return caseEntity.getUsers().stream()
+                .map(user -> caseMapper.toUserResponse(user, caseEntity))
+                .collect(Collectors.toList());
     }
 
     @Override

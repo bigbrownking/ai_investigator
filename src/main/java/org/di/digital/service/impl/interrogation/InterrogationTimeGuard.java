@@ -28,13 +28,6 @@ public class InterrogationTimeGuard {
     public Duration abandonLimit(CaseInterrogation i) {
         return profileOf(i).dailyMax;
     }
-    /**
-     * Непрерывная продолжительность = сумма сессий ТЕКУЩЕЙ серии
-     * (начавшихся не раньше currentSeriesStartedAt).
-     * Во время перерыва верхняя граница — момент ухода в перерыв (значение заморожено).
-     * После завершённого перерыва серия сбрасывается (currentSeriesStartedAt сдвинут вперёд),
-     * поэтому старые сессии не учитываются и continuous = 0 до следующего старта.
-     */
     public Duration continuousElapsed(CaseInterrogation i, LocalDateTime now) {
         LocalDateTime seriesStart = i.getCurrentSeriesStartedAt();
         if (seriesStart == null) {
@@ -62,10 +55,6 @@ public class InterrogationTimeGuard {
         return Duration.ofSeconds(Math.max(0, seconds));
     }
 
-    /**
-     * Суточная продолжительность = сумма всех сессий текущего календарного дня.
-     * Не сбрасывается перерывом. Во время перерыва так же замораживается на breakStartedAt.
-     */
     public Duration dailyElapsed(CaseInterrogation i, LocalDateTime now) {
         boolean onBreak = Boolean.TRUE.equals(i.getOnBreak());
         LocalDateTime cap = (onBreak && i.getBreakStartedAt() != null)
@@ -87,7 +76,6 @@ public class InterrogationTimeGuard {
         return Duration.ofSeconds(Math.max(0, seconds));
     }
 
-    /** Полный статус для фронта. */
     public InterrogationTimeStatusResponse status(CaseInterrogation i, LocalDateTime now) {
         InterrogationLimitProfile p = profileOf(i);
         Duration cont = continuousElapsed(i, now);
@@ -124,9 +112,7 @@ public class InterrogationTimeGuard {
                 .build();
     }
 
-    /**
-     * Проверка перед запуском/записью. Бросает, если продолжать нельзя.
-     */
+
     public void assertCanRecord(CaseInterrogation i, LocalDateTime now) {
         InterrogationLimitProfile p = profileOf(i);
 

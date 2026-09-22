@@ -6,6 +6,7 @@ import org.di.digital.dto.request.cases.CreateCaseRequest;
 import org.di.digital.dto.request.cases.EditCaseRequest;
 import org.di.digital.dto.request.cases.ReorderCaseFilesRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
+import org.di.digital.dto.response.access.FileGrantDto;
 import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.cases.Case;
@@ -34,6 +35,7 @@ public interface CaseService {
     List<CaseFileResponse> addFilesToCase(Long caseId, List<MultipartFile> files, FileType type, String email);
     void deleteFileFromCase(Long caseId, String fileName, String email);
     CaseUserResponse addUserToCase(Long caseId, Long id, String currentUserEmail);
+    CaseUserResponse addSogToCase(Long caseId, Long userId, List<FileGrantDto> fileGrants, String currentUserEmail);
     List<CaseMemberHistoryDto> getMemberHistory(Long caseId, String currentUserEmail);
     List<UserSuggestionResponse> searchUsers(String query);
     FigurantResponse addFigurantToCase(Long caseId, AddFigurantToCaseRequest request, String currentUserEmail);
@@ -52,8 +54,8 @@ public interface CaseService {
     void deleteAllFiles(Long caseId, String currentEmail);
     void deleteCaseById(Long id, String currentEmail);
     List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId, String email);
-    
 
+    CaseFileResponse getFileByName(Long caseId, String fileName, String email);
 
     // Migration methods
     void migrateAllCaseToms();

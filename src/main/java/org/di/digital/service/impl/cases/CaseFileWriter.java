@@ -42,7 +42,7 @@ public class CaseFileWriter {
     private static final int MAX_PAGES_PER_TOM = 180;
 
     private final CaseRepository caseRepository;
-   // private final CaseAccessService caseAccessService;
+    private final CaseAccessService caseAccessService;
     private final UserRepository userRepository;
     private final CaseFileRepository caseFileRepository;
     private final TaskQueueService taskQueueService;
@@ -111,7 +111,7 @@ public class CaseFileWriter {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-       // caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.ADD);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.ADD);
 
         if (Boolean.TRUE.equals(caseEntity.getIsFinalIndictmentDone())) {
             logService.log(String.format("Cannot upload files by %s user in case %s",

@@ -47,6 +47,7 @@ public class CaseInterrogationQA {
     @JoinColumn(name = "interrogation_id")
     private CaseInterrogation interrogation;
 
+    @Builder.Default
     @OneToMany(mappedBy = "qa", cascade = CascadeType.ALL,
             orphanRemoval = true, fetch = FetchType.EAGER)
     @OrderBy("createdAt ASC")

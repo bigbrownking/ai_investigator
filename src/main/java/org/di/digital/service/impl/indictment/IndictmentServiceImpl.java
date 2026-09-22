@@ -1,15 +1,18 @@
 package org.di.digital.service.impl.indictment;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.indictment.IndictmentRephraseApplyRequest;
 import org.di.digital.dto.request.indictment.IndictmentSectionUpdateRequest;
+import org.di.digital.dto.response.chat.ReferenceLinkDto;
 import org.di.digital.dto.response.indictment.IndictmentSectionDto;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.cases.CaseActivityType;
 import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.enums.log.LogAction;
@@ -32,6 +35,7 @@ import org.di.digital.service.core.StreamingService;
 import org.di.digital.service.export.DocumentFormatterService;
 import org.di.digital.service.impl.core.sse.SseHeartbeatUtil;
 import org.di.digital.service.indictment.IndictmentService;
+import org.di.digital.util.mapper.MessageMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.core.io.ByteArrayResource;
@@ -46,11 +50,13 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.TimeUnit;
+import java.util.function.Function;
 
 import static org.di.digital.util.TextUtils.stripHtml;
 import static org.di.digital.util.TextUtils.visibleOffsetToRawOffset;
@@ -75,11 +81,13 @@ public class IndictmentServiceImpl implements IndictmentService {
     private final UserRepository userRepository;
     private final WebClient.Builder webClientBuilder;
     private final IndictmentWriter indictmentWriter;
-    //private final CaseAccessService caseAccessService;
+    private final CaseAccessService caseAccessService;
 
     private final UserUtil userUtil;
+    private final MessageMapper messageMapper;
     private final SseHeartbeatUtil heartbeatUtil;
     private final ExecutorService executor = Executors.newCachedThreadPool();
+    private static final TypeReference<List<ReferenceLinkDto>> REFERENCE_LIST_TYPE = new TypeReference<>() {};
 
     @Value("${model.host}")
     private String pythonHost;
@@ -168,7 +176,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(entity, user);
-      //  caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.ADD);
+        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.ADD);
 
         String language = entity.getLanguage();
 
@@ -232,7 +240,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(entity, user);
-      //  caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.ADD);
+        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.ADD);
 
         String language = entity.getLanguage();
 
@@ -302,7 +310,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(entity, user);
-      //  caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
+        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
 
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(currentLang(), caseNumber);
@@ -350,7 +358,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(entity, user);
-       // caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
+        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
 
         if (entity.getQualificationsUploaded() == null || entity.getQualificationsUploaded().isEmpty()) {
             String message = MessageConstant.NO_QUALIFICATION.format(currentLang(), caseNumber);
@@ -421,7 +429,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(entity, user);
-      //  caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
+        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
 
         if (entity.getIndictmentSections() == null && entity.getIndictment() != null) {
             throw new IllegalStateException(MessageConstant.OLD_INDICTMENT.format(currentLang(), caseNumber));
@@ -480,7 +488,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         log.info("Indictment rephrase applied for case {} sections {}..{}",
                 caseNumber, startSectionId, endSectionId);
 
-        return toDtoList(sections);
+        return toDtoList(sections, entity.getId());
     }
 
     @Override
@@ -492,7 +500,7 @@ public class IndictmentServiceImpl implements IndictmentService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(entity, user);
-       // caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
+        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.UPDATE);
 
         if (entity.getIndictmentSections() == null && entity.getIndictment() != null) {
             throw new IllegalStateException(MessageConstant.OLD_INDICTMENT.format(currentLang(), caseNumber));
@@ -516,11 +524,7 @@ public class IndictmentServiceImpl implements IndictmentService {
 
         log.info("Indictment section {} updated for case {}", request.getId(), caseNumber);
 
-        return IndictmentSectionDto.builder()
-                .id((Integer) target.get("id"))
-                .category((String) target.get("category"))
-                .text((String) target.get("text"))
-                .build();
+        return toDto(target, linkEnricher(List.of(target), entity.getId()));
     }
 
     // ---------- read ----------
@@ -534,10 +538,10 @@ public class IndictmentServiceImpl implements IndictmentService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(entity, user);
-     //   caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.READ);
+        caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.READ);
 
         if (entity.getIndictmentSections() != null) {
-            return toDtoList(entity.getIndictmentSections());
+            return toDtoList(entity.getIndictmentSections(), entity.getId());
         }
 
         if (entity.getIndictment() != null) {
@@ -545,6 +549,7 @@ public class IndictmentServiceImpl implements IndictmentService {
                     .id(0)
                     .category("legacy")
                     .text(entity.getIndictment())
+                    .references(List.of())
                     .build());
         }
 
@@ -564,7 +569,7 @@ public class IndictmentServiceImpl implements IndictmentService {
             User user = userRepository.findByEmail(userEmail)
                     .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
             userUtil.validateUserAccess(entity, user);
-          //  caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.DOWNLOAD);
+            caseAccessService.require(entity, user, CaseModule.INDICTMENT, CaseAction.DOWNLOAD);
 
             List<Map<String, Object>> sections = entity.getIndictmentSections();
 
@@ -596,7 +601,6 @@ public class IndictmentServiceImpl implements IndictmentService {
             try {
                 return mapper.readValue(probe, String.class);
             } catch (Exception ignored) {
-                // оставляем как есть
             }
         }
         return value;
@@ -644,14 +648,42 @@ public class IndictmentServiceImpl implements IndictmentService {
         return -1;
     }
 
-    private List<IndictmentSectionDto> toDtoList(List<Map<String, Object>> sections) {
-        return sections.stream()
-                .map(s -> IndictmentSectionDto.builder()
-                        .id((Integer) s.get("id"))
-                        .category((String) s.get("category"))
-                        .text((String) s.get("text"))
-                        .build())
-                .toList();
+    private List<IndictmentSectionDto> toDtoList(List<Map<String, Object>> sections, Long caseId) {
+        if (sections == null || sections.isEmpty()) return List.of();
+        var enrich = linkEnricher(sections, caseId);
+        return sections.stream().map(s -> toDto(s, enrich)).toList();
+    }
+
+    private IndictmentSectionDto toDto(Map<String, Object> s,
+                                       Function<Collection<ReferenceLinkDto>, List<ReferenceLinkDto>> enrich) {
+        return IndictmentSectionDto.builder()
+                .id(s.get("id") instanceof Number n ? n.intValue() : null)
+                .category((String) s.get("category"))
+                .text((String) s.get("text"))
+                .references(enrich.apply(extractReferences(s.get("references"))))
+                .build();
+    }
+
+    private Function<Collection<ReferenceLinkDto>, List<ReferenceLinkDto>> linkEnricher(
+            List<Map<String, Object>> sections, Long caseId) {
+        boolean hasRefs = sections.stream()
+                .anyMatch(s -> s.get("references") instanceof Collection<?> c && !c.isEmpty());
+        List<CaseFile> files = hasRefs
+                ? caseFileRepository.findAllByCaseEntityId(caseId)
+                : List.of();
+        return messageMapper.linkEnricher(files);
+    }
+
+    private List<ReferenceLinkDto> extractReferences(Object raw) {
+        if (raw == null) {
+            return List.of();
+        }
+        try {
+            return mapper.convertValue(raw, REFERENCE_LIST_TYPE);
+        } catch (IllegalArgumentException e) {
+            log.warn("Failed to parse indictment section references: {}", e.getMessage());
+            return List.of();
+        }
     }
 
     private CaseIndictment getOrCreateIndictment(Case entity) {

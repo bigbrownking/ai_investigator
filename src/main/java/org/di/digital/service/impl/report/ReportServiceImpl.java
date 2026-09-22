@@ -52,7 +52,7 @@ public class ReportServiceImpl implements ReportService {
     private final ReportAwaitRegistry awaitRegistry;
     private final UserRepository userRepository;
     private final UserUtil userUtil;
-   // private final CaseAccessService caseAccessService;
+    private final CaseAccessService caseAccessService;
     private static final long REPORT_TIMEOUT_MINUTES = 5;
 
     @Override
@@ -63,7 +63,7 @@ public class ReportServiceImpl implements ReportService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         userUtil.validateUserAccess(caseEntity, user);
-      //  caseAccessService.require(caseEntity, user, CaseModule.REPORT, CaseAction.ADD);
+        caseAccessService.require(caseEntity, user, CaseModule.REPORT, CaseAction.ADD);
 
         Long reviewId = reportWriter.queueReport(caseNumber, userEmail);
 
@@ -181,7 +181,7 @@ public class ReportServiceImpl implements ReportService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         userUtil.validateUserAccess(caseEntity, user);
-      //  caseAccessService.require(caseEntity, user, CaseModule.REPORT, CaseAction.DOWNLOAD);
+        caseAccessService.require(caseEntity, user, CaseModule.REPORT, CaseAction.DOWNLOAD);
 
         CaseReport review = caseReportRepository.findByCaseEntityNumber(caseNumber)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.REPORT.localized(currentLang(), caseNumber)));

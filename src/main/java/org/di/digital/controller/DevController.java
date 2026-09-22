@@ -4,14 +4,26 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.model.queue.TaskQueue;
 import org.di.digital.model.enums.file.TaskStatus;
+import org.di.digital.security.crypto.FileCipher;
+import org.di.digital.service.core.MinioObjectStorage;
 import org.di.digital.service.impl.core.DevService;
 import org.di.digital.service.impl.queue.TaskQueueService;
 import org.di.digital.util.*;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.multipart.MultipartFile;
+import org.springframework.web.servlet.mvc.method.annotation.StreamingResponseBody;
 
+import java.io.InputStream;
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.Deflater;
+import java.util.zip.ZipEntry;
+import java.util.zip.ZipInputStream;
+import java.util.zip.ZipOutputStream;
 
 @Slf4j
 @RestController
@@ -27,6 +39,8 @@ public class DevController {
     private final InterrogationOwnerMigrationService interrogationOwnerMigrationService;
     private final CasePermissionMigrationService casePermissionMigrationService;
     private final TaskQueueService taskQueueService;
+    private final FileCipher fileCipher;
+    private final MinioObjectStorage storage;
 
     // ─── Stats ────────────────────────────────────────────────────
 
@@ -172,5 +186,87 @@ public class DevController {
     @PostMapping("/reset-stuck")
     public ResponseEntity<Integer> resetStuck() {
         return ResponseEntity.ok(taskQueueService.resetStuckProcessingTasks());
+    }
+
+    @PostMapping(value = "/decrypt-archive",
+            consumes = MediaType.MULTIPART_FORM_DATA_VALUE,
+            produces = "application/zip")
+    public ResponseEntity<StreamingResponseBody> decryptArchive(@RequestPart("file") MultipartFile archive) {
+        StreamingResponseBody body = out -> {
+            try (ZipInputStream zis = new ZipInputStream(archive.getInputStream(), StandardCharsets.UTF_8);
+                 ZipOutputStream zos = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
+
+                zos.setLevel(Deflater.NO_COMPRESSION);
+
+                ZipEntry entry;
+                while ((entry = zis.getNextEntry()) != null) {
+                    if (entry.isDirectory()) continue;
+
+                    String name = entry.getName();
+                    byte[] bytes = zis.readAllBytes();
+
+                    if (fileCipher.isEncryptedName(name)) {
+                        try {
+                            bytes = fileCipher.decrypt(bytes);
+                            name = name.substring(0, name.length() - ".enc".length());
+                        } catch (Exception e) {
+                            log.warn("Не удалось расшифровать {}: {}", name, e.getMessage());
+                            continue;
+                        }
+                    }
+
+                    zos.putNextEntry(new ZipEntry(name));
+                    zos.write(bytes);
+                    zos.closeEntry();
+                }
+            }
+        };
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"decrypted.zip\"")
+                .contentType(MediaType.valueOf("application/zip"))
+                .body(body);
+    }
+
+    @GetMapping(value = "/decrypt-folder", produces = "application/zip")
+    public ResponseEntity<StreamingResponseBody> decryptFolder(@RequestParam String prefix) {
+        List<String> names = storage.listObjectNames(prefix);
+        log.info("Decrypting {} objects under prefix {}", names.size(), prefix);
+
+        StreamingResponseBody body = out -> {
+            try (ZipOutputStream zos = new ZipOutputStream(out, StandardCharsets.UTF_8)) {
+                zos.setLevel(Deflater.NO_COMPRESSION);
+
+                for (String objectName : names) {
+                    byte[] bytes;
+                    try (InputStream in = storage.getObject(objectName)) {
+                        bytes = in.readAllBytes();
+                    } catch (Exception e) {
+                        log.warn("Пропущен {}: {}", objectName, e.getMessage());
+                        continue;
+                    }
+
+                    String name = objectName;
+                    if (fileCipher.isEncryptedName(objectName)) {
+                        try {
+                            bytes = fileCipher.decrypt(bytes);
+                            name = name.substring(0, name.length() - ".enc".length());
+                        } catch (Exception e) {
+                            log.warn("Не удалось расшифровать {}: {}", objectName, e.getMessage());
+                            continue;
+                        }
+                    }
+
+                    zos.putNextEntry(new ZipEntry(name));
+                    zos.write(bytes);
+                    zos.closeEntry();
+                }
+            }
+        };
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION, "attachment; filename=\"decrypted.zip\"")
+                .contentType(MediaType.valueOf("application/zip"))
+                .body(body);
     }
 }

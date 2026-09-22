@@ -3,6 +3,7 @@ package org.di.digital.model.cases;
 import jakarta.persistence.*;
 import lombok.*;
 import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseMemberType;
 import org.di.digital.model.enums.permission.CaseModule;
 import org.di.digital.model.enums.permission.DocumentAccessScope;
 import org.di.digital.model.user.User;
@@ -44,6 +45,13 @@ public class CaseUserAccess {
     @Enumerated(EnumType.STRING)
     @Column(name = "document_scope", nullable = false)
     private DocumentAccessScope documentScope = DocumentAccessScope.ALL;
+
+    @Enumerated(EnumType.STRING)
+    @Column(name = "member_type")
+    @Builder.Default
+    private CaseMemberType memberType = CaseMemberType.MEMBER;
+
+    //UPDATE case_user_access SET member_type = 'MEMBER' WHERE member_type IS NULL;
 
     public boolean can(CaseModule module, CaseAction action) {
         return permissions.stream()

@@ -38,7 +38,7 @@ public class CaseFileServiceImpl implements CaseFileService {
     private final UserRepository userRepository;
     private final TaskQueueService taskQueueService;
     private final NotificationService notificationService;
-    //private final CaseAccessService caseAccessService;
+    private final CaseAccessService caseAccessService;
     private final UserUtil userUtil;
 
     @Override
@@ -120,7 +120,7 @@ public class CaseFileServiceImpl implements CaseFileService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-        //caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.UPDATE);
+        caseAccessService.require(caseEntity, user, CaseModule.DOCUMENTS, CaseAction.UPDATE);
 
         CaseFile file = caseEntity.getFiles().stream()
                 .filter(f -> f.getId().equals(fileId))

@@ -82,7 +82,7 @@ public class PlanServiceImpl implements PlanService {
     private final PlanActionWriter planActionWriter;
     private final UserUtil userUtil;
     private final PlanResponseAssembler assembler;
-   // private final CaseAccessService caseAccessService;
+    private final CaseAccessService caseAccessService;
 
     private final PlanMapper mapper;
 
@@ -101,7 +101,7 @@ public class PlanServiceImpl implements PlanService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-      //  caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.ADD);
+        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.ADD);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
             String message = MessageConstant.NO_FILE_PROCESSED.format(currentLang(), caseNumber);
@@ -270,7 +270,7 @@ public class PlanServiceImpl implements PlanService {
                     .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
 
             userUtil.validateUserAccess(caseEntity, user);
-         //   caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.DOWNLOAD);
+            caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.DOWNLOAD);
 
             CasePlanResponse response = getPlan(caseNumber, userEmail);
 
@@ -292,7 +292,7 @@ public class PlanServiceImpl implements PlanService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         userUtil.validateUserAccess(caseEntity, user);
-       // caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.READ);
+        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.READ);
 
         if (userUtil.isRegAdmin(user) && caseEntity.getPlanStatus() == PlanStatus.PENDING) {
             throw new AccessDeniedException(AccessDeniedMessage.PLAN_OUT_OF_APPROVE.localized(getCurrentLang()));
@@ -428,7 +428,7 @@ public class PlanServiceImpl implements PlanService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         userUtil.validateUserAccess(caseEntity, user);
-       // caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.UPDATE);
+        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.UPDATE);
 
         if ("номер".equals(key)) {
             throw new IllegalArgumentException(MessageConstant.PLAN_ACTION_NUMBER_EDIT.localized(currentLang(), key));
@@ -561,7 +561,7 @@ public class PlanServiceImpl implements PlanService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         userUtil.validateUserAccess(caseEntity, user);
-       // caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.READ);
+        caseAccessService.require(caseEntity, user, CaseModule.PLAN, CaseAction.READ);
 
         return planEditHistoryRepository
                 .findByCaseEntityIdOrderByEditedAtDesc(caseEntity.getId())

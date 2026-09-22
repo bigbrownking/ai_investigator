@@ -8,6 +8,7 @@ import org.springframework.stereotype.Repository;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 @Repository
 public interface CaseUserAccessRepository extends JpaRepository<CaseUserAccess, Long> {
@@ -26,4 +27,9 @@ public interface CaseUserAccessRepository extends JpaRepository<CaseUserAccess, 
         where a.user.id = :userId
         """)
     List<CaseUserAccess> findByUserIdWithCase(@Param("userId") Long userId);
+
+    @Query("select a.user.id from CaseUserAccess a " +
+            "where a.caseEntity.id = :caseId and a.memberType = org.di.digital.model.enums.permission.CaseMemberType.SOG")
+    Set<Long> findSogUserIds(@Param("caseId") Long caseId);
+
 }

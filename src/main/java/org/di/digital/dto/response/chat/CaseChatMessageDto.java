@@ -26,30 +26,4 @@ public class CaseChatMessageDto {
     private boolean complete;
     private List<ReferenceLinkDto> references;
 
-    public static CaseChatMessageDto from(CaseChatMessage message) {
-        List<ReferenceLinkDto> refs = message.getReferences() == null
-                ? Collections.emptyList()
-                : message.getReferences().stream()
-                .map(CaseChatMessageDto::toLink)
-                .toList();
-
-        return CaseChatMessageDto.builder()
-                .id(message.getId())
-                .role(message.getRole())
-                .content(message.getContent())
-                .edited(message.getIsEdited())
-                .selected(message.getIsSelected())
-                .createdDate(message.getCreatedDate())
-                .complete(message.isComplete())
-                .references(refs)
-                .build();
-    }
-
-    private static ReferenceLinkDto toLink(ReferenceDto ref) {
-        return ReferenceLinkDto.builder()
-                .referenceId(ref.getReferenceId())
-                .link(ref.getFilePath())
-                .opis(ref.getOpis())
-                .build();
-    }
 }

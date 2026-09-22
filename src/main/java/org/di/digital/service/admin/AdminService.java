@@ -6,6 +6,7 @@ import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.*;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.CaseUserResponse;
 import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.plan.CasePlanResponse;
@@ -22,6 +23,7 @@ public interface AdminService {
     PagedUserResponse getAllUsers(int page, int size, UserSearchRequest userSearchRequest);
     CasePageResponse getAllCases(int page, int size, CaseSearchRequest caseSearchRequest);
     CasePageResponse getUserCases(Long userId, int page, int size, CaseSearchRequest caseSearchRequest);
+    List<CaseUserResponse> getCaseUsers(Long caseId);
     AdminStatsDto getStats(LocalDate from, LocalDate to);
     List<UserSuggestionResponse> searchUsers(String query);
     void activateUser(Long userId);

@@ -5,13 +5,14 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.response.cases.QueryResponse;
 import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
-import org.di.digital.dto.response.chat.CaseChatMessageDto;
+import org.di.digital.dto.response.chat.ReferenceLinkDto;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseChat;
 import org.di.digital.model.cases.CaseChatMessage;
+import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.enums.*;
 import org.di.digital.model.enums.cases.CaseActivityType;
 import org.di.digital.model.enums.log.LogAction;
@@ -22,13 +23,15 @@ import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.cases.CaseChatMessageRepository;
 import org.di.digital.repository.cases.CaseChatRepository;
+import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
+import org.di.digital.service.LogService;
 import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.cases.ChatService;
-import org.di.digital.service.LogService;
 import org.di.digital.service.impl.core.sse.SseTypingEmitter;
+import org.di.digital.util.mapper.MessageMapper;
 import org.di.digital.util.requests.UserUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.domain.PageRequest;
@@ -57,13 +60,16 @@ public class ChatServiceImpl implements ChatService {
     private final CaseChatRepository caseChatRepository;
     private final CaseChatMessageRepository chatMessageRepository;
     private final CaseRepository caseRepository;
+    private final CaseFileRepository caseFileRepository;
     private final UserRepository userRepository;
     private final CaseService caseService;
     private final LogService logService;
     private final ChatMessageWriter chatMessageWriter;
     private final WebClient.Builder webClientBuilder;
     private final SseTypingEmitter sseTypingEmitter;
-  //  private final CaseAccessService caseAccessService;
+    private final CaseAccessService caseAccessService;
+    private final MessageMapper messageMapper;
+    private final MessageMapper chatMessageMapper;
     private final UserUtil userUtil;
 
     @Value("${model.host}")
@@ -77,7 +83,7 @@ public class ChatServiceImpl implements ChatService {
 
     @Override
     public void streamChatResponse(ChatRequest request, SseEmitter emitter) {
-        String question = request.getQuestion();
+        String question = request.getQuestion() == null ? "" : request.getQuestion();
         log.info("Starting general chat for question: {}",
                 question.substring(0, Math.min(50, question.length())));
 
@@ -123,7 +129,7 @@ public class ChatServiceImpl implements ChatService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-      //  caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.ADD);
+        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.ADD);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
             String message = MessageConstant.NO_FILE_PROCESSED.format(currentLang(), caseNumber);
@@ -137,16 +143,12 @@ public class ChatServiceImpl implements ChatService {
             }
             logService.log(
                     String.format("No file processed for chat request in case %s", caseNumber),
-                    LogLevel.ERROR,
-                    LogAction.NO_FILE_PROCESSED,
-                    caseNumber,
-                    user.getEmail()
-            );
+                    LogLevel.ERROR, LogAction.NO_FILE_PROCESSED, caseNumber, user.getEmail());
             return;
         }
 
-        final Long messageId = chatMessageWriter.createMessages(
-                caseEntity.getId(), user.getId(), request.getQuestion());
+        final Long caseId = caseEntity.getId();
+        final Long messageId = chatMessageWriter.createMessages(caseId, user.getId(), request.getQuestion());
 
         RequestAttributes requestAttributes = RequestContextHolder.getRequestAttributes();
 
@@ -166,11 +168,15 @@ public class ChatServiceImpl implements ChatService {
                     throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
                 }
 
-                emitter.send(SseEmitter.event().name("message").data(response.getResponse()));
-                emitter.complete();
-
                 chatMessageWriter.updateAssistantMessage(
                         messageId, response.getResponse(), response.getReferences());
+
+                List<CaseFile> caseFiles = caseFileRepository.findAllByCaseEntityId(caseId);
+                List<ReferenceLinkDto> links = chatMessageMapper.toLinks(response.getReferences(), caseFiles);
+
+                emitter.send(SseEmitter.event().name("message").data(response.getResponse()));
+                emitter.send(SseEmitter.event().name("references").data(links));
+                emitter.complete();
 
                 caseService.updateCaseActivity(caseNumber, CaseActivityType.CHAT_MESSAGE.getDescription());
 
@@ -179,13 +185,18 @@ public class ChatServiceImpl implements ChatService {
                                 request.getQuestion(), userEmail, caseNumber),
                         LogLevel.INFO, LogAction.CHAT_MESSAGE, caseNumber, userEmail);
 
-                log.info("Case chat completed for case {} (user: {})", caseNumber, userEmail);
+                log.info("Case chat completed for case {} (user: {}), {} references",
+                        caseNumber, userEmail, links.size());
 
             } catch (Exception e) {
                 log.error("Case chat error for case {}: ", caseNumber, e);
-                chatMessageWriter.updateAssistantMessage(
-                        messageId, "[Error: " + e.getMessage() + "]", null);
-                emitter.completeWithError(e);
+                try {
+                    chatMessageWriter.updateAssistantMessage(
+                            messageId, "[Error: " + e.getMessage() + "]", null);
+                } catch (Exception saveError) {
+                    log.error("Failed to save error message {} for case {}", messageId, caseNumber, saveError);
+                }
+                completeWithErrorSafely(emitter, e);
             } finally {
                 RequestContextHolder.resetRequestAttributes();
             }
@@ -201,26 +212,39 @@ public class ChatServiceImpl implements ChatService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-       // caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.READ);
+        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.READ);
+
         return getChatHistory(caseEntity.getId(), user.getId(), page, size);
     }
 
     @Transactional(readOnly = true)
     public CaseChatHistoryResponse getChatHistory(Long caseId, Long userId, int page, int size) {
-        CaseChat chat = caseChatRepository.findByCaseIdAndUserId(caseId, userId)
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CHAT.localized(currentLang())));
+        CaseChat chat = caseChatRepository.findByCaseIdAndUserId(caseId, userId).orElse(null);
         if (chat == null) {
-            return CaseChatHistoryResponse.builder().messages(List.of()).totalMessages(0).build();
+            return CaseChatHistoryResponse.builder()
+                    .caseId(caseId)
+                    .messages(List.of())
+                    .totalMessages(0)
+                    .currentPage(page)
+                    .pageSize(size)
+                    .build();
         }
 
         List<CaseChatMessage> messages = chatMessageRepository
                 .findByChatId(chat.getId(), PageRequest.of(page, size)).getContent();
         long total = chatMessageRepository.countByChatId(chat.getId());
 
+        boolean hasRefs = messages.stream()
+                .anyMatch(m -> m.getReferences() != null && !m.getReferences().isEmpty());
+
+        List<CaseFile> caseFiles = hasRefs
+                ? caseFileRepository.findAllByCaseEntityId(caseId)
+                : List.of();
+
         return CaseChatHistoryResponse.builder()
                 .chatId(chat.getId())
                 .caseId(caseId)
-                .messages(messages.stream().map(CaseChatMessageDto::from).toList())
+                .messages(chatMessageMapper.toDtoList(messages, caseFiles))
                 .totalMessages((int) total)
                 .currentPage(page)
                 .pageSize(size)
@@ -236,20 +260,24 @@ public class ChatServiceImpl implements ChatService {
         User user = userRepository.findByEmail(userEmail)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
-      //  caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.DELETE);
+        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.DELETE);
 
         chatMessageWriter.clearChatHistory(caseEntity.getId(), user.getId());
 
         logService.log(
                 String.format("Cleared chat by %s user to case %s", userEmail, caseNumber),
-                LogLevel.INFO,
-                LogAction.CHAT_CLEAR,
-                caseNumber,
-                userEmail
-        );
+                LogLevel.INFO, LogAction.CHAT_CLEAR, caseNumber, userEmail);
     }
 
-    private UserSettingsLanguage currentLang(){
+    private void completeWithErrorSafely(SseEmitter emitter, Exception e) {
+        try {
+            emitter.completeWithError(e);
+        } catch (IllegalStateException alreadyCompleted) {
+            log.debug("Emitter already completed");
+        }
+    }
+
+    private UserSettingsLanguage currentLang() {
         return getCurrentLang();
     }
 }

@@ -42,7 +42,7 @@ public class CaseInterrogationContradictionWriter {
 
         List<CaseInterrogationContradiction> entities = items.stream()
                 .map(i -> {
-                    log.info("  contradiction: confidence={}%, refs={}, text='{}'",
+                    log.info("contradiction: confidence={}%, refs={}, text='{}'",
                             i.getConfidencePercent(),
                             i.getReferences() == null ? 0 : i.getReferences().size(),
                             truncate(i.getText(), 120));

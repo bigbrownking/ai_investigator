@@ -61,6 +61,7 @@ import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 @RequiredArgsConstructor
 public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final CaseRepository caseRepository;
+    private final CaseInterrogationQARepository caseInterrogationQARepository;
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final CaseInterrogationEducationRepository caseInterrogationEducationRepository;
     private final CaseInterrogationMilitaryRepository caseInterrogationMilitaryRepository;
@@ -81,7 +82,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final InterrogationCreateWriter interrogationWriter;
     private final AudioUploadWriter audioUploadWriter;
     private final ApplicationFileWriter applicationFileWriter;
-    //private final CaseAccessService caseAccessService;
+    private final CaseAccessService caseAccessService;
     private final InterrogationAuthService interrogationAuthService;
 
     @Value("${files.max-pages-per-file}")
@@ -102,7 +103,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         userUtil.validateUserAccess(caseEntity, user);
-      //  caseAccessService.require(caseEntity, user, CaseModule.INTERROGATION, CaseAction.READ);
+        caseAccessService.require(caseEntity, user, CaseModule.INTERROGATION, CaseAction.READ);
 
         return caseEntity.getInterrogations().stream()
                 .filter(i -> role.equals("Все") || (i.getRole() != null && i.getRole().equalsIgnoreCase(role)))
@@ -151,41 +152,37 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
     @Override
     @Transactional
-    public QAResponse createQA(Long caseId, Long interrogationId, String question, String email) {
-        InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(caseId, interrogationId, email,
-                CaseModule.INTERROGATION, CaseAction.UPDATE);
+    public QAResponse createQA(Long caseId, Long interrogationId,
+                               String question, String answer, String email) {
+        InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(
+                caseId, interrogationId, email, CaseModule.INTERROGATION, CaseAction.UPDATE);
         CaseInterrogation interrogation = ctx.interrogation();
 
-        int orderIndex = interrogation.getQaList().size();
+        String q = trimToNull(question);
+        String a = trimToNull(answer);
+        boolean hasAnswer = a != null;
 
         CaseInterrogationQA qa = CaseInterrogationQA.builder()
-                .question(question)
-                .answer(null)
-                .status(QAStatusEnum.PENDING)
-                .orderIndex(orderIndex)
+                .question(q)
+                .answer(a)
+                .status(hasAnswer ? QAStatusEnum.TRANSCRIBED : QAStatusEnum.PENDING)
+                .orderIndex(nextOrderIndex(interrogation))
                 .isEdited(false)
+                .manuallyEdited(hasAnswer)
                 .isReformulated(false)
                 .createdAt(LocalDateTime.now())
                 .interrogation(interrogation)
                 .audioRecords(new ArrayList<>())
                 .build();
 
-        interrogation.getQaList().add(qa);
-        CaseInterrogation saved = caseInterrogationRepository.save(interrogation);
+        CaseInterrogationQA savedQa = caseInterrogationQARepository.saveAndFlush(qa);
+        interrogation.getQaList().add(savedQa);
 
-        CaseInterrogationQA savedQa = saved.getQaList().stream()
-                .filter(q -> q.getOrderIndex().equals(orderIndex))
-                .findFirst()
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.QA.localized(currentLang(), String.valueOf(orderIndex))));
-
+        String caseNumber = interrogation.getCaseEntity().getNumber();
         logService.log(
-                String.format("QA created in interrogation %d by %s in case %s",
-                        interrogationId, email, interrogation.getCaseEntity().getNumber()),
-                LogLevel.INFO,
-                LogAction.QA_CREATED,
-                interrogation.getCaseEntity().getNumber(),
-                email
-        );
+                String.format("QA %d created (manual answer=%s) in interrogation %d by %s in case %s",
+                        savedQa.getId(), hasAnswer, interrogationId, email, caseNumber),
+                LogLevel.INFO, LogAction.QA_CREATED, caseNumber, email);
 
         return mapper.toShortQAResponse(savedQa);
     }
@@ -399,50 +396,44 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
     @Override
     @Transactional
-    public QAResponse editTranscribedText(Long caseId, Long interrogationId, EditAudioTranscribedTextRequest request, String email) {
-        InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(caseId, interrogationId, email,
-                CaseModule.INTERROGATION, CaseAction.UPDATE);
+    public QAResponse editTranscribedText(Long caseId, Long interrogationId,
+                                          EditAudioTranscribedTextRequest request, String email) {
+        InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(
+                caseId, interrogationId, email, CaseModule.INTERROGATION, CaseAction.UPDATE);
         CaseInterrogation interrogation = ctx.interrogation();
+
+        if (request.getQaId() == null) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang()));
+        }
 
         CaseInterrogationQA qa = interrogation.getQaList().stream()
                 .filter(q -> q.getId().equals(request.getQaId()))
                 .findFirst()
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.QA.localized(currentLang(), request.getQaId().toString())));
+                .orElseThrow(() -> new NotFoundException(
+                        NotFoundMessage.QA.localized(currentLang(), request.getQaId().toString())));
 
-        qa.setAnswer(request.getAnswer());
+        if (qa.getStatus() == QAStatusEnum.TRANSCRIBING) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang()));
+        }
+
+        String answer = trimToNull(request.getAnswer());
+        qa.setAnswer(answer);
         qa.setManuallyEdited(true);
+        qa.setStatus(answer != null ? QAStatusEnum.TRANSCRIBED : QAStatusEnum.PENDING);
 
-        boolean assistantReplied = caseInterrogationChatRepository.findByInterrogationId(interrogationId)
-                .map(chat -> chat.getMessages().stream()
+        Optional<CaseInterrogationChat> chat = caseInterrogationChatRepository.findByInterrogationId(interrogationId);
+
+        boolean assistantReplied = chat
+                .map(c -> c.getMessages().stream()
                         .anyMatch(m -> m.getRole() == MessageRole.ASSISTANT && m.isComplete()))
                 .orElse(false);
-
         qa.setIsEdited(assistantReplied);
 
         if (assistantReplied && qa.getQuestion() != null) {
-            caseInterrogationChatRepository.findByInterrogationId(interrogationId).flatMap(chat -> chatMessageRepository.findByInterrogationChatId(chat.getId(), PageRequest.of(0, Integer.MAX_VALUE))
-                    .getContent()
-                    .stream()
-                    .filter(m -> m.getRole() == MessageRole.USER
-                            && m.getContent() != null
-                            && m.getContent().contains(qa.getQuestion()))
-                    .findFirst()).ifPresent(m -> {
-                m.setIsEdited(true);
-                m.setContent("Вопрос: " + qa.getQuestion() + "\n" + "Ответ: " + request.getAnswer());
-                chatMessageRepository.save(m);
-            });
+            chat.ifPresent(c -> syncChatMessage(c, qa));
         }
-        qa.setStatus(QAStatusEnum.TRANSCRIBED);
-        caseInterrogationRepository.save(interrogation);
 
-        return QAResponse.builder()
-                .id(qa.getId())
-                .question(qa.getQuestion())
-                .answer(qa.getAnswer())
-                .orderIndex(qa.getOrderIndex())
-                .status(qa.getStatus())
-                .edited(assistantReplied)
-                .build();
+        return mapper.toShortQAResponse(qa);
     }
 
     @Override
@@ -862,6 +853,31 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         interrogation.setStatus(CaseInterrogationStatusEnum.COMPLETED);
 
         caseInterrogationRepository.save(interrogation);
+    }
+    private void syncChatMessage(CaseInterrogationChat chat, CaseInterrogationQA qa) {
+        String prefix = "Вопрос: " + qa.getQuestion() + "\n";
+        chat.getMessages().stream()
+                .filter(m -> m.getRole() == MessageRole.USER
+                        && m.getContent() != null
+                        && m.getContent().startsWith(prefix))
+                .findFirst()
+                .ifPresent(m -> {
+                    m.setIsEdited(true);
+                    m.setContent(prefix + "Ответ: " + (qa.getAnswer() != null ? qa.getAnswer() : ""));
+                });
+    }
+
+    private int nextOrderIndex(CaseInterrogation interrogation) {
+        return interrogation.getQaList().stream()
+                .map(CaseInterrogationQA::getOrderIndex)
+                .filter(Objects::nonNull)
+                .max(Integer::compare)
+                .map(i -> i + 1)
+                .orElse(0);
+    }
+
+    private static String trimToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
     }
 
     private UserSettingsLanguage currentLang(){

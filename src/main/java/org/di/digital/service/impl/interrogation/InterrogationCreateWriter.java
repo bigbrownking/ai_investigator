@@ -53,7 +53,7 @@ public class InterrogationCreateWriter {
     private final LocalizationHelper localizationHelper;
     private final InterrogationCategoryResolver categoryResolver;
     private final CaseInterrogationRepository caseInterrogationRepository;
-   // private final CaseAccessService caseAccessService;
+    private final CaseAccessService caseAccessService;
 
 
     private static final Duration MIN_DOP_INTERVAL = Duration.ofHours(2);
@@ -75,7 +75,7 @@ public class InterrogationCreateWriter {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
         userUtil.validateUserAccess(caseEntity, user);
-       // caseAccessService.require(caseEntity, user, CaseModule.INTERROGATION, CaseAction.ADD);
+        caseAccessService.require(caseEntity, user, CaseModule.INTERROGATION, CaseAction.ADD);
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
             throw new IllegalStateException(MessageConstant.NO_FILE_PROCESSED.format(currentLang(), caseEntity.getNumber()));

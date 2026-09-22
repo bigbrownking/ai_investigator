@@ -11,6 +11,7 @@ import org.di.digital.dto.response.admin.AppealDto;
 import org.di.digital.dto.response.admin.RegionStatsDto;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.CaseUserResponse;
 import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
@@ -62,6 +63,7 @@ public class RegAdminController {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return ResponseEntity.ok(regAdminService.getMyRegionUsers(userDetails.getId(), page, size, userSearchRequest));
     }
+
     @GetMapping("/cases")
     public ResponseEntity<CasePageResponse> getRegionCases(
             Authentication authentication,
@@ -90,6 +92,17 @@ public class RegAdminController {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return ResponseEntity.ok(regAdminService.getUserCases(userDetails.getId(), userId, page, size, caseSearchRequest));
     }
+    @GetMapping("/cases/{caseId}/users")
+    public ResponseEntity<List<CaseUserResponse>> getCaseUsers(
+            @PathVariable Long caseId,
+            Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+        List<CaseUserResponse> users = regAdminService.getCaseUsers(userDetails.getId(), caseId);
+        return ResponseEntity.ok(users);
+    }
+
+
     @PutMapping("/appeals/{id}/approve")
     public ResponseEntity<Void> approve(@PathVariable Long id, Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();

@@ -125,7 +125,7 @@ public class CaseInterrogationController {
             Authentication authentication
     ) {
         return ResponseEntity.ok(caseInterrogationService
-                .createQA(caseId, interrogationId, request.getQuestion(), authentication.getName()));
+                .createQA(caseId, interrogationId, request.getQuestion(), request.getAnswer(),  authentication.getName()));
     }
 
     @PostMapping(value = "/{caseId}/interrogations/{interrogationId}/audio",
