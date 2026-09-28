@@ -439,3 +439,4 @@ public class RegAdminServiceImpl implements RegAdminService {
             log.info("Админ {} удалил участника {} из дела {}", adminId, userId, caseId);
         }
     }
+}

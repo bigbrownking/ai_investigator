@@ -452,7 +452,7 @@ public class AuthServiceImpl implements AuthService {
 
         for (PasswordHistory h : history) {
             if (passwordEncoder.matches(rawPassword, h.getPasswordHash())) {
-                throw new IllegalStateException(MessageConstant.PASSWORD_ALREADY_USED.format(currentLang());
+                throw new IllegalStateException(MessageConstant.PASSWORD_ALREADY_USED.format(currentLang()));
             }
         }
 
