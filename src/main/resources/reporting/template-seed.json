@@ -1,0 +1,73 @@
+[
+  {
+    "code": "form_1",
+    "name": "Сводная форма 1 (пример)",
+    "description": "ПРИМЕР: замените колонки реальными в resources/reporting/template-seed.json",
+    "columns": [
+      { "key": "registered", "label": "Зарегистрировано", "type": "NUMBER", "required": true },
+      { "key": "completed", "label": "Завершено", "type": "NUMBER", "required": true },
+      { "key": "comment", "label": "Комментарий", "type": "STRING", "required": false }
+    ]
+  },
+  {
+    "code": "form_2",
+    "name": "Сводная форма 2 (пример)",
+    "description": "ПРИМЕР: замените колонки реальными в resources/reporting/template-seed.json",
+    "columns": [
+      { "key": "count", "label": "Количество", "type": "NUMBER", "required": true },
+      { "key": "amount", "label": "Сумма, тыс. тг", "type": "NUMBER", "required": false }
+    ]
+  },
+  {
+    "code": "form_3",
+    "name": "Сводная форма 3 (пример)",
+    "description": "ПРИМЕР: замените колонки реальными в resources/reporting/template-seed.json",
+    "columns": [
+      { "key": "value", "label": "Значение", "type": "NUMBER", "required": true },
+      {
+        "key": "status", "label": "Статус", "type": "SELECT", "required": true,
+        "options": [
+          { "value": "IN_PROGRESS", "label": "В работе" },
+          { "value": "DONE", "label": "Выполнено" },
+          { "value": "SUSPENDED", "label": "Приостановлено" }
+        ]
+      }
+    ]
+  },
+  {
+    "code": "form_4",
+    "name": "Сводная форма 4 (пример)",
+    "description": "ПРИМЕР: замените колонки реальными в resources/reporting/template-seed.json",
+    "columns": [
+      { "key": "event_date", "label": "Дата события", "type": "DATE", "required": true },
+      { "key": "count", "label": "Количество", "type": "NUMBER", "required": true },
+      { "key": "note", "label": "Примечание", "type": "STRING", "required": false }
+    ]
+  },
+  {
+    "code": "form_5",
+    "name": "Сводная форма 5 (пример)",
+    "description": "ПРИМЕР: замените колонки реальными в resources/reporting/template-seed.json",
+    "columns": [
+      { "key": "planned", "label": "План", "type": "NUMBER", "required": true },
+      { "key": "actual", "label": "Факт", "type": "NUMBER", "required": true },
+      { "key": "percent", "label": "Исполнение, %", "type": "NUMBER", "required": false }
+    ]
+  },
+  {
+    "code": "form_6",
+    "name": "Сводная форма 6 (пример)",
+    "description": "ПРИМЕР: замените колонки реальными в resources/reporting/template-seed.json",
+    "columns": [
+      { "key": "count", "label": "Количество", "type": "NUMBER", "required": true },
+      {
+        "key": "priority", "label": "Приоритет", "type": "SELECT", "required": false,
+        "options": [
+          { "value": "HIGH", "label": "Высокий" },
+          { "value": "NORMAL", "label": "Обычный" }
+        ]
+      },
+      { "key": "deadline", "label": "Срок", "type": "DATE", "required": false }
+    ]
+  }
+]
