@@ -36,12 +36,14 @@ import org.di.digital.repository.indictment.CaseIndictmentRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationQARepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.qualification.CaseQualificationRepository;
+import org.di.digital.repository.review.CaseReportRepository;
 import org.di.digital.repository.search.*;
 import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.repository.user.*;
 import org.di.digital.service.admin.AdminService;
 import org.di.digital.service.cases.CaseService;
+import org.di.digital.service.core.MinioService;
 import org.di.digital.service.impl.cases.CaseRejectionEnricher;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
@@ -57,6 +59,14 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.di.digital.model.report.CaseReport;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
+import org.di.digital.service.core.MinioService;
+import org.di.digital.repository.review.CaseReportRepository;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import java.io.IOException;
+import java.io.InputStream;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -102,6 +112,8 @@ public class AdminServiceImpl implements AdminService {
     private final CaseService caseService;
     private final CaseRejectionEnricher caseRejectionEnricher;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
+    private final CaseReportRepository caseReportRepository;
+    private final MinioService minioService;
 
     @Override
     public PagedUserResponse getAllUsers(int page, int size, UserSearchRequest req) {
@@ -653,6 +665,29 @@ public class AdminServiceImpl implements AdminService {
                 .canWithdraw(planService.canWithdraw(caseEntity.getPlanStatus()))
                 .plan(planService.enrichPlanWithStatus(caseEntity.getPlan()))
                 .build();
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public Resource getCaseReport(Long caseId) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        CaseReport report = caseReportRepository.findByCaseEntityNumber(caseEntity.getNumber())
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.REPORT.localized(currentLang(), caseId.toString())));
+
+        if (report.getStatus() != CaseFileStatusEnum.COMPLETED) {
+            throw new IllegalStateException(
+                    IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), report.getStatus().getLabel()));
+        }
+        if (report.getReportFileUrl() == null || report.getReportFileUrl().isBlank()) {
+            throw new NotFoundException(NotFoundMessage.FILE.localized(currentLang()));
+        }
+
+        try (InputStream stream = minioService.downloadFile(report.getReportFileUrl())) {
+            return new ByteArrayResource(stream.readAllBytes());
+        } catch (IOException e) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
+        }
     }
 
     @Override

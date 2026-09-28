@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.osmotr.DistributionRequest;
 import org.di.digital.dto.response.osmotr.OsmotrResultDto;
+import org.di.digital.dto.response.osmotr.OsmotrSearchResultItem;
 import org.di.digital.model.enums.osmotr.OsmotrFileType;
 import org.di.digital.service.osmotr.OsmotrService;
 import org.springframework.http.HttpHeaders;
@@ -103,8 +104,9 @@ public class OsmotrController {
                 caseNumber, resultId, fileType.getValue().toLowerCase(), authentication.getName());
         String fileName = switch (fileType) {
             case RETURN -> "возврат.docx";
+            case RESOLUTION -> "постановление.docx";
             case EVIDENCE -> "вещественные_документы.docx";
-            case REPORT -> "постановление.docx";
+            case REPORT -> "протокол.docx";
         };
         return ResponseEntity.ok()
                 .header(HttpHeaders.CONTENT_DISPOSITION,

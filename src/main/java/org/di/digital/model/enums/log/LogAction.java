@@ -45,7 +45,7 @@ public enum LogAction {
     REFORMULATE("Переформулировать вопрос в допросе"),
     CASE_UPDATED("Обновление дела"),
     CASE_LANGUAGE_UPDATE("Смена языка в деле"),
-    AUDIO_UPLOADED("Загрузка айдио"),
+    AUDIO_UPLOADED("Загрузка аудио"),
     INTERROGATION_COMPLETED("Завершение допроса"),
     USER_UPDATED("Обновление данных пользователя"),
     NO_FILE_PROCESSED("Ни одного обработанного файла"),
@@ -57,6 +57,11 @@ public enum LogAction {
     INTERROGATION_LIMIT_OVERRIDE("Превышение лимита проведения допроса"),
     REVIEW_CREATE("Создание рецензии"),
     SUPPORT_TICKET_CREATE("Создание обращения в поддержку"),
+    INITIAL_ACCESS("Начальный уровень доступа"),
+    FULL_ACCESS("Полный уровень доступа"),
+    GRANT_ACCESS("Доступ к модулю"),
+    REVOKE_ACCESS("Лишить прав к модулю"),
+    GRANT_FILE("Доступ на файл"),
     NO_ACCESS("Нет доступа");
 
     private final String description;

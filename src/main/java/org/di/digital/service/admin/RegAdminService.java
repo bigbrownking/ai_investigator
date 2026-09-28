@@ -13,6 +13,7 @@ import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 
 import java.util.List;
@@ -55,5 +56,6 @@ public interface RegAdminService {
     String getMyRegionQualification(Long adminId, Long caseId);
 
     Map<String, Object> getMyRegionPlan(Long adminId, Long caseId);
+    Resource getMyRegionReport(Long adminId, Long caseId);
     List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long adminId,Long caseId, String email);
 }

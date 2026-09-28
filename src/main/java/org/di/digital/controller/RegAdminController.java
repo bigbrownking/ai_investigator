@@ -20,6 +20,7 @@ import org.di.digital.model.enums.cases.CaseRejectionReason;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.admin.RegAdminService;
 import org.di.digital.service.cases.CaseService;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
@@ -221,6 +222,25 @@ public class RegAdminController {
     public ResponseEntity<Map<String, Object>> getPlan(@PathVariable Long caseId,Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return ResponseEntity.ok(regAdminService.getMyRegionPlan(userDetails.getId(), caseId));
+    }
+
+    @GetMapping("/cases/{caseId}/report")
+    public ResponseEntity<Resource> getReport(
+            @PathVariable Long caseId,
+            Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+
+        CaseResponse caseDetail = regAdminService.getMyRegionCaseDetail(userDetails.getId(), caseId);
+        Resource resource = regAdminService.getMyRegionReport(userDetails.getId(), caseId);
+
+        String filename = String.format("справка_%s.docx", caseDetail.getNumber().replace("/", "-"));
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + encode(filename, StandardCharsets.UTF_8))
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .body(resource);
     }
 
     @GetMapping("/cases/{caseId}/status/history")

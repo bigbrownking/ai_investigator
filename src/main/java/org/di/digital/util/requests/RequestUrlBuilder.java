@@ -36,6 +36,9 @@ public class RequestUrlBuilder {
     public static String qualificationChatUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, "/query/" + caseNumber);
     }
+    public static String qualificationCheckUrl(String host, String port, String caseNumber, String language, String article) {
+        return buildUrl(host, port, String.format("qualification/%s/corpus-delicti?language=%s&article=%s", caseNumber, language, article));
+    }
 
     public static String indictmentUrl(String host, String port) {
         return buildUrl(host, port, "/generate_akt");
@@ -74,8 +77,17 @@ public class RequestUrlBuilder {
     public static String osmotrDecisionUrl(String host, String port) {
         return buildUrl(host, port, "/api/submit-decisions");
     }
+    public static String osmotrResolutionUrl(String host, String port) {
+        return buildUrl(host, port, "/api/generate-resolution");
+    }
     public static String osmotrDownloadUrl(String host, String port, String sessionId, String fileType) {
         return buildUrl(host, port, String.format("/api/download/%s/%s", sessionId, fileType));
+    }
+    public static String osmotrSearchUrl(String host, String port){
+        return buildUrl(host, port, "/api/search");
+    }
+    public static String osmotrTimelineUrl(String host, String port){
+        return buildUrl(host, port, "/api/analyze-timeline");
     }
 
     public static String interrogationReformulateUrl(String host, String port) {

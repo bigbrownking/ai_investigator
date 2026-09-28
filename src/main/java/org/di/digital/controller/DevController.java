@@ -172,6 +172,11 @@ public class DevController {
         return ResponseEntity.ok(casePermissionMigrationService.grantFullAccessToAllOwners());
     }
 
+    @PostMapping("/migrate-participantPermissions")
+    public ResponseEntity<Integer> migrate7() {
+        return ResponseEntity.ok(casePermissionMigrationService.grantInitialAccessToAllParticipants());
+    }
+
     @GetMapping("/avg-page")
     public DevService.AvgTimePerPageResponse avgPage(){
         return devService.getAvgTimePerPage();

@@ -376,7 +376,7 @@ public class CaseServiceImpl implements CaseService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         Specification<Case> spec = CaseSpecifications.build(req)
-                .and(CaseSpecifications.hasOwner(user.getId()));
+                .and(CaseSpecifications.forUser(email));
 
         List<CasePreviewResponse> previews = caseRepository.findAll(spec)
                 .stream()
@@ -649,6 +649,7 @@ public class CaseServiceImpl implements CaseService {
             throw new IllegalStateException(IllegalStateMessage.ALREADY_EXISTS.localized(currentLang(), email));
         }
 
+        log.info("Adding sog to case...");
         caseEntity.addUser(sogUser);
         Case savedCase = caseRepository.save(caseEntity);
 
@@ -803,7 +804,7 @@ public class CaseServiceImpl implements CaseService {
 
         caseEntity.removeUser(userToRemove);
         caseRepository.save(caseEntity);
-
+        caseAccessService.revokeAll(caseId, userId);
         recordMemberHistory(caseNumber, userToRemove, currentUser, CaseMemberAction.REMOVE);
 
         logService.log(

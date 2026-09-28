@@ -12,6 +12,8 @@ import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.*;
 import org.di.digital.model.enums.MessageConstant;
+import org.di.digital.model.enums.log.LogAction;
+import org.di.digital.model.enums.log.LogLevel;
 import org.di.digital.model.enums.permission.CaseAction;
 import org.di.digital.model.enums.permission.CaseMemberType;
 import org.di.digital.model.enums.permission.CaseModule;
@@ -23,6 +25,7 @@ import org.di.digital.repository.assess.CaseUserAccessRepository;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
+import org.di.digital.service.LogService;
 import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.util.mapper.PermissionMapper;
 import org.springframework.security.access.AccessDeniedException;
@@ -43,6 +46,7 @@ public class CaseAccessServiceImpl implements CaseAccessService {
     private final PermissionMapper permissionMapper;
     private final UserRepository userRepository;
     private final CaseRepository caseRepository;
+    private final LogService logService;
 
     private static final Map<CaseModule, Set<CaseAction>> SOG_PERMISSIONS = Map.of(
             CaseModule.CASE,          EnumSet.of(CaseAction.READ),
@@ -68,7 +72,13 @@ public class CaseAccessServiceImpl implements CaseAccessService {
                 .documentScope(scope)
                 .build();
         accessRepository.save(access);
-
+        logService.log(
+                String.format("User %s granted initial access", user.getEmail()),
+                LogLevel.INFO,
+                LogAction.INITIAL_ACCESS,
+                caseEntity.getNumber(),
+                user.getEmail()
+        );
         if (restricted) {
             grantFiles(caseEntity, user, fileGrants);
         }
@@ -87,6 +97,13 @@ public class CaseAccessServiceImpl implements CaseAccessService {
         access.setPermissions(allPermissions());
         access.setDocumentScope(DocumentAccessScope.ALL);
         accessRepository.save(access);
+        logService.log(
+                String.format("User %s granted full access", user.getEmail()),
+                LogLevel.INFO,
+                LogAction.FULL_ACCESS,
+                caseEntity.getNumber(),
+                user.getEmail()
+        );
     }
 
     private Set<CasePermission> allPermissions() {
@@ -146,6 +163,13 @@ public class CaseAccessServiceImpl implements CaseAccessService {
         if (!can(caseEntity, user, module, action)) {
             UserSettingsLanguage lang = getCurrentLang();
             String detail = module.localized(lang) + " / " + action.localized(lang);
+            logService.log(
+                    String.format("User %s tried to access case %s", user.getEmail(), caseEntity.getNumber()),
+                    LogLevel.WARNING,
+                    LogAction.NO_ACCESS,
+                    caseEntity.getNumber(),
+                    user.getEmail()
+            );
             throw new AccessDeniedException(AccessDeniedMessage.USER_ONLY.localized(lang, detail));
         }
     }
@@ -256,6 +280,13 @@ public class CaseAccessServiceImpl implements CaseAccessService {
         }
 
         log.info("Access granted to user {} in case {} by {}", target.getEmail(), caseId, ownerEmail);
+        logService.log(
+                String.format("User %s granted access to case %s by %s", target.getEmail(), caseEntity.getNumber(), ownerEmail),
+                LogLevel.WARNING,
+                LogAction.GRANT_ACCESS,
+                caseEntity.getNumber(),
+                owner.getEmail()
+        );
     }
 
     @Transactional
@@ -278,6 +309,13 @@ public class CaseAccessServiceImpl implements CaseAccessService {
 
         revokeAll(caseId, userId);
         log.info("Access revoked for user {} in case {} by {}", userId, caseId, ownerEmail);
+        logService.log(
+                String.format("User %s revoked access to case %s by %s", target.getEmail(), caseEntity.getNumber(), ownerEmail),
+                LogLevel.WARNING,
+                LogAction.REVOKE_ACCESS,
+                caseEntity.getNumber(),
+                owner.getEmail()
+        );
     }
 
     @Transactional
@@ -299,6 +337,20 @@ public class CaseAccessServiceImpl implements CaseAccessService {
         grantFiles(caseEntity, target, request.getFileGrants());
 
         log.info("File access updated for user {} in case {} by {}", target.getEmail(), caseId, ownerEmail);
+        List<String> fileNames = request.getFileGrants() == null ? List.of() :
+                request.getFileGrants().stream()
+                        .map(g -> caseFileRepository.findById(g.fileId())
+                                .map(CaseFile::getOriginalFileName)
+                                .orElse("file#" + g.fileId()))
+                        .toList();
+        logService.log(
+                String.format("User %s updated file access to case %s by %s. Files: %s",
+                        target.getEmail(), caseEntity.getNumber(), ownerEmail, fileNames),
+                LogLevel.WARNING,
+                LogAction.GRANT_ACCESS,
+                caseEntity.getNumber(),
+                owner.getEmail()
+        );
     }
 
     @Override

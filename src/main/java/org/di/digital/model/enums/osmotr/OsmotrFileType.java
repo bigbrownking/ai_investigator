@@ -6,6 +6,7 @@ import lombok.Getter;
 public enum OsmotrFileType {
     RETURN("return"),
     EVIDENCE("evidence"),
+    RESOLUTION("resolution"),
     REPORT("report");
 
     private final String value;

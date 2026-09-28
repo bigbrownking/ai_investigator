@@ -24,6 +24,7 @@ import org.di.digital.service.admin.AdminService;
 import org.di.digital.service.auth.AuthService;
 import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.impl.core.DevService;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
@@ -268,6 +269,20 @@ public class AdminController {
     @GetMapping("/cases/{caseId}/plan")
     public ResponseEntity<CasePlanResponse> getPlan(@PathVariable Long caseId) {
         return ResponseEntity.ok(adminService.getPlan(caseId));
+    }
+    @GetMapping("/cases/{caseId}/report")
+    public ResponseEntity<Resource> getCaseReport(@PathVariable Long caseId) {
+        CaseResponse caseDetail = adminService.getCaseDetail(caseId);
+        Resource resource = adminService.getCaseReport(caseId);
+
+        String filename = String.format("справка_%s.docx", caseDetail.getNumber().replace("/", "-"));
+
+        return ResponseEntity.ok()
+                .header(HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + encode(filename, StandardCharsets.UTF_8))
+                .contentType(MediaType.parseMediaType(
+                        "application/vnd.openxmlformats-officedocument.wordprocessingml.document"))
+                .body(resource);
     }
 
     @PatchMapping("/queue/case/{caseNumber}/priority")

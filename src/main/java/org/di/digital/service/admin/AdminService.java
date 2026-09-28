@@ -14,6 +14,7 @@ import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 
 import java.time.LocalDate;
@@ -52,5 +53,6 @@ public interface AdminService {
     String getIndictment(Long caseId);
     String getQualification(Long caseId);
     CasePlanResponse getPlan(Long caseId);
+    Resource getCaseReport(Long caseId);
 
 }

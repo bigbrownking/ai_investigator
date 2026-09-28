@@ -13,15 +13,19 @@ import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.enums.MessageConstant;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.enums.settings.UserSettingsLanguage;
+import org.di.digital.model.report.CaseReport;
 import org.di.digital.model.user.Appeal;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.user.Region;
 import org.di.digital.model.user.User;
 import org.di.digital.model.enums.appeal.AppealStatus;
 import org.di.digital.model.interrogation.CaseInterrogation;
+import org.di.digital.repository.review.CaseReportRepository;
 import org.di.digital.repository.user.AppealRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.cases.RejectionReasonStatusRepository;
@@ -33,12 +37,15 @@ import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
 import org.di.digital.service.admin.RegAdminService;
+import org.di.digital.service.core.MinioService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.mapper.SupportMapper;
 import org.di.digital.util.mapper.UserMapper;
 import org.di.digital.util.requests.UserUtil;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -46,6 +53,8 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -71,6 +80,8 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final InterrogationExportService interrogationExportService;
     private final UserUtil userUtil;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
+    private final CaseReportRepository caseReportRepository;
+    private final MinioService minioService;
 
     @Override
     public Page<AppealDto> getMyRegionAppeals(Long adminId, int page, int size, AppealSearchRequest req) {
@@ -376,6 +387,34 @@ public class RegAdminServiceImpl implements RegAdminService {
         userUtil.validateRegionAccess(admin, caseEntity);
 
         return caseEntity.getPlan();
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public Resource getMyRegionReport(Long adminId, Long caseId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        userUtil.validateRegionAccess(admin, caseEntity);
+
+        CaseReport report = caseReportRepository.findByCaseEntityNumber(caseEntity.getNumber())
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.REPORT.localized(currentLang(), caseId.toString())));
+
+        if (report.getStatus() != CaseFileStatusEnum.COMPLETED) {
+            throw new IllegalStateException(
+                    IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), report.getStatus().getLabel()));
+        }
+        if (report.getReportFileUrl() == null || report.getReportFileUrl().isBlank()) {
+            throw new NotFoundException(NotFoundMessage.FILE.localized(currentLang()));
+        }
+
+        try (InputStream stream = minioService.downloadFile(report.getReportFileUrl())) {
+            return new ByteArrayResource(stream.readAllBytes());
+        } catch (IOException e) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
+        }
     }
 
     @Override

@@ -5,18 +5,13 @@ import lombok.AllArgsConstructor;
 import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
-import org.di.digital.dto.response.osmotr.OsmotrDataItemDto;
-
-import java.util.List;
-import java.util.Map;
 
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
-public class OsmotrSubmitDecisionsRequest {
+public class OsmotrSearchRequest {
     @JsonProperty("session_id")
     private String sessionId;
-
-    private Map<String, Boolean> decisions;
+    private String query;
 }

@@ -5,11 +5,9 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.OsmotrProcessingMessage;
 import org.di.digital.dto.request.osmotr.DistributionRequest;
 import org.di.digital.dto.request.osmotr.OsmotrDecisionDto;
+import org.di.digital.dto.request.osmotr.OsmotrSearchRequest;
 import org.di.digital.dto.request.osmotr.OsmotrSubmitDecisionsRequest;
-import org.di.digital.dto.response.osmotr.OsmotrDataItemDto;
-import org.di.digital.dto.response.osmotr.OsmotrResultDto;
-import org.di.digital.dto.response.osmotr.OsmotrResultSegmentDto;
-import org.di.digital.dto.response.osmotr.OsmotrSubmitDecisionsResponse;
+import org.di.digital.dto.response.osmotr.*;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
@@ -42,10 +40,11 @@ import org.springframework.web.reactive.function.client.WebClient;
 import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.*;
+import java.util.stream.Collectors;
 
 import static java.util.Base64.getDecoder;
 import static java.util.Base64.getEncoder;
-import static org.di.digital.util.requests.RequestUrlBuilder.osmotrDecisionUrl;
+import static org.di.digital.util.requests.RequestUrlBuilder.*;
 import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
@@ -110,9 +109,8 @@ public class OsmotrServiceImpl implements OsmotrService {
                     }
                 }
             });
-            for (String type : List.of("report", "evidence", "return")) {
-                String generatedPath = String.format("%s/osmotr/%s/%s.docx", caseNumber, type, type);
-                minioService.deleteFile(generatedPath);
+            for (String type : List.of("report", "evidence", "return", "resolution")) {
+                minioService.deleteFile(buildObjectPath(caseNumber, type));
             }
 
             result.setOriginalFileName(originalFileName);
@@ -227,17 +225,15 @@ public class OsmotrServiceImpl implements OsmotrService {
                         .docId(s.getTitle())
                         .startPage(s.getStartPage())
                         .endPage(s.getEndPage())
-                        .inspectionText(s.getInspectionText())
+                        .text(s.getInspectionText())
                         .needed(s.getEvidenceNeeded())
                         .build())
                 .toList();
 
-        List<OsmotrDecisionDto> decisions = saved.getSegments().stream()
-                .map(s -> OsmotrDecisionDto.builder()
-                        .docId(s.getTitle())
-                        .needed(s.getEvidenceNeeded())
-                        .build())
-                .toList();
+        Map<String, Boolean> decisionsMap = saved.getSegments().stream()
+                .collect(Collectors.toMap(
+                        s -> s.getId().toString(),
+                        s -> Boolean.TRUE.equals(s.getEvidenceNeeded())));
 
         OsmotrResultDto dto = mapper.toDto(saved);
 
@@ -248,10 +244,7 @@ public class OsmotrServiceImpl implements OsmotrService {
                     .contentType(MediaType.APPLICATION_JSON)
                     .bodyValue(OsmotrSubmitDecisionsRequest.builder()
                             .sessionId(saved.getSessionId())
-                            .userId(user.getId())
-                            .results(resultItems)
-                            .data(resultItems)
-                            .decisions(decisions)
+                            .decisions(decisionsMap)
                             .build())
                     .retrieve()
                     .bodyToMono(OsmotrSubmitDecisionsResponse.class)
@@ -351,15 +344,18 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.OSMOTR.localized(currentLang(), resultId.toString())));
 
         if (result.getSessionId() == null) {
-            throw new IllegalStateException(MessageConstant.OSMOTR_PROCESSING.format(currentLang(),  resultId.toString()));
+            throw new IllegalStateException(MessageConstant.OSMOTR_PROCESSING.format(currentLang(), resultId.toString()));
         }
 
-        String fileName = fileType + ".docx";
-        String objectPath = String.format("%s/osmotr/%s/%s", caseNumber, fileType, fileName);
+        String objectPath = buildObjectPath(caseNumber, fileType);
+
+        if (!minioService.fileExists(objectPath)) {
+            generateAndStoreFile(caseNumber, result, fileType);
+        }
 
         if (minioService.fileExists(objectPath)) {
             try (InputStream is = minioService.downloadFile(objectPath)) {
-                log.info("Generated file found in MinIO: {}", objectPath);
+                log.info("Returning generated file from MinIO: {}", objectPath);
                 return is.readAllBytes();
             } catch (Exception e) {
                 log.error("Failed to read generated file {}: {}", objectPath, e.getMessage(), e);
@@ -370,7 +366,63 @@ public class OsmotrServiceImpl implements OsmotrService {
         throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), resultId.toString()));
     }
 
-    @Transactional(readOnly = true)
+    private void generateAndStoreFile(String caseNumber, OsmotrResult result, String fileType) {
+        Map<String, Boolean> decisionsMap = result.getSegments().stream()
+                .collect(Collectors.toMap(
+                        s -> s.getId().toString(),
+                        s -> Boolean.TRUE.equals(s.getEvidenceNeeded())));
+
+        try {
+            if ("resolution".equals(fileType)) {
+                OsmotrResolutionResponse response = webClientBuilder.build()
+                        .post()
+                        .uri(osmotrResolutionUrl(osmotrHost, osmotrPort))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(OsmotrSubmitDecisionsRequest.builder()
+                                .sessionId(result.getSessionId())
+                                .decisions(decisionsMap)
+                                .build())
+                        .retrieve()
+                        .bodyToMono(OsmotrResolutionResponse.class)
+                        .block();
+
+                if (response != null && response.getResolutionBase64() != null
+                        && !response.getResolutionBase64().isBlank()) {
+                    overwriteGeneratedFile(caseNumber, "resolution", "resolution.docx", response.getResolutionBase64());
+                }
+
+            } else if ("evidence".equals(fileType) || "return".equals(fileType)) {
+                OsmotrSubmitDecisionsResponse response = webClientBuilder.build()
+                        .post()
+                        .uri(osmotrDecisionUrl(osmotrHost, osmotrPort))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .bodyValue(OsmotrSubmitDecisionsRequest.builder()
+                                .sessionId(result.getSessionId())
+                                .decisions(decisionsMap)
+                                .build())
+                        .retrieve()
+                        .bodyToMono(OsmotrSubmitDecisionsResponse.class)
+                        .block();
+
+                if (response != null && response.getFiles() != null) {
+                    String evidenceB64 = response.getFiles().get("evidence_base64");
+                    if (evidenceB64 != null && !evidenceB64.isBlank()) {
+                        overwriteGeneratedFile(caseNumber, "evidence", "evidence.docx", evidenceB64);
+                    }
+                    String returnB64 = response.getFiles().get("return_base64");
+                    if (returnB64 != null && !returnB64.isBlank()) {
+                        overwriteGeneratedFile(caseNumber, "return", "return.docx", returnB64);
+                    }
+                }
+
+            } else {
+                log.warn("Unknown fileType '{}', no model request performed", fileType);
+            }
+        } catch (Exception e) {
+            log.error("Failed to generate '{}' file from model for case {}: {}", fileType, caseNumber, e.getMessage(), e);
+        }
+    }
+
     public List<OsmotrResultDto> searchSegments(String caseNumber, String query, String email) {
         Case caseEntity = caseRepository.findByNumber(caseNumber)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
@@ -379,25 +431,64 @@ public class OsmotrServiceImpl implements OsmotrService {
         userUtil.validateUserAccess(caseEntity, user);
         caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.READ);
 
-        if (query == null || query.isBlank()) {
-            return List.of();
+        OsmotrResult result = osmotrResultRepository.findFirstByCaseNumber(caseNumber)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.OSMOTR.localized(currentLang(), caseNumber)));
+
+        OsmotrResultDto dto = mapper.toDto(result);
+
+        if (query == null || query.isBlank() || result.getSessionId() == null) {
+            return List.of(dto);
         }
 
-        String q = query.trim().toLowerCase();
+        try {
+            OsmotrSearchResponse response = webClientBuilder.build()
+                    .post()
+                    .uri(osmotrSearchUrl(osmotrHost, osmotrPort))
+                    .contentType(MediaType.APPLICATION_JSON)
+                    .bodyValue(OsmotrSearchRequest.builder()
+                            .sessionId(result.getSessionId())
+                            .query(query)
+                            .build())
+                    .retrieve()
+                    .bodyToMono(OsmotrSearchResponse.class)
+                    .block();
 
-        return osmotrResultRepository.searchBySegmentText(caseNumber, q).stream()
-                .map(result -> {
-                    OsmotrResultDto dto = mapper.toDto(result);
-                    if (dto.getSegments() != null) {
-                        List<OsmotrResultSegmentDto> matched = dto.getSegments().stream()
-                                .filter(s -> s.getInspectionText() != null
-                                        && s.getInspectionText().toLowerCase().contains(q))
-                                .toList();
-                        dto.setSegments(matched);
-                    }
-                    return dto;
-                })
-                .toList();
+            if (response != null && response.getResults() != null) {
+                Map<Integer, OsmotrResultSegment> dbSegmentMap = result.getSegments().stream()
+                        .filter(s -> s.getStartPage() != null)
+                        .collect(Collectors.toMap(
+                                OsmotrResultSegment::getStartPage,
+                                s -> s,
+                                (s1, s2) -> s1
+                        ));
+
+                List<OsmotrResultSegmentDto> segments = response.getResults().stream()
+                        .map(item -> {
+                            OsmotrResultSegmentDto.OsmotrResultSegmentDtoBuilder builder = OsmotrResultSegmentDto.builder()
+                                    .title(item.getTitle())
+                                    .startPage(item.getStartPage())
+                                    .endPage(item.getEndPage())
+                                    .inspectionText(item.getSnippet());
+
+                            OsmotrResultSegment dbSegment = dbSegmentMap.get(item.getStartPage());
+                            if (dbSegment != null) {
+                                builder.id(dbSegment.getId())
+                                        .evidenceNeeded(dbSegment.getEvidenceNeeded())
+                                        .returnNeeded(dbSegment.getReturnNeeded())
+                                        .fileUrl(dbSegment.getFileUrl());
+                            }
+
+                            return builder.build();
+                        })
+                        .toList();
+
+                dto.setSegments(segments);
+            }
+        } catch (Exception e) {
+            log.error("Failed to search in AI for caseNumber={}: {}", caseNumber, e.getMessage(), e);
+        }
+
+        return List.of(dto);
     }
 
     private void overwriteGeneratedFile(String caseNumber, String type, String fileName, String base64) {
@@ -413,5 +504,7 @@ public class OsmotrServiceImpl implements OsmotrService {
     private UserSettingsLanguage currentLang(){
         return getCurrentLang();
     }
-
+    private String buildObjectPath(String caseNumber, String fileType) {
+        return String.format("%s/osmotr/%s/%s.docx.enc", caseNumber, fileType, fileType);
+    }
 }

@@ -7,30 +7,19 @@ import lombok.Builder;
 import lombok.Getter;
 import lombok.NoArgsConstructor;
 
-import java.util.Map;
+import java.util.List;
 
 @Getter
 @Builder
 @NoArgsConstructor
 @AllArgsConstructor
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class OsmotrSubmitDecisionsResponse {
+public class OsmotrSearchResponse {
     private String status;
-
     @JsonProperty("session_id")
     private String sessionId;
-
-    private String message;
-
-    @JsonProperty("evidence_download_url")
-    private String evidenceDownloadUrl;
-
-    @JsonProperty("return_download_url")
-    private String returnDownloadUrl;
-
-    private Map<String, String> downloads;
-
-    private Map<String, String> previews;
-
-    private Map<String, String> files;
+    private String query;
+    @JsonProperty("total_matches")
+    private Integer totalMatches;
+    private List<OsmotrSearchResultItem> results;
 }
