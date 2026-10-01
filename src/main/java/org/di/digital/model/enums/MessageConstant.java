@@ -9,6 +9,10 @@ import org.di.digital.model.enums.settings.UserSettingsLanguage;
 @RequiredArgsConstructor
 public enum MessageConstant implements LocalizedMessage {
 
+    NO_ARTICLE(
+            "Не удалось определить статью УК РК для квалификации в деле: %s",
+            "Іс бойынша саралау үшін ҚР ҚК бабы анықталмады: %s"
+    ),
     NEW_USER_APPEAL(
             "Новый пользователь хочет зарегистрироваться в вашем регионе: %s %s",
             "Жаңа пайдаланушы сіздің өңіріңізде тіркелгісі келеді: %s %s"
@@ -228,7 +232,7 @@ public enum MessageConstant implements LocalizedMessage {
     ),
     EMAIL_NOT_SENT(
             "Не удалось отправить письмо",
-            ""
+            "Хатты жіберу мүмкін болмады"
     ),
     WORKSPACE_RENAME_FAILED(
             "Не удалось переименовать дело %s -> %s",

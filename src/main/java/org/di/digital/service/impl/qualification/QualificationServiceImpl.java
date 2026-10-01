@@ -80,6 +80,9 @@ public class QualificationServiceImpl implements QualificationService {
     @Value("${qualification.port}")
     private String pythonPort;
 
+    @Value("${tree.port}")
+    private String treePort;
+
     // ---------- public API ----------
 
     @Override
@@ -157,6 +160,34 @@ public class QualificationServiceImpl implements QualificationService {
         }
 
         try {
+            String article = fetchArticleFromCaseInfo(caseNumber);
+            if (article == null || article.isBlank()) {
+                String message = MessageConstant.NO_ARTICLE.format(currentLang(), caseNumber);
+                log.warn(message);
+                emitter.completeWithError(new IllegalStateException(message));
+                return;
+            }
+
+            String checkJson = webClientBuilder.build()
+                    .post()
+                    .uri(qualificationCheckUrl(pythonHost, pythonPort, caseNumber, entity.getLanguage(), article))
+                    .retrieve()
+                    .bodyToMono(String.class)
+                    .block();
+
+            Map<String, Object> corpusDelicti = qualificationWriter.saveCorpusDelicti(caseNumber, checkJson);
+            emitter.send(SseEmitter.event()
+                    .name("corpus_delicti")
+                    .data(mapper.writeValueAsString(corpusDelicti)));
+
+            if ("locked".equals(corpusDelicti.get("status"))) {
+                log.info("Qualification locked for case {}: {}", caseNumber, corpusDelicti.get("message"));
+                logService.log(String.format("Qualification locked by corpus delicti check in case %s", caseNumber),
+                        LogLevel.INFO, LogAction.QUALIFICATION, caseNumber, email);
+                emitter.complete();
+                return;
+            }
+
             String responseJson = webClientBuilder.build()
                     .post()
                     .uri(qualificationUrl(pythonHost, pythonPort, user.getId(), caseNumber, entity.getLanguage()))
@@ -545,6 +576,22 @@ public class QualificationServiceImpl implements QualificationService {
                 .orElseGet(() -> CaseQualification.builder()
                         .caseEntity(entity)
                         .build());
+    }
+    private String fetchArticleFromCaseInfo(String caseNumber) {
+        try {
+            Map<?, ?> body = webClientBuilder.build()
+                    .post()
+                    .uri(caseInfoUrl(pythonHost, treePort, caseNumber))
+                    .retrieve()
+                    .bodyToMono(Map.class)
+                    .block();
+
+            Object article = body == null ? null : body.get("article");
+            return article == null ? null : article.toString().strip();
+        } catch (Exception e) {
+            log.warn("Could not fetch case info for {}: {}", caseNumber, e.getMessage());
+            return null;
+        }
     }
 
     private UserSettingsLanguage currentLang(){
