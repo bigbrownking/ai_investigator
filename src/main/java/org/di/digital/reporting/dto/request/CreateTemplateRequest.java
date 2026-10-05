@@ -1,17 +1,20 @@
 package org.di.digital.reporting.dto.request;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import jakarta.validation.constraints.Pattern;
-import lombok.*;
-import org.di.digital.reporting.dto.ColumnDefinitionDto;
-
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Creates a new report form (version 1, DRAFT). Also the format of entries in template-seed.json.
- */
+import org.di.digital.reporting.dto.ColumnDefinitionDto;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Pattern;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
+
+
 @Getter
 @Setter
 @Builder

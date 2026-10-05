@@ -11,19 +11,17 @@ import java.time.ZoneId;
 
 /**
  * Defines "today" for reporting: the report date operators may edit and the default date of
- * consolidated tables. Kazakhstan time (Asia/Almaty, UTC+5) unless reporting.time-zone says otherwise,
- * because servers and containers usually run in UTC.
+ * consolidated tables. The zone comes from reporting.time-zone (Kazakhstan time), because servers
+ * and containers usually run in UTC.
  */
 @Component
 public class ReportingClock {
 
-    static final String DEFAULT_ZONE = "Asia/Almaty";
-
     private final Clock clock;
 
     @Autowired
-    public ReportingClock(@Value("${reporting.time-zone:" + DEFAULT_ZONE + "}") String timeZone) {
-        this(Clock.system(ZoneId.of(timeZone == null || timeZone.isBlank() ? DEFAULT_ZONE : timeZone.trim())));
+    public ReportingClock(@Value("${reporting.time-zone}") String timeZone) {
+        this(Clock.system(ZoneId.of(timeZone.trim())));
     }
 
     /** For tests: a fixed or offset clock. */

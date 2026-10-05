@@ -16,13 +16,13 @@ import java.time.LocalDate;
 import java.util.List;
 
 /**
- * Regional operators are regional admins (REG_ADMIN); the region comes from the current user
- * via ReportingUserContext, never from the request.
+ * Regional reports are filled in by zonal users (ZONAL, one per region); the region comes from
+ * the current user, never from the request.
  */
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/api/v1/reporting/operator/templates")
-@PreAuthorize("hasAuthority('REG_ADMIN')")
+@PreAuthorize("hasAuthority('ZONAL')")
 public class OperatorReportController {
 
     private final TemplateService templateService;

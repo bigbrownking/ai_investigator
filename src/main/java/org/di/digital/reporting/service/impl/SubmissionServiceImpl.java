@@ -6,26 +6,24 @@ import org.di.digital.exception.NotFoundException;
 import org.di.digital.reporting.config.ReportingClock;
 import org.di.digital.reporting.dto.request.ReportRowRequest;
 import org.di.digital.reporting.dto.response.OperatorFormResponse;
-import org.di.digital.reporting.integration.ReportingUserContext;
-import org.di.digital.reporting.mapper.TemplateMapper;
-import org.di.digital.reporting.model.ColumnDefinition;
+import org.di.digital.reporting.mapper.SubmissionMapper;
 import org.di.digital.reporting.model.RegionalSubmission;
 import org.di.digital.reporting.model.ReportTemplate;
-import org.di.digital.reporting.model.enums.ReportRowStatus;
 import org.di.digital.reporting.model.enums.SubmissionStatus;
 import org.di.digital.reporting.model.enums.TemplateStatus;
 import org.di.digital.reporting.repository.RegionalSubmissionRepository;
 import org.di.digital.reporting.repository.ReportTemplateRepository;
 import org.di.digital.reporting.service.SubmissionService;
 import org.di.digital.reporting.validation.SubmissionCellsValidator;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
-import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.Optional;
 
 /**
  * A concurrent first save for the same region and date hits the unique constraint,
@@ -40,19 +38,17 @@ public class SubmissionServiceImpl implements SubmissionService {
     private final RegionalSubmissionRepository submissionRepository;
     private final ReportTemplateRepository templateRepository;
     private final SubmissionCellsValidator cellsValidator;
-    private final TemplateMapper templateMapper;
-    private final ReportingUserContext userContext;
+    private final SubmissionMapper submissionMapper;
+    private final UserUtil userUtil;
     private final ReportingClock clock;
 
     @Override
     public OperatorFormResponse getForm(String templateCode, LocalDate requestedDate) {
         LocalDate reportDate = requestedDate != null ? requestedDate : clock.today();
         ReportTemplate template = findActiveTemplate(templateCode);
-        Long regionId = userContext.currentRegionId();
-        RegionalSubmission submission = submissionRepository
-                .findByTemplateCodeAndRegionIdAndReportDate(templateCode, regionId, reportDate)
-                .orElse(null);
-        return toResponse(template, regionId, reportDate, submission);
+        Long regionId = userUtil.getCurrentUserRegionId();
+        RegionalSubmission submission = findRow(templateCode, regionId, reportDate).orElse(null);
+        return submissionMapper.toOperatorForm(template, regionId, reportDate, submission, isEditable(reportDate));
     }
 
     @Override
@@ -63,9 +59,9 @@ public class SubmissionServiceImpl implements SubmissionService {
         ReportTemplate template = findActiveTemplate(templateCode);
         Map<String, Object> cells = cellsValidator.validateDraft(template, request.getCells());
 
-        Long regionId = userContext.currentRegionId();
+        Long regionId = userUtil.getCurrentUserRegionId();
         LocalDateTime now = clock.now();
-        RegionalSubmission submission = findOrCreate(templateCode, regionId, reportDate, now);
+        RegionalSubmission submission = findOrCreate(template, regionId, reportDate, now);
         checkLockVersion(submission, request.getLockVersion());
         if (submission.getStatus() == SubmissionStatus.SUBMITTED) {
             // A draft would replace validated data with unvalidated data the admin already sees
@@ -73,13 +69,14 @@ public class SubmissionServiceImpl implements SubmissionService {
                     + " is already submitted; send the corrected row with submit instead of saving a draft");
         }
 
+        submission.setTemplate(template);
         submission.setCells(cells);
-        submission.setTemplateVersion(template.getVersion());
-        submission.setOperatorId(userContext.currentOperatorId());
+        submission.setOperatorId(currentUserId());
         submission.setUpdatedAt(now);
 
         // Flush so the response carries the incremented lockVersion
-        return toResponse(template, regionId, reportDate, submissionRepository.saveAndFlush(submission));
+        RegionalSubmission saved = submissionRepository.saveAndFlush(submission);
+        return submissionMapper.toOperatorForm(template, regionId, reportDate, saved, true);
     }
 
     @Override
@@ -90,24 +87,24 @@ public class SubmissionServiceImpl implements SubmissionService {
         ReportTemplate template = findActiveTemplate(templateCode);
         Map<String, Object> cells = cellsValidator.validateSubmit(template, request.getCells());
 
-        Long regionId = userContext.currentRegionId();
-        Long operatorId = userContext.currentOperatorId();
+        Long regionId = userUtil.getCurrentUserRegionId();
+        Long operatorId = currentUserId();
         LocalDateTime now = clock.now();
-        RegionalSubmission submission = findOrCreate(templateCode, regionId, reportDate, now);
+        RegionalSubmission submission = findOrCreate(template, regionId, reportDate, now);
         checkLockVersion(submission, request.getLockVersion());
 
+        submission.setTemplate(template);
         submission.setStatus(SubmissionStatus.SUBMITTED);
         submission.setCells(cells);
-        submission.setTemplateVersion(template.getVersion());
         submission.setOperatorId(operatorId);
         submission.setSubmittedAt(now);
         submission.setSubmitCount(submission.getSubmitCount() == null ? 1 : submission.getSubmitCount() + 1);
         submission.setUpdatedAt(now);
 
         RegionalSubmission saved = submissionRepository.saveAndFlush(submission);
-        log.info("Report {} for region {} on {} submitted by operator {} (submission #{}, template v{})",
+        log.info("Report {} for region {} on {} submitted by user {} (submission #{}, template v{})",
                 templateCode, regionId, reportDate, operatorId, saved.getSubmitCount(), template.getVersion());
-        return toResponse(template, regionId, reportDate, saved);
+        return submissionMapper.toOperatorForm(template, regionId, reportDate, saved, true);
     }
 
     private void assertEditable(LocalDate reportDate) {
@@ -128,10 +125,16 @@ public class SubmissionServiceImpl implements SubmissionService {
                 .orElseThrow(() -> new NotFoundException("Report form " + templateCode + " has no active version"));
     }
 
-    private RegionalSubmission findOrCreate(String templateCode, Long regionId, LocalDate reportDate, LocalDateTime now) {
-        return submissionRepository.findByTemplateCodeAndRegionIdAndReportDate(templateCode, regionId, reportDate)
+    private Optional<RegionalSubmission> findRow(String templateCode, Long regionId, LocalDate reportDate) {
+        return submissionRepository.findFirstByTemplate_CodeAndRegionIdAndReportDateOrderByIdDesc(
+                templateCode, regionId, reportDate);
+    }
+
+    private RegionalSubmission findOrCreate(ReportTemplate template, Long regionId, LocalDate reportDate,
+                                            LocalDateTime now) {
+        return findRow(template.getCode(), regionId, reportDate)
                 .orElseGet(() -> RegionalSubmission.builder()
-                        .templateCode(templateCode)
+                        .template(template)
                         .regionId(regionId)
                         .reportDate(reportDate)
                         .status(SubmissionStatus.DRAFT)
@@ -146,47 +149,7 @@ public class SubmissionServiceImpl implements SubmissionService {
         }
     }
 
-    private OperatorFormResponse toResponse(ReportTemplate template, Long regionId, LocalDate reportDate,
-                                            RegionalSubmission submission) {
-        boolean editable = isEditable(reportDate);
-        OperatorFormResponse.OperatorFormResponseBuilder response = OperatorFormResponse.builder()
-                .templateCode(template.getCode())
-                .templateName(template.getName())
-                .templateDescription(template.getDescription())
-                .templateVersion(template.getVersion())
-                .columns(templateMapper.toColumnDtos(template.getColumns()))
-                .regionId(regionId)
-                .reportDate(reportDate)
-                .editable(editable);
-        if (submission == null) {
-            return response.status(ReportRowStatus.NOT_SUBMITTED)
-                    .cells(new LinkedHashMap<>())
-                    .draftAllowed(editable)
-                    .build();
-        }
-        boolean submitted = submission.getStatus() == SubmissionStatus.SUBMITTED;
-        return response
-                .status(submitted ? ReportRowStatus.SUBMITTED : ReportRowStatus.DRAFT)
-                .cells(currentColumnsOnly(template, submission.getCells()))
-                .submittedAt(submission.getSubmittedAt())
-                .updatedAt(submission.getUpdatedAt())
-                .draftAllowed(editable && !submitted)
-                .lockVersion(submission.getLockVersion())
-                .build();
-    }
-
-    // A row saved against an older template version may hold keys the current columns no longer have;
-    // sending them back would fail with "unknown column", so the form only shows current columns
-    private Map<String, Object> currentColumnsOnly(ReportTemplate template, Map<String, Object> cells) {
-        Map<String, Object> result = new LinkedHashMap<>();
-        if (cells == null) {
-            return result;
-        }
-        for (ColumnDefinition column : template.getColumns()) {
-            if (cells.containsKey(column.getKey())) {
-                result.put(column.getKey(), cells.get(column.getKey()));
-            }
-        }
-        return result;
+    private static Long currentUserId() {
+        return UserUtil.getCurrentUser().getId();
     }
 }

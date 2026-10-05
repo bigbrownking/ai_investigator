@@ -11,10 +11,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Structure of one consolidated table: its columns only. Rows are regions, one per region,
- * in the fixed order given by RegionDirectory.
+ * Structure of one consolidated table: its columns only. Rows are regions, one per region, ordered by region id.
  * {@code code} identifies the form, {@code version} grows on every change: an ACTIVE template is never
- * edited in place. "One ACTIVE / one DRAFT per code" is enforced by partial indexes, see ReportingSchemaInitializer.
+ * edited in place. TemplateService keeps at most one ACTIVE and one DRAFT version per code.
  */
 @Getter
 @Setter

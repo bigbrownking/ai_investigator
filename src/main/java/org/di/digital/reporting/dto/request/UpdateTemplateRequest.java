@@ -1,12 +1,17 @@
 package org.di.digital.reporting.dto.request;
 
-import jakarta.validation.Valid;
-import jakarta.validation.constraints.NotBlank;
-import lombok.*;
-import org.di.digital.reporting.dto.ColumnDefinitionDto;
-
 import java.util.ArrayList;
 import java.util.List;
+
+import org.di.digital.reporting.dto.ColumnDefinitionDto;
+
+import jakarta.validation.Valid;
+import jakarta.validation.constraints.NotBlank;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * Full replacement of a DRAFT version's content.

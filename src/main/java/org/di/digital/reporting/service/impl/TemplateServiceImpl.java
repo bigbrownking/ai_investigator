@@ -9,13 +9,13 @@ import org.di.digital.reporting.dto.request.UpdateTemplateRequest;
 import org.di.digital.reporting.dto.response.ActiveFormResponse;
 import org.di.digital.reporting.dto.response.TemplateResponse;
 import org.di.digital.reporting.dto.response.TemplateSummaryResponse;
-import org.di.digital.reporting.integration.ReportingUserContext;
 import org.di.digital.reporting.mapper.TemplateMapper;
 import org.di.digital.reporting.model.ReportTemplate;
 import org.di.digital.reporting.model.enums.TemplateStatus;
 import org.di.digital.reporting.repository.ReportTemplateRepository;
 import org.di.digital.reporting.service.TemplateService;
 import org.di.digital.reporting.validation.TemplateDefinitionValidator;
+import org.di.digital.util.requests.UserUtil;
 import org.springframework.data.domain.Sort;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -30,7 +30,7 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 /**
- * Concurrency is guarded by unique constraints / partial indexes and @Version; conflicts surface as 409.
+ * Concurrency is guarded by the (code, version) unique constraint and @Version; conflicts surface as 409.
  */
 @Slf4j
 @Service
@@ -41,7 +41,6 @@ public class TemplateServiceImpl implements TemplateService {
     private final ReportTemplateRepository templateRepository;
     private final TemplateDefinitionValidator templateValidator;
     private final TemplateMapper templateMapper;
-    private final ReportingUserContext userContext;
     private final ReportingClock clock;
 
     @Override
@@ -100,7 +99,7 @@ public class TemplateServiceImpl implements TemplateService {
                 .description(request.getDescription())
                 .status(TemplateStatus.DRAFT)
                 .columns(templateMapper.toColumns(request.getColumns()))
-                .createdBy(userContext.currentOperatorId())
+                .createdBy(UserUtil.getCurrentUser().getId())
                 .createdAt(now)
                 .updatedAt(now)
                 .build();
@@ -129,7 +128,7 @@ public class TemplateServiceImpl implements TemplateService {
                 .description(latest.getDescription())
                 .status(TemplateStatus.DRAFT)
                 .columns(templateMapper.copyColumns(latest.getColumns()))
-                .createdBy(userContext.currentOperatorId())
+                .createdBy(UserUtil.getCurrentUser().getId())
                 .createdAt(now)
                 .updatedAt(now)
                 .build();

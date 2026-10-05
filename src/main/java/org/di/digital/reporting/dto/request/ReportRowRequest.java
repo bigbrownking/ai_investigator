@@ -1,11 +1,15 @@
 package org.di.digital.reporting.dto.request;
 
-import jakarta.validation.constraints.NotNull;
-import lombok.*;
-
 import java.time.LocalDate;
 import java.util.HashMap;
 import java.util.Map;
+
+import jakarta.validation.constraints.NotNull;
+import lombok.AllArgsConstructor;
+import lombok.Builder;
+import lombok.Getter;
+import lombok.NoArgsConstructor;
+import lombok.Setter;
 
 /**
  * The operator's single row for a date: used by both draft and submit.

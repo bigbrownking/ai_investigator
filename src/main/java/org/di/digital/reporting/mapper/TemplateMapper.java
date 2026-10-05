@@ -47,7 +47,7 @@ public class TemplateMapper {
 
     public List<ColumnDefinitionDto> toColumnDtos(List<ColumnDefinition> columns) {
         return columns.stream()
-                .map(column -> ColumnDefinitionDto.builder()
+                .<ColumnDefinitionDto>map(column -> ColumnDefinitionDto.builder()
                         .key(column.getKey())
                         .label(column.getLabel())
                         .type(column.getType())
