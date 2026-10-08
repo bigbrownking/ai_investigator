@@ -17,7 +17,7 @@ public class ReviewReminderScheduler {
     private final NotificationService notificationService;
     private final UserRepository userRepository;
 
-    @Scheduled(cron = "${scheduler.review.reminder}", zone = "Asia/Almaty")
+    @Scheduled(cron = "${scheduler.review.reminder}", zone = "${reporting.time-zone}")
     public void sendWeeklyReviewReminder() {
         log.info("Запуск еженедельного напоминания о рецензии");
         List<String> emails = userRepository.findAllActiveNonAdminEmails();

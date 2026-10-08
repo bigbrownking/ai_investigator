@@ -114,6 +114,8 @@ public class AdminServiceImpl implements AdminService {
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
     private final CaseReportRepository caseReportRepository;
     private final MinioService minioService;
+    private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
+
 
     @Override
     public PagedUserResponse getAllUsers(int page, int size, UserSearchRequest req) {
@@ -492,7 +494,7 @@ public class AdminServiceImpl implements AdminService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        Role role = roleRepository.findByName("ADVANCED_USER")
+        Role role = roleRepository.findByName(ADVANCED_ROLE_NAME)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
 
         user.getRoles().add(role);

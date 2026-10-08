@@ -116,4 +116,5 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     @Query(value = "SELECT EXISTS(SELECT 1 FROM region_admins WHERE user_id = :userId) " +
             "OR EXISTS(SELECT 1 FROM regions WHERE admin_id = :userId)", nativeQuery = true)
     boolean isRegionAdmin(@Param("userId") Long userId);
+    List<User> findByRegionIdAndRoles_Name(Long regionId, String roleName);
 }

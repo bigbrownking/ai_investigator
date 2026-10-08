@@ -1,7 +1,6 @@
 package org.di.digital.reporting.validation;
 
 import org.di.digital.reporting.model.ColumnDefinition;
-import org.di.digital.reporting.model.ReportTemplate;
 import org.di.digital.reporting.model.SelectOption;
 import org.springframework.stereotype.Component;
 
@@ -15,30 +14,20 @@ import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 
-/**
- * Validates the operator's flat row (columnKey -> value) against the template columns.
- * <ul>
- *   <li>Draft: only the shape is checked (known columns, scalar values, text length); values are kept as entered.</li>
- *   <li>Submit: every value is checked and normalized by column type, required columns must be filled.</li>
- * </ul>
- * Errors are collected per column and reported together.
- */
 @Component
 public class SubmissionCellsValidator {
 
     private static final int MAX_TEXT_LENGTH = 2000;
-    // Keeps values well inside what jsonb numeric and BigDecimal consumers handle
     private static final int MAX_INTEGER_DIGITS = 18;
     private static final int MAX_FRACTION_DIGITS = 6;
 
-    /** @return cells in template column order, blank values dropped */
-    public Map<String, Object> validateDraft(ReportTemplate template, Map<String, Object> cells) {
+    public Map<String, Object> validateDraft(List<ColumnDefinition> columns, Map<String, Object> cells) {
         Errors errors = new Errors();
         Map<String, Object> input = cells == null ? Map.of() : cells;
-        rejectUnknownColumns(template, input, errors);
+        rejectUnknownColumns(columns, input, errors);
 
         Map<String, Object> result = new LinkedHashMap<>();
-        for (ColumnDefinition column : template.getColumns()) {
+        for (ColumnDefinition column : columns) {
             Object value = input.get(column.getKey());
             if (isBlank(value)) {
                 continue;
@@ -55,17 +44,13 @@ public class SubmissionCellsValidator {
         return result;
     }
 
-    /**
-     * @return normalized cells in template column order: NUMBER -> BigDecimal, STRING -> String,
-     *         DATE -> ISO yyyy-MM-dd String, SELECT -> option value
-     */
-    public Map<String, Object> validateSubmit(ReportTemplate template, Map<String, Object> cells) {
+    public Map<String, Object> validateSubmit(List<ColumnDefinition> columns, Map<String, Object> cells) {
         Errors errors = new Errors();
         Map<String, Object> input = cells == null ? Map.of() : cells;
-        rejectUnknownColumns(template, input, errors);
+        rejectUnknownColumns(columns, input, errors);
 
         Map<String, Object> result = new LinkedHashMap<>();
-        for (ColumnDefinition column : template.getColumns()) {
+        for (ColumnDefinition column : columns) {
             Object value = input.get(column.getKey());
             if (isBlank(value)) {
                 if (column.isRequired()) {
@@ -143,8 +128,8 @@ public class SubmissionCellsValidator {
         }
     }
 
-    private void rejectUnknownColumns(ReportTemplate template, Map<String, Object> input, Errors errors) {
-        Set<String> known = template.getColumns().stream()
+    private void rejectUnknownColumns(List<ColumnDefinition> columns, Map<String, Object> input, Errors errors) {
+        Set<String> known = columns.stream()
                 .map(ColumnDefinition::getKey)
                 .collect(Collectors.toSet());
         input.keySet().stream()
@@ -160,7 +145,6 @@ public class SubmissionCellsValidator {
         return value instanceof String || value instanceof Number || value instanceof Boolean;
     }
 
-    /** Collects messages both as a flat list ("key: message") and grouped by column key. */
     private static final class Errors {
         private final List<String> flat = new ArrayList<>();
         private final Map<String, List<String>> byColumn = new LinkedHashMap<>();

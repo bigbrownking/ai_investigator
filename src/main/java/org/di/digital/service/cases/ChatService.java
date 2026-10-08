@@ -14,4 +14,14 @@ public interface ChatService {
     CaseChatHistoryResponse getChatHistory(Long caseId, Long userId, int page, int size);
 
     void clearChatHistoryByCaseNumber(String caseNumber, String userEmail);
+
+    void streamRegAdminCaseChat(Long caseId, ChatRequest request, Long adminId, SseEmitter emitter);
+    CaseChatHistoryResponse getRegAdminChatHistory(Long caseId, Long adminId, int page, int size);
+    void clearRegAdminChatHistory(Long caseId, Long adminId);
+
+    void streamAdminCaseChat(Long caseId, ChatRequest request, Long adminId, SseEmitter emitter);
+
+    CaseChatHistoryResponse getAdminChatHistory(Long caseId, Long adminId, int page, int size);
+
+    void clearAdminChatHistory(Long caseId, Long adminId);
 }

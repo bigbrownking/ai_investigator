@@ -1,8 +1,10 @@
 package org.di.digital.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChangeOwnerRequest;
+import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
@@ -13,6 +15,7 @@ import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.cases.CaseUserResponse;
 import org.di.digital.dto.response.cases.RejectionReasonResponse;
+import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
@@ -20,6 +23,8 @@ import org.di.digital.model.enums.cases.CaseRejectionReason;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.admin.RegAdminService;
 import org.di.digital.service.cases.CaseService;
+import org.di.digital.service.cases.ChatService;
+import org.di.digital.service.impl.core.sse.SseHeartbeatUtil;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
@@ -28,10 +33,12 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.TimeUnit;
 
 import static java.net.URLEncoder.encode;
 import static org.di.digital.util.requests.UserUtil.getCurrentUser;
@@ -44,6 +51,8 @@ public class RegAdminController {
 
     private final RegAdminService regAdminService;
     private final CaseService caseService;
+    private final ChatService chatService;
+    private final SseHeartbeatUtil heartbeatUtil;
 
     @GetMapping("/appeals")
     public ResponseEntity<Page<AppealDto>> getAppeals(
@@ -206,6 +215,15 @@ public class RegAdminController {
         return ResponseEntity.ok(regAdminService.searchUsers(userDetails.getId(), query));
     }
 
+    @PutMapping("/users/assign-zonal")
+    public ResponseEntity<Void> assignZonal(
+            @RequestParam String email,
+            Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        regAdminService.assignZonalUserRole(userDetails.getId(), email);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/cases/{caseId}/indictment")
     public ResponseEntity<String> getIndictment(@PathVariable Long caseId,Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
@@ -252,5 +270,36 @@ public class RegAdminController {
         return ResponseEntity.ok(
                 regAdminService.getRejectionReasonResponseHistory(caseId, adminId, authentication.getName())
         );
+    }
+
+
+    @PostMapping(value = "/cases/{caseId}/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamCaseChat(
+            @PathVariable Long caseId,
+            @Valid @RequestBody ChatRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        log.info("Reg-admin {} starting chat stream for case {}", userDetails.getId(), caseId);
+
+        SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(10));
+        heartbeatUtil.startHeartbeat(emitter, "reg-admin-case-" + caseId);
+        chatService.streamRegAdminCaseChat(caseId, request, userDetails.getId(), emitter);
+        return emitter;
+    }
+
+    @GetMapping("/cases/{caseId}/chat/history")
+    public ResponseEntity<CaseChatHistoryResponse> getCaseChatHistory(
+            @PathVariable Long caseId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        return ResponseEntity.ok(chatService.getRegAdminChatHistory(caseId, userDetails.getId(), page, size));
+    }
+
+    @DeleteMapping("/cases/{caseId}/chat/history")
+    public ResponseEntity<Void> clearCaseChatHistory(
+            @PathVariable Long caseId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        chatService.clearRegAdminChatHistory(caseId, userDetails.getId());
+        return ResponseEntity.noContent().build();
     }
 }

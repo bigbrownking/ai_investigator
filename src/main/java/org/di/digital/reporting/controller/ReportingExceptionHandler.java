@@ -16,11 +16,6 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 
 import java.util.List;
 
-/**
- * Reporting-only handlers, checked before GlobalExceptionHandler. Without them request and conflict
- * errors fall into its catch-all Exception handler and become 500, and validation errors lose their
- * per-cell details. Everything else (404, 403, ...) still goes to GlobalExceptionHandler.
- */
 @Slf4j
 @Order(Ordered.HIGHEST_PRECEDENCE)
 @RestControllerAdvice(basePackages = "org.di.digital.reporting")
@@ -48,7 +43,6 @@ public class ReportingExceptionHandler {
         return problem;
     }
 
-    /** Missing or malformed JSON body, e.g. cells sent as something other than a JSON object. */
     @ExceptionHandler(HttpMessageNotReadableException.class)
     public ProblemDetail handleUnreadableBody(HttpMessageNotReadableException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
@@ -57,7 +51,6 @@ public class ReportingExceptionHandler {
         return problem;
     }
 
-    /** Path or query parameter of the wrong type, e.g. a date not in yyyy-MM-dd or a non-numeric version. */
     @ExceptionHandler(MethodArgumentTypeMismatchException.class)
     public ProblemDetail handleTypeMismatch(MethodArgumentTypeMismatchException ex) {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(HttpStatus.BAD_REQUEST,
@@ -66,7 +59,6 @@ public class ReportingExceptionHandler {
         return problem;
     }
 
-    // DataIntegrityViolationException: a unique constraint lost a race (e.g. two first saves of the same report)
     @ExceptionHandler({OptimisticLockingFailureException.class, DataIntegrityViolationException.class})
     public ProblemDetail handleConflict(RuntimeException ex) {
         log.warn("Reporting conflict: {}", ex.getMessage());

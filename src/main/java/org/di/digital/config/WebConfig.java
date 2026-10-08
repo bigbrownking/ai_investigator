@@ -86,6 +86,7 @@ public class WebConfig {
 
                         .requestMatchers("/error/**").permitAll()
                         .requestMatchers("/dict/**").permitAll()
+                        .requestMatchers("/admin/zonal/**").hasAnyAuthority("ADMIN", "REG_ADMIN")
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
                         .requestMatchers("/reg-admin/**").hasAnyAuthority("REG_ADMIN", "ADVANCED_USER")
                         .anyRequest().authenticated()

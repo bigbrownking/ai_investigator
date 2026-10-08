@@ -1,7 +1,6 @@
 package org.di.digital.reporting.validation;
 
 import org.di.digital.reporting.model.ColumnDefinition;
-import org.di.digital.reporting.model.ReportTemplate;
 import org.di.digital.reporting.model.SelectOption;
 import org.di.digital.reporting.model.enums.ColumnType;
 import org.springframework.stereotype.Component;
@@ -12,47 +11,21 @@ import java.util.List;
 import java.util.Set;
 import java.util.regex.Pattern;
 
-/**
- * Checks template structure (columns only) before it is saved or published.
- */
 @Component
 public class TemplateDefinitionValidator {
 
-    // Column keys become JSON object keys in jsonb and are addressed in JSON paths: keep them identifier-like
     private static final Pattern KEY_PATTERN = Pattern.compile("^[a-zA-Z][a-zA-Z0-9_]{0,63}$");
 
-    /** Full check before publishing: at least one column. */
-    public void validateForPublish(ReportTemplate template) {
-        validate(template, true);
-    }
-
-    /** Drafts may have no columns yet, but what is filled in must be well-formed. */
-    public void validateDraft(ReportTemplate template) {
-        validate(template, false);
-    }
-
-    private void validate(ReportTemplate template, boolean requireContent) {
+    public void validateColumns(List<ColumnDefinition> columns) {
         List<String> errors = new ArrayList<>();
-
-        if (template.getCode() == null || !KEY_PATTERN.matcher(template.getCode()).matches()) {
-            errors.add("Invalid template code: " + template.getCode());
-        }
-        if (template.getName() == null || template.getName().isBlank()) {
-            errors.add("Template name is required");
-        }
-
-        List<ColumnDefinition> columns = template.getColumns();
         if (columns == null || columns.isEmpty()) {
-            if (requireContent) {
-                errors.add("Template must have at least one column");
-            }
+            errors.add("Template must have at least one column");
         } else {
             Set<String> columnKeys = new HashSet<>();
             for (ColumnDefinition column : columns) {
                 validateColumn(column, columnKeys, errors);
             }
         }
-
         if (!errors.isEmpty()) {
             throw new ReportingValidationException(errors);
         }

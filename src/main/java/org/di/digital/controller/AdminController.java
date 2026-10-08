@@ -1,8 +1,10 @@
 package org.di.digital.controller;
 
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChangeOwnerRequest;
+import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.request.search.*;
 import org.di.digital.dto.request.user.UpdateProfileRequest;
 import org.di.digital.dto.request.auth.SignUpRequest;
@@ -12,6 +14,7 @@ import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.cases.CaseUserResponse;
 import org.di.digital.dto.response.cases.RejectionReasonResponse;
+import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
@@ -23,7 +26,9 @@ import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.admin.AdminService;
 import org.di.digital.service.auth.AuthService;
 import org.di.digital.service.cases.CaseService;
+import org.di.digital.service.cases.ChatService;
 import org.di.digital.service.impl.core.DevService;
+import org.di.digital.service.impl.core.sse.SseHeartbeatUtil;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -31,12 +36,16 @@ import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.security.core.Authentication;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+
 import static java.net.URLEncoder.encode;
 
 import java.nio.charset.StandardCharsets;
 import java.time.LocalDate; 
 import java.util.List;
+import java.util.concurrent.TimeUnit;
 
 @Slf4j
 @RestController
@@ -48,6 +57,8 @@ public class AdminController {
     private final AuthService authService;
     private final DevService devService;
     private final CaseService caseService;
+    private final ChatService chatService;
+    private final SseHeartbeatUtil heartbeatUtil;
 
     @PostMapping("/reg_admin")
     public ResponseEntity<String> regAdmin(@RequestBody SignUpRequest signUpRequest) {
@@ -296,13 +307,39 @@ public class AdminController {
 
     @GetMapping("/cases/{caseId}/status/history")
     public ResponseEntity<List<RejectionReasonResponse>> getRejectionReasonResponseHistory(
-                @PathVariable Long caseId,
-                Authentication authentication
-    ){
+                @PathVariable Long caseId){
         return ResponseEntity.ok(
                 adminService.getRejectionReasonResponseHistory(caseId)
         );
     }
 
-    
+    @PostMapping(value = "/cases/{caseId}/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
+    public SseEmitter streamCaseChat(
+            @PathVariable Long caseId,
+            @Valid @RequestBody ChatRequest request,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        log.info("Admin {} starting chat stream for case {}", userDetails.getId(), caseId);
+
+        SseEmitter emitter = new SseEmitter(TimeUnit.MINUTES.toMillis(10));
+        heartbeatUtil.startHeartbeat(emitter, "admin-case-" + caseId);
+        chatService.streamAdminCaseChat(caseId, request, userDetails.getId(), emitter);
+        return emitter;
+    }
+
+    @GetMapping("/cases/{caseId}/chat/history")
+    public ResponseEntity<CaseChatHistoryResponse> getCaseChatHistory(
+            @PathVariable Long caseId,
+            @RequestParam(defaultValue = "0") int page,
+            @RequestParam(defaultValue = "50") int size,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        return ResponseEntity.ok(chatService.getAdminChatHistory(caseId, userDetails.getId(), page, size));
+    }
+
+    @DeleteMapping("/cases/{caseId}/chat/history")
+    public ResponseEntity<Void> clearCaseChatHistory(
+            @PathVariable Long caseId,
+            @AuthenticationPrincipal UserDetailsImpl userDetails) {
+        chatService.clearAdminChatHistory(caseId, userDetails.getId());
+        return ResponseEntity.noContent().build();
+    }
 }

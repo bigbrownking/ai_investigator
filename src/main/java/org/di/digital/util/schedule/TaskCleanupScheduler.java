@@ -21,7 +21,7 @@ public class TaskCleanupScheduler {
 
     private final TaskQueueRepository taskQueueRepository;
 
-    @Scheduled(cron = "${scheduler.task.cleanup}", zone = "Asia/Almaty")
+    @Scheduled(cron = "${scheduler.task.cleanup}", zone = "${reporting.time-zone}")
     public void cleanupOldTasks() {
         LocalDateTime cutoffDate = LocalDateTime.now().minusDays(cleanup);
         taskQueueRepository.deleteByStatusAndCompletedAtBefore(

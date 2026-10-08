@@ -9,11 +9,6 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.ZoneId;
 
-/**
- * Defines "today" for reporting: the report date operators may edit and the default date of
- * consolidated tables. The zone comes from reporting.time-zone (Kazakhstan time), because servers
- * and containers usually run in UTC.
- */
 @Component
 public class ReportingClock {
 
@@ -24,7 +19,6 @@ public class ReportingClock {
         this(Clock.system(ZoneId.of(timeZone.trim())));
     }
 
-    /** For tests: a fixed or offset clock. */
     public ReportingClock(Clock clock) {
         this.clock = clock;
     }

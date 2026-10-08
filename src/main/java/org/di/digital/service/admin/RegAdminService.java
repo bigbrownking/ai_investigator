@@ -1,5 +1,6 @@
 package org.di.digital.service.admin;
 
+import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
@@ -10,11 +11,13 @@ import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.cases.CaseUserResponse;
 import org.di.digital.dto.response.cases.RejectionReasonResponse;
+import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
@@ -46,7 +49,7 @@ public interface RegAdminService {
 
     void changeOwner(Long adminId, Long caseId, Long id);
     List<UserSuggestionResponse> searchUsers(Long adminId, String query);
-
+    void assignZonalUserRole(Long adminId, String email);
     void addParticipant(Long adminId, Long caseId, Long userId);
 
     void removeParticipant(Long adminId, Long caseId, Long userId);

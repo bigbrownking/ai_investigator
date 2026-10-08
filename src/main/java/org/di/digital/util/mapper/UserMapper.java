@@ -19,6 +19,7 @@ public class UserMapper {
 
     private final LocalizationHelper localizationHelper;
     private final RegionRepository regionRepository;
+    public static final long AFM_REGION_ID = 1L;
 
     @Value("${last.seen.ttl}")
     private int ttl;
@@ -59,6 +60,7 @@ public class UserMapper {
                 .faceEnabled(user.isFaceEnabled())
                 .active(user.isActive())
                 .online(user.isOnline(ttl))
+                .isRegAfm(user.getRegion().getId() ==  AFM_REGION_ID)
                 .settings(toSettingsDto(user, lang))
                 .street(localizationHelper.getLocalizedName(primaryAddress(user), lang))
                 .createdCaseCount(user.getOwnedCases() != null ? user.getOwnedCases().size() : 0)

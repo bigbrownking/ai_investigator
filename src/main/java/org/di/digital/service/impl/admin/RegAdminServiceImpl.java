@@ -22,6 +22,7 @@ import org.di.digital.model.report.CaseReport;
 import org.di.digital.model.user.Appeal;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.user.Region;
+import org.di.digital.model.user.Role;
 import org.di.digital.model.user.User;
 import org.di.digital.model.enums.appeal.AppealStatus;
 import org.di.digital.model.interrogation.CaseInterrogation;
@@ -31,6 +32,7 @@ import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.cases.RejectionReasonStatusRepository;
 import org.di.digital.repository.LogRepository;
 import org.di.digital.repository.user.RegionRepository;
+import org.di.digital.repository.user.RoleRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.search.AppealSpecifications;
@@ -72,6 +74,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
     private final LogRepository logRepository;
+    private final RoleRepository roleRepository;
     private final UserMapper userMapper;
     private final CaseMapper caseMapper;
     private final InterrogationMapper interrogationMapper;
@@ -82,6 +85,9 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
     private final CaseReportRepository caseReportRepository;
     private final MinioService minioService;
+    private static final String ZONAL_ROLE_NAME = "ZONAL";
+    private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
+
 
     @Override
     public Page<AppealDto> getMyRegionAppeals(Long adminId, int page, int size, AppealSearchRequest req) {
@@ -348,6 +354,54 @@ public class RegAdminServiceImpl implements RegAdminService {
                         .email(user.getEmail())
                         .build())
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public void assignZonalUserRole(Long adminId, String email) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        userUtil.validateUserRegionAccess(admin, user);
+
+        if (!user.isActive()) {
+            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang()));
+        }
+
+        Region region = user.getRegion();
+
+        userRepository.findByRegionIdAndRoles_Name(region.getId(), ZONAL_ROLE_NAME).stream()
+                .filter(previous -> !previous.getId().equals(user.getId()))
+                .forEach(previous -> {
+                    previous.getRoles().removeIf(r ->
+                            ZONAL_ROLE_NAME.equals(r.getName()) || ADVANCED_ROLE_NAME.equals(r.getName()));
+                    region.getAdmins().removeIf(a -> a.getId().equals(previous.getId()));
+                    log.info("User {} lost {} role in region {}: replaced by {} (admin {})",
+                            previous.getEmail(), ZONAL_ROLE_NAME, region.getId(), email, adminId);
+                });
+
+        addRoleIfMissing(user, ZONAL_ROLE_NAME);
+        addRoleIfMissing(user, ADVANCED_ROLE_NAME);
+
+        if (region.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
+            region.getAdmins().add(user);
+        }
+
+        log.info("User {} assigned {} and {} roles by admin {}", email, ZONAL_ROLE_NAME, ADVANCED_ROLE_NAME, adminId);
+    }
+
+    private void addRoleIfMissing(User user, String roleName) {
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
+
+        boolean hasRole = user.getRoles().stream()
+                .anyMatch(r -> r.getId().equals(role.getId()));
+        if (!hasRole) {
+            user.getRoles().add(role);
+        }
     }
 
     @Override

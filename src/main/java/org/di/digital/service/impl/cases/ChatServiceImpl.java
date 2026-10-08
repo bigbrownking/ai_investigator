@@ -1,5 +1,6 @@
 package org.di.digital.service.impl.cases;
 
+import lombok.Getter;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChatRequest;
@@ -81,6 +82,19 @@ public class ChatServiceImpl implements ChatService {
     @Value("${chat.port}")
     private String chatPort;
 
+    @Getter
+    @RequiredArgsConstructor
+    private enum ChatActor {
+        PARTICIPANT("user", true),
+        REG_ADMIN("reg-admin", false),
+        ADMIN("admin", false);
+
+        private final String label;
+        private final boolean trackActivity;
+    }
+
+    // ===================== Общий чат (без дела) =====================
+
     @Override
     public void streamChatResponse(ChatRequest request, SseEmitter emitter) {
         String question = request.getQuestion() == null ? "" : request.getQuestion();
@@ -121,6 +135,8 @@ public class ChatServiceImpl implements ChatService {
         });
     }
 
+    // участник дела
+
     @Override
     public void streamCaseChatResponseWithHistory(String caseNumber, ChatRequest request,
                                                   String userEmail, SseEmitter emitter) {
@@ -130,6 +146,100 @@ public class ChatServiceImpl implements ChatService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
         userUtil.validateUserAccess(caseEntity, user);
         caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.ADD);
+
+        doStreamCaseChat(caseEntity, user, request, emitter, ChatActor.PARTICIPANT);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CaseChatHistoryResponse getChatHistoryByCaseNumber(String caseNumber, String userEmail,
+                                                              int page, int size) {
+        Case caseEntity = caseRepository.findByNumber(caseNumber)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
+        userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.READ);
+
+        return getChatHistory(caseEntity.getId(), user.getId(), page, size);
+    }
+
+    @Override
+    @Transactional
+    public void clearChatHistoryByCaseNumber(String caseNumber, String userEmail) {
+        Case caseEntity = caseRepository.findByNumber(caseNumber)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
+        User user = userRepository.findByEmail(userEmail)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
+        userUtil.validateUserAccess(caseEntity, user);
+        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.DELETE);
+
+        doClearChat(caseEntity, user, ChatActor.PARTICIPANT);
+    }
+
+    // региональный админ
+
+    @Override
+    public void streamRegAdminCaseChat(Long caseId, ChatRequest request, Long adminId, SseEmitter emitter) {
+        Case caseEntity = findCaseById(caseId);
+        User admin = findUserById(adminId);
+        userUtil.validateRegionAccess(admin, caseEntity);
+
+        doStreamCaseChat(caseEntity, admin, request, emitter, ChatActor.REG_ADMIN);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CaseChatHistoryResponse getRegAdminChatHistory(Long caseId, Long adminId, int page, int size) {
+        Case caseEntity = findCaseById(caseId);
+        User admin = findUserById(adminId);
+        userUtil.validateRegionAccess(admin, caseEntity);
+
+        return getChatHistory(caseEntity.getId(), admin.getId(), page, size);
+    }
+
+    @Override
+    @Transactional
+    public void clearRegAdminChatHistory(Long caseId, Long adminId) {
+        Case caseEntity = findCaseById(caseId);
+        User admin = findUserById(adminId);
+        userUtil.validateRegionAccess(admin, caseEntity);
+
+        doClearChat(caseEntity, admin, ChatActor.REG_ADMIN);
+    }
+
+    // админ
+
+    @Override
+    public void streamAdminCaseChat(Long caseId, ChatRequest request, Long adminId, SseEmitter emitter) {
+        Case caseEntity = findCaseById(caseId);
+        User admin = findUserById(adminId);
+
+        doStreamCaseChat(caseEntity, admin, request, emitter, ChatActor.ADMIN);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public CaseChatHistoryResponse getAdminChatHistory(Long caseId, Long adminId, int page, int size) {
+        Case caseEntity = findCaseById(caseId);
+        User admin = findUserById(adminId);
+
+        return getChatHistory(caseEntity.getId(), admin.getId(), page, size);
+    }
+
+    @Override
+    @Transactional
+    public void clearAdminChatHistory(Long caseId, Long adminId) {
+        Case caseEntity = findCaseById(caseId);
+        User admin = findUserById(adminId);
+
+        doClearChat(caseEntity, admin, ChatActor.ADMIN);
+    }
+
+    private void doStreamCaseChat(Case caseEntity, User user, ChatRequest request,
+                                  SseEmitter emitter, ChatActor actor) {
+        final String caseNumber = caseEntity.getNumber();
+        final String userEmail = user.getEmail();
 
         if (!caseEntity.isAtLeastOneFileProcessed()) {
             String message = MessageConstant.NO_FILE_PROCESSED.format(currentLang(), caseNumber);
@@ -143,7 +253,7 @@ public class ChatServiceImpl implements ChatService {
             }
             logService.log(
                     String.format("No file processed for chat request in case %s", caseNumber),
-                    LogLevel.ERROR, LogAction.NO_FILE_PROCESSED, caseNumber, user.getEmail());
+                    LogLevel.ERROR, LogAction.NO_FILE_PROCESSED, caseNumber, userEmail);
             return;
         }
 
@@ -178,15 +288,17 @@ public class ChatServiceImpl implements ChatService {
                 emitter.send(SseEmitter.event().name("references").data(links));
                 emitter.complete();
 
-                caseService.updateCaseActivity(caseNumber, CaseActivityType.CHAT_MESSAGE.getDescription());
+                if (actor.isTrackActivity()) {
+                    caseService.updateCaseActivity(caseNumber, CaseActivityType.CHAT_MESSAGE.getDescription());
+                }
 
                 logService.log(
-                        String.format("New chat message %s by %s user to case %s",
-                                request.getQuestion(), userEmail, caseNumber),
+                        String.format("New chat message %s by %s %s to case %s",
+                                request.getQuestion(), actor.getLabel(), userEmail, caseNumber),
                         LogLevel.INFO, LogAction.CHAT_MESSAGE, caseNumber, userEmail);
 
-                log.info("Case chat completed for case {} (user: {}), {} references",
-                        caseNumber, userEmail, links.size());
+                log.info("Case chat completed for case {} ({}: {}), {} references",
+                        caseNumber, actor.getLabel(), userEmail, links.size());
 
             } catch (Exception e) {
                 log.error("Case chat error for case {}: ", caseNumber, e);
@@ -203,18 +315,13 @@ public class ChatServiceImpl implements ChatService {
         });
     }
 
-    @Override
-    @Transactional(readOnly = true)
-    public CaseChatHistoryResponse getChatHistoryByCaseNumber(String caseNumber, String userEmail,
-                                                              int page, int size) {
-        Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
-        userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.READ);
+    private void doClearChat(Case caseEntity, User user, ChatActor actor) {
+        chatMessageWriter.clearChatHistory(caseEntity.getId(), user.getId());
 
-        return getChatHistory(caseEntity.getId(), user.getId(), page, size);
+        logService.log(
+                String.format("Cleared chat by %s %s in case %s",
+                        actor.getLabel(), user.getEmail(), caseEntity.getNumber()),
+                LogLevel.INFO, LogAction.CHAT_CLEAR, caseEntity.getNumber(), user.getEmail());
     }
 
     @Transactional(readOnly = true)
@@ -252,21 +359,14 @@ public class ChatServiceImpl implements ChatService {
                 .build();
     }
 
-    @Override
-    @Transactional
-    public void clearChatHistoryByCaseNumber(String caseNumber, String userEmail) {
-        Case caseEntity = caseRepository.findByNumber(caseNumber)
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
-        User user = userRepository.findByEmail(userEmail)
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userEmail)));
-        userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.CHAT, CaseAction.DELETE);
+    private Case findCaseById(Long caseId) {
+        return caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+    }
 
-        chatMessageWriter.clearChatHistory(caseEntity.getId(), user.getId());
-
-        logService.log(
-                String.format("Cleared chat by %s user to case %s", userEmail, caseNumber),
-                LogLevel.INFO, LogAction.CHAT_CLEAR, caseNumber, userEmail);
+    private User findUserById(Long userId) {
+        return userRepository.findById(userId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
     }
 
     private void completeWithErrorSafely(SseEmitter emitter, Exception e) {

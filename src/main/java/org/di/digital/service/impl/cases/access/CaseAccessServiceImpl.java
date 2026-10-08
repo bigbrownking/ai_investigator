@@ -50,7 +50,7 @@ public class CaseAccessServiceImpl implements CaseAccessService {
 
     private static final Map<CaseModule, Set<CaseAction>> SOG_PERMISSIONS = Map.of(
             CaseModule.CASE,          EnumSet.of(CaseAction.READ),
-            CaseModule.INTERROGATION, EnumSet.of(CaseAction.READ, CaseAction.ADD),
+            CaseModule.INTERROGATION, EnumSet.allOf(CaseAction.class),
             CaseModule.CHAT,          EnumSet.allOf(CaseAction.class),
             CaseModule.DOCUMENTS,     EnumSet.of(CaseAction.READ, CaseAction.DOWNLOAD)
     );
