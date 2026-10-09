@@ -253,6 +253,14 @@ public class AdminController {
         adminService.changeOwner(caseId, request.getUserId());
         return ResponseEntity.ok().build();
     }
+
+    @PutMapping("/users/assign-zonal")
+    public ResponseEntity<Void> assignZonal(
+            @RequestParam String email) {
+        adminService.assignZonalUserRole(email);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/users/search")
     public ResponseEntity<List<UserSuggestionResponse>> searchUsers(
             @RequestParam String query) {

@@ -117,6 +117,8 @@ public class AdminServiceImpl implements AdminService {
     private final CaseReportRepository caseReportRepository;
     private final MinioService minioService;
     private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
+    private static final String ZONAL_ROLE_NAME = "ZONAL";
+    private static final String REG_ADMIN_ROLE_NAME = "REG_ADMIN";
 
 
     @Override
@@ -534,6 +536,58 @@ public class AdminServiceImpl implements AdminService {
 
         userRepository.save(user);
         log.info("User {} assigned REG_ADMIN role for regions {}", email, regions);
+    }
+
+    @Override
+    @Transactional
+    public void assignZonalUserRole(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        if (!user.isActive()) {
+            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang(), user.getEmail()));
+        }
+
+        Region region = user.getRegion();
+        if (region == null) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
+        }
+
+        userRepository.findByRegionIdAndRoles_Name(region.getId(), ZONAL_ROLE_NAME).stream()
+                .filter(previous -> !previous.getId().equals(user.getId()))
+                .forEach(previous -> {
+                    previous.getRoles().removeIf(r ->
+                            ZONAL_ROLE_NAME.equals(r.getName()) || ADVANCED_ROLE_NAME.equals(r.getName()));
+
+                    boolean isRegAdmin = previous.getRoles().stream()
+                            .anyMatch(r -> REG_ADMIN_ROLE_NAME.equals(r.getName()));
+                    if (!isRegAdmin) {
+                        region.getAdmins().removeIf(a -> a.getId().equals(previous.getId()));
+                    }
+
+                    log.info("User {} lost {} role in region {}: replaced by {})",
+                            previous.getEmail(), ZONAL_ROLE_NAME, region.getId(), email);
+                });
+
+        addRoleIfMissing(user, ZONAL_ROLE_NAME);
+        addRoleIfMissing(user, ADVANCED_ROLE_NAME);
+
+        if (region.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
+            region.getAdmins().add(user);
+        }
+
+        log.info("User {} assigned {} and {} roles by admin {}", email, ZONAL_ROLE_NAME, ADVANCED_ROLE_NAME, email);
+    }
+
+    private void addRoleIfMissing(User user, String roleName) {
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
+
+        boolean hasRole = user.getRoles().stream()
+                .anyMatch(r -> r.getId().equals(role.getId()));
+        if (!hasRole) {
+            user.getRoles().add(role);
+        }
     }
 
     @Override

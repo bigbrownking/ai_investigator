@@ -160,7 +160,7 @@ public class QualificationServiceImpl implements QualificationService {
         }
 
         try {
-            String article = fetchArticleFromCaseInfo(caseNumber);
+            /*String article = fetchArticleFromCaseInfo(caseNumber);
             if (article == null || article.isBlank()) {
                 String message = MessageConstant.NO_ARTICLE.format(currentLang(), caseNumber);
                 log.warn(message);
@@ -186,7 +186,7 @@ public class QualificationServiceImpl implements QualificationService {
                         LogLevel.INFO, LogAction.QUALIFICATION, caseNumber, email);
                 emitter.complete();
                 return;
-            }
+            }*/
 
             String responseJson = webClientBuilder.build()
                     .post()
