@@ -39,6 +39,7 @@ import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
 import org.di.digital.service.admin.RegAdminService;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.core.MinioService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.mapper.CaseMapper;
@@ -82,6 +83,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final InterrogationExportService interrogationExportService;
     private final UserUtil userUtil;
+    private final CaseAccessService caseAccessService;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
     private final CaseReportRepository caseReportRepository;
     private final MinioService minioService;
@@ -297,7 +299,6 @@ public class RegAdminServiceImpl implements RegAdminService {
     public void changeOwner(Long adminId, Long caseId, Long id) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
-
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
@@ -305,28 +306,12 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         User newOwner = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), id.toString())));
-
         if (!newOwner.isActive()) {
-            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang()));
+            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang(), newOwner.getEmail()));
         }
-
         userUtil.validateUserRegionAccess(admin, newOwner);
 
-        User oldOwner = caseEntity.getOwner();
-        caseEntity.setOwner(newOwner);
-
-        if (oldOwner != null && caseEntity.hasUser(oldOwner)) {
-            caseEntity.removeUser(oldOwner);
-        }
-
-        if (!caseEntity.hasUser(newOwner)) {
-            caseEntity.addUser(newOwner);
-        }
-
-        caseRepository.save(caseEntity);
-
-        log.info("Case {} owner changed from {} to {} by admin {}",
-                caseId, oldOwner != null ? oldOwner.getEmail() : "null", newOwner.getEmail(), adminId);
+        caseAccessService.reassignOwner(caseEntity, newOwner, admin.getEmail());
     }
 
     @Override
@@ -524,6 +509,7 @@ public class RegAdminServiceImpl implements RegAdminService {
             caseRepository.save(caseEntity);
             log.info("Админ {} добавил участника {} в дело {}", adminId, userId, caseId);
         }
+        caseAccessService.grantInitialAccess(caseEntity, userToAdd, null);
     }
 
     @Override
@@ -540,10 +526,14 @@ public class RegAdminServiceImpl implements RegAdminService {
         User userToRemove = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
 
+        if (caseEntity.isOwner(userToRemove)) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
+        }
         if (caseEntity.hasUser(userToRemove)) {
             caseEntity.removeUser(userToRemove);
             caseRepository.save(caseEntity);
             log.info("Админ {} удалил участника {} из дела {}", adminId, userId, caseId);
         }
+        caseAccessService.revokeAll(caseId, userId);
     }
 }

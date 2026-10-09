@@ -60,6 +60,10 @@ public class CaseAccessServiceImpl implements CaseAccessService {
 
     @Transactional
     public void grantInitialAccess(Case caseEntity, User user, List<FileGrantDto> fileGrants) {
+        if (caseEntity.isOwner(user)
+                || accessRepository.existsByCaseEntityIdAndUserId(caseEntity.getId(), user.getId())) {
+            return;
+        }
         boolean restricted = fileGrants != null && !fileGrants.isEmpty();
         DocumentAccessScope scope = restricted
                 ? DocumentAccessScope.RESTRICTED
@@ -91,12 +95,16 @@ public class CaseAccessServiceImpl implements CaseAccessService {
                         .caseEntity(caseEntity)
                         .user(user)
                         .permissions(new HashSet<>())
-                        .documentScope(DocumentAccessScope.ALL)
                         .build());
 
         access.setPermissions(allPermissions());
         access.setDocumentScope(DocumentAccessScope.ALL);
+        access.setMemberType(CaseMemberType.MEMBER);
         accessRepository.save(access);
+
+        fileAccessRepository.deleteAllActionsByCaseAndUser(caseEntity.getId(), user.getId());
+        fileAccessRepository.deleteAllByCaseAndUser(caseEntity.getId(), user.getId());
+
         logService.log(
                 String.format("User %s granted full access", user.getEmail()),
                 LogLevel.INFO,
@@ -395,6 +403,58 @@ public class CaseAccessServiceImpl implements CaseAccessService {
         return accessRepository.findByCaseEntityIdAndUserId(caseEntity.getId(), user.getId())
                 .map(a -> a.getMemberType() == CaseMemberType.SOG)
                 .orElse(false);
+    }
+    @Override
+    @Transactional
+    public void transferOwnership(Case caseEntity, User oldOwner, User newOwner, String changedBy) {
+        boolean ownerChanged = oldOwner != null && !oldOwner.getId().equals(newOwner.getId());
+
+        if (ownerChanged) {
+            revokeAll(caseEntity.getId(), oldOwner.getId());
+        }
+        grantFullAccess(caseEntity, newOwner);
+
+        log.info("Ownership of case {} transferred from {} to {} by {}",
+                caseEntity.getNumber(),
+                oldOwner != null ? oldOwner.getEmail() : "null",
+                newOwner.getEmail(), changedBy);
+        logService.log(
+                String.format("Case %s ownership transferred from %s to %s by %s",
+                        caseEntity.getNumber(),
+                        oldOwner != null ? oldOwner.getEmail() : "null",
+                        newOwner.getEmail(), changedBy),
+                LogLevel.WARNING,
+                LogAction.FULL_ACCESS,
+                caseEntity.getNumber(),
+                changedBy
+        );
+    }
+
+    @Override
+    @Transactional
+    public void reassignOwner(Case caseEntity, User newOwner, String changedBy) {
+        User oldOwner = caseEntity.getOwner();
+        if (oldOwner != null && oldOwner.getId().equals(newOwner.getId())) {
+            return;
+        }
+
+        caseEntity.setOwner(newOwner);
+        if (oldOwner != null && caseEntity.hasUser(oldOwner)) {
+            caseEntity.removeUser(oldOwner);
+        }
+        if (!caseEntity.hasUser(newOwner)) {
+            caseEntity.addUser(newOwner);
+        }
+        caseRepository.save(caseEntity);
+
+        transferOwnership(caseEntity, oldOwner, newOwner, changedBy);
+    }
+
+    @Override
+    @Transactional
+    public void revokeAllForUser(Long userId) {
+        accessRepository.findAllByUserId(userId)
+                .forEach(a -> revokeAll(a.getCaseEntity().getId(), userId));
     }
 
     private UserSettingsLanguage currentLang(){

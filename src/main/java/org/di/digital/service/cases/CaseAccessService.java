@@ -30,4 +30,7 @@ public interface CaseAccessService {
     void updateFileAccess(Long caseId, Long userId, UpdateFileAccessRequest request, String ownerEmail);
     void grantSogAccess(Case caseEntity, User user, List<FileGrantDto> fileGrants);
     boolean isSog(Case caseEntity, User user);
+    void transferOwnership(Case caseEntity, User oldOwner, User newOwner, String changedBy);
+    void reassignOwner(Case caseEntity, User newOwner, String changedBy);
+    void revokeAllForUser(Long userId);
 }

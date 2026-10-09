@@ -42,6 +42,7 @@ import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.repository.user.*;
 import org.di.digital.service.admin.AdminService;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.core.MinioService;
 import org.di.digital.service.impl.cases.CaseRejectionEnricher;
@@ -110,6 +111,7 @@ public class AdminServiceImpl implements AdminService {
     private final ReviewRepository reviewRepository;
     private final InterrogationExportService interrogationExportService;
     private final CaseService caseService;
+    private final CaseAccessService caseAccessService;
     private final CaseRejectionEnricher caseRejectionEnricher;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
     private final CaseReportRepository caseReportRepository;
@@ -336,12 +338,13 @@ public class AdminServiceImpl implements AdminService {
             caseService.updateCaseStatus(c.getId(), false, user.getEmail(), null);
 
             if (regionAdmin != null) {
-                c.setOwner(regionAdmin);
+                caseAccessService.reassignOwner(c, regionAdmin, "system:user-deleted");
                 user.getOwnedCases().remove(c);
             }
         }
 
         caseRepository.removeUserFromAllCases(userId);
+        caseAccessService.revokeAllForUser(userId);
 
         user.setActive(false);
         user.setDeleted(true);
@@ -575,21 +578,7 @@ public class AdminServiceImpl implements AdminService {
             throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang(), newOwner.getEmail()));
         }
 
-        User oldOwner = caseEntity.getOwner();
-        caseEntity.setOwner(newOwner);
-
-        if (oldOwner != null && caseEntity.hasUser(oldOwner)) {
-            caseEntity.removeUser(oldOwner);
-        }
-
-        if (!caseEntity.hasUser(newOwner)) {
-            caseEntity.addUser(newOwner);
-        }
-
-        caseRepository.save(caseEntity);
-
-        log.info("Case {} owner changed from {} to {} by admin",
-                caseId, oldOwner != null ? oldOwner.getEmail() : "null", newOwner.getEmail());
+        caseAccessService.reassignOwner(caseEntity, newOwner, getCurrentUser().getEmail());
     }
 
     @Override

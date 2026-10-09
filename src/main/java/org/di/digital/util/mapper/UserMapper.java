@@ -60,7 +60,7 @@ public class UserMapper {
                 .faceEnabled(user.isFaceEnabled())
                 .active(user.isActive())
                 .online(user.isOnline(ttl))
-                .isRegAfm(user.getRegion().getId() ==  AFM_REGION_ID)
+                .isRegAfm(user.getRegion() != null && user.getRegion().getId() == AFM_REGION_ID)
                 .settings(toSettingsDto(user, lang))
                 .street(localizationHelper.getLocalizedName(primaryAddress(user), lang))
                 .createdCaseCount(user.getOwnedCases() != null ? user.getOwnedCases().size() : 0)

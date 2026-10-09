@@ -2,6 +2,11 @@ package org.di.digital.util.requests;
 
 import lombok.experimental.UtilityClass;
 import org.di.digital.model.enums.cases.TreeModuleType;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 
 @UtilityClass
 public class RequestUrlBuilder {
@@ -36,8 +41,26 @@ public class RequestUrlBuilder {
     public static String qualificationChatUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, "/query/" + caseNumber);
     }
-    public static String qualificationCheckUrl(String host, String port, String caseNumber, String language, String article) {
-        return buildUrl(host, port, String.format("qualification/%s/corpus-delicti?language=%s&article=%s", caseNumber, language, article));
+
+    public static URI qualificationCheckUrl(String host, String port, String caseNumber,
+                                            String language, String article) {
+        UriComponentsBuilder b = UriComponentsBuilder
+                .fromUriString(host.trim() + ":" + port.trim())
+                .path("/qualification/{caseNumber}/corpus-delicti")
+                .queryParam("language", "{language}");
+
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("caseNumber", caseNumber);
+        vars.put("language", language);
+
+        if (article != null && !article.isBlank()) {
+            b.queryParam("article", "{article}");
+            vars.put("article", article.strip());
+        }
+
+        return b.encode()
+                .buildAndExpand(vars)
+                .toUri();
     }
 
     public static String indictmentUrl(String host, String port) {

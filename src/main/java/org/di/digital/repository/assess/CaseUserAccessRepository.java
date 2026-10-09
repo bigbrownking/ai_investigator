@@ -21,6 +21,7 @@ public interface CaseUserAccessRepository extends JpaRepository<CaseUserAccess, 
 
     void deleteByCaseEntityIdAndUserId(Long caseId, Long userId);
     List<CaseUserAccess> findByUserId(Long userId);
+    List<CaseUserAccess> findAllByUserId(Long userId);
     @Query("""
         select a from CaseUserAccess a
         join fetch a.caseEntity c

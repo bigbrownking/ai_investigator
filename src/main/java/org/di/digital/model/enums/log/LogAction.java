@@ -59,6 +59,7 @@ public enum LogAction {
     SUPPORT_TICKET_CREATE("Создание обращения в поддержку"),
     INITIAL_ACCESS("Начальный уровень доступа"),
     FULL_ACCESS("Полный уровень доступа"),
+    CHANGE_OWNER("Смена владельца"),
     GRANT_ACCESS("Доступ к модулю"),
     REVOKE_ACCESS("Лишить прав к модулю"),
     GRANT_FILE("Доступ на файл"),
