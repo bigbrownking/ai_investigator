@@ -25,6 +25,7 @@ public class CaseResponse {
     private boolean hasPlan;
     private boolean hasQualification;
     private boolean hasIndictment;
+    private List<Long> osmotrIds;
 
     private List<CaseUserResponse> users;
 

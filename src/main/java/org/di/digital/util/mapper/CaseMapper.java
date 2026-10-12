@@ -21,6 +21,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Component;
 
+import java.util.Collections;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -39,7 +40,7 @@ public class CaseMapper {
     private final CaseUserAccessRepository accessRepository;
 
 
-    public CaseResponse toResponse(Case c) {
+    public CaseResponse toResponse(Case c, List<Long> osmotrIds) {
         return CaseResponse.builder()
                 .id(c.getId())
                 .title(c.getTitle())
@@ -70,7 +71,12 @@ public class CaseMapper {
                 .qualificationGeneratedAt(c.getQualificationGeneratedAt())
                 .indictmentGeneratedAt(c.getIndictmentGeneratedAt())
                 .updatedDate(c.getUpdatedDate())
+                .osmotrIds(osmotrIds)
                 .build();
+    }
+
+    public CaseResponse toResponse(Case c) {
+        return toResponse(c, Collections.emptyList());
     }
 
     public CasePreviewResponse toPreview(Case c) {

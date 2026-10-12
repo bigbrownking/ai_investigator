@@ -35,6 +35,7 @@ import org.di.digital.repository.cases.RejectionReasonStatusRepository;
 import org.di.digital.repository.indictment.CaseIndictmentRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationQARepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
+import org.di.digital.repository.osmotr.OsmotrResultRepository;
 import org.di.digital.repository.qualification.CaseQualificationRepository;
 import org.di.digital.repository.review.CaseReportRepository;
 import org.di.digital.repository.search.*;
@@ -116,6 +117,7 @@ public class AdminServiceImpl implements AdminService {
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
     private final CaseReportRepository caseReportRepository;
     private final MinioService minioService;
+    private final OsmotrResultRepository osmotrResultRepository;
     private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
     private static final String ZONAL_ROLE_NAME = "ZONAL";
     private static final String REG_ADMIN_ROLE_NAME = "REG_ADMIN";
@@ -407,9 +409,10 @@ public class AdminServiceImpl implements AdminService {
     @Override
     @Transactional(readOnly = true)
     public CaseResponse getCaseDetail(Long caseId) {
-        return caseRepository.findById(caseId)
-                .map(caseMapper::toResponse)
+        Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+        List<Long> osmotrIds = osmotrResultRepository.findIdsByCaseNumber(caseEntity.getNumber());
+        return caseMapper.toResponse(caseEntity, osmotrIds);
     }
 
     @Override

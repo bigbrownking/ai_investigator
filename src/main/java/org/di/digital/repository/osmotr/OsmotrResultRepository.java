@@ -24,4 +24,6 @@ public interface OsmotrResultRepository extends JpaRepository<OsmotrResult, Long
         """)
     List<OsmotrResult> searchBySegmentText(@Param("caseNumber") String caseNumber,
                                            @Param("query") String query);
+    @Query("SELECT o.id FROM OsmotrResult o WHERE o.caseNumber = :caseNumber")
+    List<Long> findIdsByCaseNumber(@Param("caseNumber") String caseNumber);
 }
