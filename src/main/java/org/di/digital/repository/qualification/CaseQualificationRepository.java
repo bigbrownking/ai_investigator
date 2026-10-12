@@ -14,12 +14,16 @@ import java.util.Optional;
 @Repository
 public interface CaseQualificationRepository extends JpaRepository<CaseQualification, Long> {
     Optional<CaseQualification> findByCaseEntityNumber(String caseNumber);
+
     @Query("""
         SELECT COUNT(q) FROM CaseQualification q
         WHERE q.content IS NOT NULL AND q.content <> ''
         AND q.caseEntity.createdDate BETWEEN :start AND :end
+        AND (:regionId IS NULL OR q.caseEntity.owner.region.id = :regionId)
         """)
-    long countNonEmptyBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+    long countNonEmptyBetweenAndRegion(@Param("start") LocalDateTime start,
+                                       @Param("end") LocalDateTime end,
+                                       @Param("regionId") Long regionId);
 
     @Query("""
             SELECT q.caseEntity FROM CaseQualification q

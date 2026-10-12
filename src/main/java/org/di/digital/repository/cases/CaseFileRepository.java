@@ -22,8 +22,15 @@ public interface CaseFileRepository extends JpaRepository<CaseFile, Long> {
     List<CaseFile> findAllByCaseEntityId(Long caseId);
     Optional<CaseFile> findByOriginalFileNameAndCaseEntityId(String originalFileName, Long caseId);
 
-    @Query("SELECT SUM(f.pages) FROM CaseFile f WHERE f.status = 'COMPLETED' AND f.pages IS NOT NULL AND f.completedAt BETWEEN :start AND :end")
-    Long countPagesBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+    @Query("""
+        SELECT SUM(f.pages) FROM CaseFile f 
+        WHERE f.status = 'COMPLETED' AND f.pages IS NOT NULL 
+        AND f.completedAt BETWEEN :start AND :end
+        AND (:regionId IS NULL OR f.caseEntity.owner.region.id = :regionId)
+        """)
+    Long countPagesBetweenAndRegion(@Param("start") LocalDateTime start,
+                                    @Param("end") LocalDateTime end,
+                                    @Param("regionId") Long regionId);
 
     @Query("SELECT cf.id FROM CaseFile cf WHERE cf.id IN :ids")
     List<Long> findExistingIds(@Param("ids") List<Long> ids);

@@ -46,8 +46,30 @@ public interface CaseChatMessageRepository extends JpaRepository<CaseChatMessage
     long countByCaseInterrogationCaseChatId(Long chatId);
     void deleteAllByCaseInterrogationCaseChatId(Long chatId);
 
-    long countByRoleAndInterrogationChatIsNotNullAndCreatedDateBetween(
-            MessageRole role, LocalDateTime start, LocalDateTime end);
+    @Query("""
+        SELECT COUNT(m) FROM CaseChatMessage m 
+        WHERE m.role = :role 
+        AND m.interrogationChat IS NOT NULL 
+        AND m.createdDate BETWEEN :start AND :end
+        AND (:regionId IS NULL OR m.interrogationChat.interrogation.caseEntity.owner.region.id = :regionId)
+        """)
+    long countByRoleAndInterrogationChatIsNotNullAndCreatedDateBetweenAndRegion(
+            @Param("role") MessageRole role,
+            @Param("start") LocalDateTime start,
+            @Param("end") LocalDateTime end,
+            @Param("regionId") Long regionId);
 
-    long countByIsSelectedTrueAndCreatedDateBetween(LocalDateTime start, LocalDateTime end);
+    @Query("""
+        SELECT COUNT(m) FROM CaseChatMessage m 
+        WHERE m.isSelected = true 
+        AND m.createdDate BETWEEN :start AND :end
+        AND (:regionId IS NULL OR COALESCE(
+            m.interrogationChat.interrogation.caseEntity.owner.region.id,
+            m.chat.caseEntity.owner.region.id,
+            m.caseInterrogationCaseChat.interrogation.caseEntity.owner.region.id
+        ) = :regionId)
+        """)
+    long countByIsSelectedTrueAndCreatedDateBetweenAndRegion(@Param("start") LocalDateTime start,
+                                                             @Param("end") LocalDateTime end,
+                                                             @Param("regionId") Long regionId);
 }

@@ -61,7 +61,12 @@ public interface CaseRepository extends JpaRepository<Case, Long>, JpaSpecificat
     @Query("SELECT COUNT(c) FROM Case c WHERE c.owner.region.id IN :regionIds")
     long countByRegionIdIn(@Param("regionIds") List<Long> regionIds);
 
-    long countByCreatedDateBetween(LocalDateTime start, LocalDateTime end);
+    @Query("SELECT COUNT(c) FROM Case c " +
+            "WHERE c.createdDate BETWEEN :start AND :end " +
+            "AND (:regionId IS NULL OR c.owner.region.id = :regionId)")
+    long countByCreatedDateBetweenAndRegion(@Param("start") LocalDateTime start,
+                                            @Param("end") LocalDateTime end,
+                                            @Param("regionId") Long regionId);
 
     @Query("""
                     select new org.di.digital.dto.response.cases.CasePreviewResponse(

@@ -33,7 +33,14 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByEmail(String email);
 
     Page<User> findByRegionId(Long regionId, Pageable pageable);
-    long countByCreatedDateBetween(LocalDateTime start, LocalDateTime end);
+
+    @Query("SELECT COUNT(u) FROM User u " +
+            "WHERE u.createdDate BETWEEN :start AND :end " +
+            "AND (:regionId IS NULL OR u.region.id = :regionId)")
+    long countByCreatedDateBetweenAndRegion(@Param("start") LocalDateTime start,
+                                            @Param("end") LocalDateTime end,
+                                            @Param("regionId") Long regionId);
+
     long countByActiveTrueAndDeletedFalseAndCreatedDateBetween(LocalDateTime start, LocalDateTime end);
     long countByActiveFalseAndDeletedFalseAndCreatedDateBetween(LocalDateTime start, LocalDateTime end);
 

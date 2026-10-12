@@ -17,16 +17,23 @@ public interface CaseInterrogationRepository extends JpaRepository<CaseInterroga
     @Query("SELECT COUNT(i) FROM CaseInterrogation i WHERE i.caseEntity.id = :caseId AND i.status != 'COMPLETED'")
     long countNonClosedInterrogations(@Param("caseId") Long caseId);
 
-    @Query("SELECT COUNT(i) FROM CaseInterrogation i WHERE i.date BETWEEN :start AND :end")
-    long countByDateBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
+    @Query("SELECT COUNT(i) FROM CaseInterrogation i " +
+            "WHERE i.date BETWEEN :start AND :end " +
+            "AND (:regionId IS NULL OR i.caseEntity.owner.region.id = :regionId)")
+    long countByDateBetweenAndRegion(@Param("start") LocalDate start,
+                                     @Param("end") LocalDate end,
+                                     @Param("regionId") Long regionId);
 
     @Query("""
     SELECT COUNT(DISTINCT i) FROM CaseInterrogation i
     JOIN i.qaList qa
     WHERE (SIZE(qa.audioRecords) > 0 OR qa.audioFileUrl <> '')
     AND i.date BETWEEN :start AND :end
+    AND (:regionId IS NULL OR i.caseEntity.owner.region.id = :regionId)
     """)
-    long countWithAudioBetween(@Param("start") LocalDate start, @Param("end") LocalDate end);
+    long countWithAudioBetweenAndRegion(@Param("start") LocalDate start,
+                                        @Param("end") LocalDate end,
+                                        @Param("regionId") Long regionId);
 
     @Query("SELECT i FROM CaseInterrogation i JOIN FETCH i.caseEntity WHERE i.status = :status")
     List<CaseInterrogation> findActiveWithCase(@Param("status") CaseInterrogationStatusEnum status);}

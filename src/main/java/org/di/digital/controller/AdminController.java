@@ -146,11 +146,13 @@ public class AdminController {
     public ResponseEntity<List<RegionStatsDto>> getMapStats() {
         return ResponseEntity.ok(adminService.getRegionMapStats());
     }
+
     @GetMapping("/stats")
     public ResponseEntity<AdminStatsDto> getStats(
             @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to) {
-        return ResponseEntity.ok(adminService.getStats(from, to));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to,
+            @RequestParam(required = false) Long regionId) {
+        return ResponseEntity.ok(adminService.getStats(from, to, regionId));
     }
 
     @PutMapping("/users/{id}/activate")

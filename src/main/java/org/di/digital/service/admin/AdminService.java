@@ -25,7 +25,7 @@ public interface AdminService {
     CasePageResponse getAllCases(int page, int size, CaseSearchRequest caseSearchRequest);
     CasePageResponse getUserCases(Long userId, int page, int size, CaseSearchRequest caseSearchRequest);
     List<CaseUserResponse> getCaseUsers(Long caseId);
-    AdminStatsDto getStats(LocalDate from, LocalDate to);
+    AdminStatsDto getStats(LocalDate from, LocalDate to, Long regionId);
     List<UserSuggestionResponse> searchUsers(String query);
     void activateUser(Long userId);
     void deactivateUser(Long userId);

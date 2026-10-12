@@ -238,24 +238,32 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
-    public AdminStatsDto getStats(LocalDate from, LocalDate to) {
+    public AdminStatsDto getStats(LocalDate from, LocalDate to, Long regionId) {
         LocalDateTime start = from != null ? from.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
         LocalDateTime end = to != null ? to.plusDays(1).atStartOfDay() : LocalDateTime.now().plusDays(1);
 
         LocalDate fromDate = from != null ? from : LocalDate.of(1970, 1, 1);
         LocalDate toDate = to != null ? to : LocalDate.now();
-        long totalUsers = userRepository.countByCreatedDateBetween(start, end);
-        long totalCases = caseRepository.countByCreatedDateBetween(start, end);
-        long totalInterrogations = caseInterrogationRepository.countByDateBetween(fromDate, toDate);
 
-        long totalQualifications = caseQualificationRepository.countNonEmptyBetween(start, end);
-        long totalIndictments = caseIndictmentRepository.countNonEmptyBetween(start, end);
-        long totalAudios = caseInterrogationRepository.countWithAudioBetween(fromDate, toDate);
-        long totalPages = caseFileRepository.countPagesBetween(start, end);
-        Double avgQualificationScore = caseAnalyticsRepository.getAverageQualificationScorePercentBetween(start, end);
-        long totalAiMessages = chatMessageRepository.countByRoleAndInterrogationChatIsNotNullAndCreatedDateBetween(MessageRole.ASSISTANT, start, end) / 5;
-        long totalSelectedMessages = chatMessageRepository.countByIsSelectedTrueAndCreatedDateBetween(start, end);
-        long totalReformulatedMessages = caseInterrogationQARepository.countByIsReformulatedTrueAndCreatedAtBetween(start, end);
+        long totalUsers = userRepository.countByCreatedDateBetweenAndRegion(start, end, regionId);
+        long totalCases = caseRepository.countByCreatedDateBetweenAndRegion(start, end, regionId);
+        long totalInterrogations = caseInterrogationRepository.countByDateBetweenAndRegion(fromDate, toDate, regionId);
+
+        long totalQualifications = caseQualificationRepository.countNonEmptyBetweenAndRegion(start, end, regionId);
+        long totalIndictments = caseIndictmentRepository.countNonEmptyBetweenAndRegion(start, end, regionId);
+        long totalAudios = caseInterrogationRepository.countWithAudioBetweenAndRegion(fromDate, toDate, regionId);
+
+        Long totalPagesRaw  = caseFileRepository.countPagesBetweenAndRegion(start, end, regionId);
+        long totalPages = totalPagesRaw != null ? totalPagesRaw : 0L;
+
+        Double avgQualificationScore = caseAnalyticsRepository.getAverageQualificationScorePercentBetweenAndRegion(start, end, regionId);
+
+        long totalAiMessages = chatMessageRepository.countByRoleAndInterrogationChatIsNotNullAndCreatedDateBetweenAndRegion(MessageRole.ASSISTANT, start, end, regionId) / 5;
+        long totalSelectedMessages = chatMessageRepository.countByIsSelectedTrueAndCreatedDateBetweenAndRegion(start, end, regionId);
+        long totalReformulatedMessages = caseInterrogationQARepository.countByIsReformulatedTrueAndCreatedAtBetweenAndRegion(start, end, regionId);
+
+        long qualificationModifier = (regionId == null) ? 193L : 0L;
+        long indictmentModifier = (regionId == null) ? 25L : 0L;
 
         return AdminStatsDto.builder()
                 .totalUsers(totalUsers)
@@ -268,8 +276,8 @@ public class AdminServiceImpl implements AdminService {
                 .totalInterrogations(totalInterrogations)
                 .totalAudios(totalAudios)
                 .totalPages(totalPages)
-                .totalQualifications(totalQualifications + 193)
-                .totalIndictments(totalIndictments + 25)
+                .totalQualifications(totalQualifications + qualificationModifier)
+                .totalIndictments(totalIndictments + indictmentModifier)
                 .totalAiMessages(totalAiMessages)
                 .totalSelectedMessages(totalSelectedMessages)
                 .totalReformulatedMessages(totalReformulatedMessages)

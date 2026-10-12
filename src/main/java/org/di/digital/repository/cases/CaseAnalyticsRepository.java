@@ -16,6 +16,9 @@ public interface CaseAnalyticsRepository extends JpaRepository<CaseAnalytics, Lo
         SELECT AVG(a.qualificationScorePercent) FROM CaseAnalytics a
         WHERE a.qualificationScorePercent IS NOT NULL
         AND a.computedAt BETWEEN :start AND :end
+        AND (:regionId IS NULL OR a.caseEntity.owner.region.id = :regionId)
         """)
-    Double getAverageQualificationScorePercentBetween(@Param("start") LocalDateTime start, @Param("end") LocalDateTime end);
+    Double getAverageQualificationScorePercentBetweenAndRegion(@Param("start") LocalDateTime start,
+                                                               @Param("end") LocalDateTime end,
+                                                               @Param("regionId") Long regionId);
 }
