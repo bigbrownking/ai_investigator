@@ -373,7 +373,7 @@ public class AdminServiceImpl implements AdminService {
                         .mapCode(region.getMapCode())
                         .totalUsers(userRepository.countByRegionId(region.getId()))
                         .activeUsers(userRepository.countByRegionIdAndActiveTrue(region.getId()))
-                        .totalCases(caseRepository.countByRegionId(region.getId()))
+                        .totalCases(caseRepository.countByRegionIdAndStatus(region.getId(), false))
                         .pendingAppeals(appealRepository.countByRegionIdAndStatus(region.getId(), AppealStatus.PENDING))
                         .build()
                 ).toList();
