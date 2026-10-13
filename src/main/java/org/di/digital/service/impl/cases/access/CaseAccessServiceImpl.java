@@ -152,6 +152,12 @@ public class CaseAccessServiceImpl implements CaseAccessService {
         fileAccessRepository.deleteAllActionsByCaseAndUser(caseId, userId);
         fileAccessRepository.deleteAllByCaseAndUser(caseId, userId);
     }
+    @Override
+    @Transactional
+    public void revokeAllForCase(Long caseId) {
+        accessRepository.findAllByCaseEntityId(caseId)
+                .forEach(a -> revokeAll(caseId, a.getUser().getId()));
+    }
     private Set<CasePermission> defaultPermissions() {
         Set<CasePermission> perms = new HashSet<>();
         for (CaseModule module : CaseModule.values()) {

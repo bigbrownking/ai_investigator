@@ -75,6 +75,7 @@ import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import static org.di.digital.repository.search.CaseSpecifications.hasOwner;
@@ -116,9 +117,11 @@ public class AdminServiceImpl implements AdminService {
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
     private final CaseReportRepository caseReportRepository;
     private final MinioService minioService;
+    private static final String USER_ROLE_NAME = "USER";
     private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
     private static final String ZONAL_ROLE_NAME = "ZONAL";
     private static final String REG_ADMIN_ROLE_NAME = "REG_ADMIN";
+    private static final Set<Long> ADVANCED_PROFESSION_IDS = Set.of(3L, 4L);
 
 
     @Override
@@ -495,23 +498,38 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
-    public void assignAdvancedUserRole(String email) {
+    public void assignAdvancedUserRole(String email, Long professionId) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        Role role = roleRepository.findByName(ADVANCED_ROLE_NAME)
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
+        Profession profession = resolveAdvancedProfession(professionId);
 
-        user.getRoles().add(role);
+        replaceRoles(user, ADVANCED_ROLE_NAME);
+        user.setProfession(profession);
 
-        if (user.getRegion() != null && !user.getRegion().getAdmins().contains(user)) {
-            user.getRegion().getAdmins().add(user);
-            regionRepository.save(user.getRegion());
+        Region region = user.getRegion();
+        detachFromRegions(user, region != null ? region.getId() : null);
+
+        if (region != null && region.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
+            region.getAdmins().add(user);
         }
 
         userRepository.save(user);
-        log.info("User {} assigned ADVANCED_USER role", email);
+        log.info("User {} assigned {} role with profession {}", email, ADVANCED_ROLE_NAME, professionId);
     }
+
+    @Override
+    @Transactional
+    public void assignUserRole(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        replaceRoles(user, USER_ROLE_NAME);
+        detachFromRegions(user, null);
+
+        log.info("User {} assigned {} role", email, USER_ROLE_NAME);
+    }
+
 
     @Override
     @Transactional
@@ -519,16 +537,13 @@ public class AdminServiceImpl implements AdminService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        Role regAdminRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
-
-        user.getRoles().add(regAdminRole);
+        replaceRoles(user, REG_ADMIN_ROLE_NAME);
 
         for (String regionName : regions) {
             Region reg = regionRepository.findByRuName(regionName)
                     .orElseThrow(() -> new NotFoundException(NotFoundMessage.REGION.localized(currentLang(), regionName)));
 
-            if (!reg.getAdmins().contains(user)) {
+            if (reg.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
                 reg.getAdmins().add(user);
                 regionRepository.save(reg);
             }
@@ -556,38 +571,42 @@ public class AdminServiceImpl implements AdminService {
         userRepository.findByRegionIdAndRoles_Name(region.getId(), ZONAL_ROLE_NAME).stream()
                 .filter(previous -> !previous.getId().equals(user.getId()))
                 .forEach(previous -> {
-                    previous.getRoles().removeIf(r ->
-                            ZONAL_ROLE_NAME.equals(r.getName()) || ADVANCED_ROLE_NAME.equals(r.getName()));
+                    replaceRoles(previous, USER_ROLE_NAME);
+                    detachFromRegions(previous, null);
 
-                    boolean isRegAdmin = previous.getRoles().stream()
-                            .anyMatch(r -> REG_ADMIN_ROLE_NAME.equals(r.getName()));
-                    if (!isRegAdmin) {
-                        region.getAdmins().removeIf(a -> a.getId().equals(previous.getId()));
-                    }
-
-                    log.info("User {} lost {} role in region {}: replaced by {})",
+                    log.info("User {} lost {} role in region {}: replaced by {}",
                             previous.getEmail(), ZONAL_ROLE_NAME, region.getId(), email);
                 });
 
-        addRoleIfMissing(user, ZONAL_ROLE_NAME);
-        addRoleIfMissing(user, ADVANCED_ROLE_NAME);
+        replaceRoles(user, ZONAL_ROLE_NAME);
+        detachFromRegions(user, region.getId());
 
         if (region.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
             region.getAdmins().add(user);
         }
 
-        log.info("User {} assigned {} and {} roles by admin {}", email, ZONAL_ROLE_NAME, ADVANCED_ROLE_NAME, email);
+        log.info("User {} assigned {} role", email, ZONAL_ROLE_NAME);
     }
 
-    private void addRoleIfMissing(User user, String roleName) {
+    private void replaceRoles(User user, String roleName) {
         Role role = roleRepository.findByName(roleName)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
 
-        boolean hasRole = user.getRoles().stream()
-                .anyMatch(r -> r.getId().equals(role.getId()));
-        if (!hasRole) {
-            user.getRoles().add(role);
+        user.getRoles().clear();
+        user.getRoles().add(role);
+    }
+
+    private void detachFromRegions(User user, Long keepRegionId) {
+        regionRepository.findAllByAdmins_Id(user.getId()).stream()
+                .filter(r -> keepRegionId == null || !r.getId().equals(keepRegionId))
+                .forEach(r -> r.getAdmins().removeIf(a -> a.getId().equals(user.getId())));
+    }
+    private Profession resolveAdvancedProfession(Long professionId) {
+        if (professionId == null || !ADVANCED_PROFESSION_IDS.contains(professionId)) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
         }
+        return professionRepository.findById(professionId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.PROFESSION.localized(currentLang(), professionId.toString())));
     }
 
     @Override
@@ -596,25 +615,21 @@ public class AdminServiceImpl implements AdminService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        Role regAdminRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
-
         for (String regionName : regions) {
             Region reg = regionRepository.findByRuName(regionName)
                     .orElseThrow(() -> new NotFoundException(NotFoundMessage.REGION.localized(currentLang(), regionName)));
 
-            if (!reg.getAdmins().contains(user)) {
+            boolean removed = reg.getAdmins().removeIf(a -> a.getId().equals(user.getId()));
+            if (!removed) {
                 throw new IllegalStateException(MessageConstant.USER_IS_NOT_REG_ADMIN.format(currentLang(), email));
             }
-
-            reg.getAdmins().remove(user);
-            regionRepository.save(reg);
         }
 
+        regionRepository.flush();
+
         if (regionRepository.countByAdminsContaining(user) == 0) {
-            user.getRoles().remove(regAdminRole);
-            userRepository.save(user);
-            log.info("User {} removed from REG_ADMIN role (no regions left)", email);
+            replaceRoles(user, USER_ROLE_NAME);
+            log.info("User {} downgraded from REG_ADMIN to USER (no regions left)", email);
         }
 
         log.info("User {} removed from regions {}", email, regions);

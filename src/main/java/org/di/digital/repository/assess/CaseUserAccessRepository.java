@@ -18,6 +18,7 @@ public interface CaseUserAccessRepository extends JpaRepository<CaseUserAccess, 
     List<CaseUserAccess> findByCaseEntityId(Long caseId);
 
     boolean existsByCaseEntityIdAndUserId(Long caseId, Long userId);
+    List<CaseUserAccess> findAllByCaseEntityId(Long caseId);
 
     void deleteByCaseEntityIdAndUserId(Long caseId, Long userId);
     List<CaseUserAccess> findByUserId(Long userId);

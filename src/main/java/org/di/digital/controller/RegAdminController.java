@@ -224,6 +224,25 @@ public class RegAdminController {
         return ResponseEntity.ok().build();
     }
 
+    @PutMapping("/users/assign-advanced")
+    public ResponseEntity<Void> assignAdvanced(
+            @RequestParam String email,
+            @RequestParam Long professionId,
+            Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        regAdminService.assignAdvancedUserRole(userDetails.getId(), email, professionId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/users/assign-user")
+    public ResponseEntity<Void> assignUser(
+            @RequestParam String email,
+            Authentication authentication) {
+        UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
+        regAdminService.assignUserRole(userDetails.getId(), email);
+        return ResponseEntity.ok().build();
+    }
+
     @GetMapping("/cases/{caseId}/indictment")
     public ResponseEntity<String> getIndictment(@PathVariable Long caseId,Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
@@ -241,7 +260,6 @@ public class RegAdminController {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return ResponseEntity.ok(regAdminService.getMyRegionPlan(userDetails.getId(), caseId));
     }
-
     @GetMapping("/cases/{caseId}/report")
     public ResponseEntity<Resource> getReport(
             @PathVariable Long caseId,

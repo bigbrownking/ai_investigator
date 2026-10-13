@@ -43,7 +43,8 @@ public interface AdminService {
     SupportTicketDto getSupportTicketDetail(Long id);
     Page<ReviewDto> getAllReviews(int page, int size, ReviewSearchRequest request);
     ReviewDto getReviewDetail(Long id);
-    void assignAdvancedUserRole(String email);
+    void assignAdvancedUserRole(String email, Long professionId);
+    void assignUserRole(String email);
     void assignRegAdminRole(String email, List<String> regions);
     void removeRegAdminRole(String email, List<String> regions);
     void changeOwner(Long caseId, Long id);
