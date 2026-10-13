@@ -21,6 +21,7 @@ import org.di.digital.security.jwt.JwtTokenUtil;
 import org.di.digital.security.jwt.OneTimeTokenService;
 import org.di.digital.security.jwt.PreAuthTokenUtil;
 import org.di.digital.service.LogService;
+import org.di.digital.service.appeal.AppealService;
 import org.di.digital.service.auth.AuthService;
 import org.di.digital.service.impl.core.EmailService;
 import org.di.digital.service.impl.core.NotificationService;
@@ -79,6 +80,7 @@ public class AuthServiceImpl implements AuthService {
     private final EmailService emailService;
     private final PreAuthTokenUtil preAuthTokenUtil;
     private final OneTimeTokenService oneTimeTokenService;
+    private final AppealService appealService;
 
     private String decryptAndValidatePassword(String encryptedPassword) {
         String raw = rsaDecryptor.decrypt(encryptedPassword);
@@ -211,7 +213,9 @@ public class AuthServiceImpl implements AuthService {
                 .createdAt(LocalDateTime.now())
                 .build();
 
-        appealRepository.save(appeal);
+        Appeal savedAppeal = appealRepository.save(appeal);
+
+        appealService.createNewAppealNotification(savedAppeal, savedUser);
 
         if (region != null && !region.getAdmins().isEmpty()) {
             region.getAdmins().forEach(admin ->

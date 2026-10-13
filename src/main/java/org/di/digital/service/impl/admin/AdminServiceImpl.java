@@ -43,6 +43,7 @@ import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.repository.user.*;
 import org.di.digital.service.admin.AdminService;
+import org.di.digital.service.appeal.AppealService;
 import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.core.MinioService;
@@ -118,6 +119,7 @@ public class AdminServiceImpl implements AdminService {
     private final CaseReportRepository caseReportRepository;
     private final MinioService minioService;
     private final OsmotrResultRepository osmotrResultRepository;
+    private final AppealService appealService;
     private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
     private static final String ZONAL_ROLE_NAME = "ZONAL";
     private static final String REG_ADMIN_ROLE_NAME = "REG_ADMIN";
@@ -441,6 +443,8 @@ public class AdminServiceImpl implements AdminService {
         user.setActive(true);
         userRepository.save(user);
 
+        appealService.createAppealReviewedNotification(appeal, admin);
+
         log.info("Appeal {} approved by admin {}", appealId, adminId);
     }
 
@@ -457,6 +461,8 @@ public class AdminServiceImpl implements AdminService {
         appeal.setReviewedBy(admin);
         appeal.setReviewedAt(LocalDateTime.now());
         appealRepository.save(appeal);
+
+        appealService.createAppealReviewedNotification(appeal, admin);
 
         log.info("Appeal {} rejected by admin {}", appealId, adminId);
     }
