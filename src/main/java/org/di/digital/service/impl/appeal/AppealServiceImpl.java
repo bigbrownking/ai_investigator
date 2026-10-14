@@ -5,9 +5,9 @@ import org.di.digital.model.appeal.AppealNotification;
 import org.di.digital.model.enums.appeal.AppealNotificationType;
 import org.di.digital.model.enums.appeal.AppealStatus;
 import org.di.digital.model.user.Appeal;
-import org.di.digital.model.user.Region;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.appeal.AppealNotificationRepository;
+import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.appeal.AppealService;
 import org.di.digital.service.impl.core.NotificationService;
 import org.springframework.security.access.AccessDeniedException;
@@ -22,7 +22,8 @@ import java.util.List;
 public class AppealServiceImpl implements AppealService {
 
     private final AppealNotificationRepository notificationRepository;
-    private final NotificationService emailNotificationService; // Ваш сервис (WebSocket/Email)
+    private final NotificationService emailNotificationService;
+    private final UserRepository userRepository;
 
     @Override
     @Transactional(readOnly = true)
@@ -59,23 +60,23 @@ public class AppealServiceImpl implements AppealService {
 
     @Override
     @Transactional
-    public void createNewAppealNotification(Appeal appeal, User applicant) {
-        Region region = appeal.getRegion();
-        if (region != null && region.getAdmins() != null) {
-            region.getAdmins().forEach(admin -> {
-                AppealNotification notification = AppealNotification.builder()
-                        .userEmail(admin.getEmail())
-                        .appealId(appeal.getId())
-                        .applicantName(applicant.getName())
-                        .applicantSurname(applicant.getSurname())
-                        .type(AppealNotificationType.NEW_APPEAL_RECEIVED)
-                        .appealStatus(AppealStatus.PENDING)
-                        .isRead(false)
-                        .createdAt(LocalDateTime.now())
-                        .build();
-                notificationRepository.save(notification);
-            });
-        }
+    public void createNewAppealNotification(Appeal appeal) {
+        List<User> systemAdmins = userRepository.findAllSystemAdmins();
+
+        systemAdmins.forEach(admin -> {
+            AppealNotification notification = AppealNotification.builder()
+                    .userEmail(admin.getEmail())
+                    .appealId(appeal.getId())
+                    .applicantName(appeal.getUser().getName())
+                    .applicantSurname(appeal.getUser().getSurname())
+                    .type(AppealNotificationType.NEW_APPEAL_RECEIVED)
+                    .appealStatus(AppealStatus.PENDING)
+                    .isRead(false)
+                    .createdAt(LocalDateTime.now())
+                    .build();
+
+            notificationRepository.save(notification);
+        });
     }
 
     @Override

@@ -12,6 +12,6 @@ public interface AppealService {
     void markOneRead(Long id, String email);
     long getUnreadCount(String email);
 
-    void createNewAppealNotification(Appeal appeal, User applicant);
+    void createNewAppealNotification(Appeal appeal);
     void createAppealReviewedNotification(Appeal appeal, User reviewer);
 }

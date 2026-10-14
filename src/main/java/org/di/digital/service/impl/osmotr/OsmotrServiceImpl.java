@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.message.OsmotrProcessingMessage;
 import org.di.digital.dto.request.osmotr.DistributionRequest;
-import org.di.digital.dto.request.osmotr.OsmotrDecisionDto;
 import org.di.digital.dto.request.osmotr.OsmotrSearchRequest;
 import org.di.digital.dto.request.osmotr.OsmotrSubmitDecisionsRequest;
 import org.di.digital.dto.response.osmotr.*;
@@ -25,8 +24,8 @@ import org.di.digital.repository.osmotr.OsmotrResultRepository;
 import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.core.MinioService;
-import org.di.digital.service.osmotr.OsmotrService;
 import org.di.digital.service.impl.queue.OsmotrQueueService;
+import org.di.digital.service.osmotr.OsmotrService;
 import org.di.digital.util.PdfSplitter;
 import org.di.digital.util.mapper.OsmotrMapper;
 import org.di.digital.util.requests.UserUtil;
@@ -337,8 +336,13 @@ public class OsmotrServiceImpl implements OsmotrService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
-        userUtil.validateUserAccess(caseEntity, user);
-        caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.DOWNLOAD);
+        boolean isAdmin = user.hasRole("ADMIN");
+        if (!isAdmin) {
+            userUtil.validateUserAccess(caseEntity, user);
+            caseAccessService.require(caseEntity, user, CaseModule.OSMOTR, CaseAction.DOWNLOAD);
+        } else {
+            log.info("User {} is ADMIN. Access verification bypassed for case {}", email, caseNumber);
+        }
 
         OsmotrResult result = osmotrResultRepository.findById(resultId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.OSMOTR.localized(currentLang(), resultId.toString())));

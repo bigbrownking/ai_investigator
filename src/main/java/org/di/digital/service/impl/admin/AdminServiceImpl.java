@@ -4,7 +4,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.search.*;
 import org.di.digital.dto.request.user.UpdateProfileRequest;
-import org.di.digital.dto.response.*;
+import org.di.digital.dto.response.LogDto;
 import org.di.digital.dto.response.admin.*;
 import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
@@ -21,17 +21,15 @@ import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.appeal.AppealStatus;
 import org.di.digital.model.enums.cases.MessageRole;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.interrogation.CaseInterrogation;
+import org.di.digital.model.report.CaseReport;
 import org.di.digital.model.support.Review;
 import org.di.digital.model.support.SupportTicket;
 import org.di.digital.model.user.*;
-import org.di.digital.repository.*;
-import org.di.digital.repository.cases.CaseAnalyticsRepository;
-import org.di.digital.repository.cases.CaseChatMessageRepository;
-import org.di.digital.repository.cases.CaseFileRepository;
-import org.di.digital.repository.cases.CaseRepository;
-import org.di.digital.repository.cases.RejectionReasonStatusRepository;
+import org.di.digital.repository.LogRepository;
+import org.di.digital.repository.cases.*;
 import org.di.digital.repository.indictment.CaseIndictmentRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationQARepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
@@ -47,14 +45,16 @@ import org.di.digital.service.appeal.AppealService;
 import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.core.MinioService;
+import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.service.impl.cases.CaseRejectionEnricher;
 import org.di.digital.service.plan.PlanService;
-import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.LocalizationHelper;
 import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.mapper.SupportMapper;
 import org.di.digital.util.mapper.UserMapper;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -62,15 +62,9 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
-import org.di.digital.model.report.CaseReport;
-import org.di.digital.model.enums.file.CaseFileStatusEnum;
-import org.di.digital.service.core.MinioService;
-import org.di.digital.repository.review.CaseReportRepository;
-import org.springframework.core.io.ByteArrayResource;
-import org.springframework.core.io.Resource;
+
 import java.io.IOException;
 import java.io.InputStream;
-
 import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
@@ -80,7 +74,8 @@ import java.util.Optional;
 import java.util.stream.Collectors;
 
 import static org.di.digital.repository.search.CaseSpecifications.hasOwner;
-import static org.di.digital.util.requests.UserUtil.*;
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
+import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 @Slf4j
 @Service
@@ -211,9 +206,17 @@ public class AdminServiceImpl implements AdminService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public PagedAppealResponse getAllAppeals(int page, int size, AppealSearchRequest req) {
+        if (req.getAppealId() != null) {
+            appealRepository.findById(req.getAppealId())
+                    .orElseThrow(() -> new NotFoundException("Заявка с ID " + req.getAppealId() + " не найдена"));
+        }
+
         Pageable pageable = PageRequest.of(page, size, Sort.by(Sort.Direction.DESC, "createdAt"));
         Specification<Appeal> spec = AppealSpecifications.build(req);
+
+
         Page<AppealDto> result = appealRepository.findAll(spec, pageable)
                 .map(supportMapper::toAppealDto);
 

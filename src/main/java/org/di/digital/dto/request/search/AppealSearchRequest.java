@@ -16,4 +16,5 @@ public class AppealSearchRequest {
     private String region;
     private LocalDate from;
     private LocalDate to;
+    private Long appealId;
 }

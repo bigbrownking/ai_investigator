@@ -14,7 +14,8 @@ import java.util.List;
 public class AppealSpecifications {
     public static Specification<Appeal> build(AppealSearchRequest req) {
         return Specification
-                .where(hasStatus(req.getStatus()))
+                .where(hasId(req.getAppealId()))
+                .and(hasStatus(req.getStatus()))
                 .and(hasRegion(req.getRegion()))
                 .and(hasFrom(req.getCameFrom()))
                 .and(hasTo(req.getCameTo()))
@@ -28,6 +29,13 @@ public class AppealSpecifications {
                 .and(hasFrom(req.getCameFrom()))
                 .and(hasTo(req.getCameTo()))
                 .and(createdBetween(req.getFrom(), req.getTo()));
+    }
+
+    private static Specification<Appeal> hasId(Long appealId) {
+        return (root, query, cb) -> {
+            if (appealId == null) return null;
+            return cb.equal(root.get("id"), appealId); // Строгое равенство по первичному ключу
+        };
     }
 
     private static Specification<Appeal> inRegions(List<Long> regionIds) {

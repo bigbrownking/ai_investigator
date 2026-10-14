@@ -215,7 +215,7 @@ public class AuthServiceImpl implements AuthService {
 
         Appeal savedAppeal = appealRepository.save(appeal);
 
-        appealService.createNewAppealNotification(savedAppeal, savedUser);
+        appealService.createNewAppealNotification(savedAppeal);
 
         if (region != null && !region.getAdmins().isEmpty()) {
             region.getAdmins().forEach(admin ->
