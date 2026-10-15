@@ -5,7 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
-import org.di.digital.dto.response.*;
+import org.di.digital.dto.response.LogDto;
 import org.di.digital.dto.response.admin.AppealDto;
 import org.di.digital.dto.response.admin.RegionStatsDto;
 import org.di.digital.dto.response.cases.*;
@@ -15,33 +15,33 @@ import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
+import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.MessageConstant;
+import org.di.digital.model.enums.appeal.AppealStatus;
 import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.enums.settings.UserSettingsLanguage;
+import org.di.digital.model.interrogation.CaseInterrogation;
 import org.di.digital.model.report.CaseReport;
 import org.di.digital.model.user.Appeal;
-import org.di.digital.model.cases.Case;
 import org.di.digital.model.user.Region;
 import org.di.digital.model.user.Role;
 import org.di.digital.model.user.User;
-import org.di.digital.model.enums.appeal.AppealStatus;
-import org.di.digital.model.interrogation.CaseInterrogation;
-import org.di.digital.repository.review.CaseReportRepository;
-import org.di.digital.repository.user.AppealRepository;
+import org.di.digital.repository.LogRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.cases.RejectionReasonStatusRepository;
-import org.di.digital.repository.LogRepository;
-import org.di.digital.repository.user.RegionRepository;
-import org.di.digital.repository.user.RoleRepository;
-import org.di.digital.repository.user.UserRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
+import org.di.digital.repository.review.CaseReportRepository;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
+import org.di.digital.repository.user.AppealRepository;
+import org.di.digital.repository.user.RoleRepository;
+import org.di.digital.repository.user.UserRepository;
 import org.di.digital.service.admin.RegAdminService;
 import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.core.MinioService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
+import org.di.digital.util.admin.RegionStatsService;
 import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.mapper.SupportMapper;
@@ -62,7 +62,6 @@ import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
-import java.util.stream.Collectors;
 
 import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
@@ -87,6 +86,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
     private final CaseReportRepository caseReportRepository;
     private final MinioService minioService;
+    private final RegionStatsService regionStatsService;
     private static final String ZONAL_ROLE_NAME = "ZONAL";
     private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
 
@@ -292,6 +292,11 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .totalCases(caseRepository.countByRegionIdIn(regionIds))
                 .pendingAppeals(appealRepository.countByRegionIdInAndStatus(regionIds, AppealStatus.PENDING))
                 .build();
+    }
+
+    @Override
+    public List<RegionStatsDto> getRegionMapStats() {
+        return regionStatsService.getRegionMapStats(currentLang());
     }
 
     @Override

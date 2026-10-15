@@ -176,10 +176,15 @@ public class RegAdminController {
     }
 
     @GetMapping("/stats")
-    @PreAuthorize(ReportingAccess.ADMIN_OR_AFM_REG_ADMIN)
     public ResponseEntity<RegionStatsDto> getStats(Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return ResponseEntity.ok(regAdminService.getMyRegionStats(userDetails.getId()));
+    }
+
+    @GetMapping("/map/stats")
+    @PreAuthorize(ReportingAccess.ADMIN_OR_AFM_REG_ADMIN)
+    public ResponseEntity<List<RegionStatsDto>> getMapStats() {
+        return ResponseEntity.ok(regAdminService.getRegionMapStats());
     }
 
     @PatchMapping("/cases/{caseId}/owner")

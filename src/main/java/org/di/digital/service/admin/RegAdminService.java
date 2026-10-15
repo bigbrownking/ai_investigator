@@ -46,6 +46,7 @@ public interface RegAdminService {
     byte[] downloadMyRegionInterrogation(Long adminId, Long interrogationId);
 
     RegionStatsDto getMyRegionStats(Long adminId);
+    List<RegionStatsDto> getRegionMapStats();
 
     void changeOwner(Long adminId, Long caseId, Long id);
     List<UserSuggestionResponse> searchUsers(Long adminId, String query);

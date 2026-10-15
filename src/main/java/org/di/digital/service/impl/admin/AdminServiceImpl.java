@@ -49,6 +49,7 @@ import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.service.impl.cases.CaseRejectionEnricher;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.util.LocalizationHelper;
+import org.di.digital.util.admin.RegionStatsService;
 import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.mapper.SupportMapper;
@@ -115,6 +116,7 @@ public class AdminServiceImpl implements AdminService {
     private final MinioService minioService;
     private final OsmotrResultRepository osmotrResultRepository;
     private final AppealService appealService;
+    private final RegionStatsService regionStatsService;
     private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
     private static final String ZONAL_ROLE_NAME = "ZONAL";
     private static final String REG_ADMIN_ROLE_NAME = "REG_ADMIN";
@@ -371,17 +373,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public List<RegionStatsDto> getRegionMapStats() {
-        return regionRepository.findAll().stream()
-                .map(region -> RegionStatsDto.builder()
-                        .regionId(region.getId())
-                        .regionName(localizationHelper.getLocalizedName(region, currentLang()))
-                        .mapCode(region.getMapCode())
-                        .totalUsers(userRepository.countByRegionId(region.getId()))
-                        .activeUsers(userRepository.countByRegionIdAndActiveTrue(region.getId()))
-                        .totalCases(caseRepository.countByRegionIdAndStatus(region.getId(), false))
-                        .pendingAppeals(appealRepository.countByRegionIdAndStatus(region.getId(), AppealStatus.PENDING))
-                        .build()
-                ).toList();
+        return regionStatsService.getRegionMapStats(currentLang());
     }
 
     @Override
