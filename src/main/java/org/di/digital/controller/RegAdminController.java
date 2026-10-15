@@ -21,6 +21,7 @@ import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.model.enums.cases.CaseRejectionReason;
 import org.di.digital.security.UserDetailsImpl;
+import org.di.digital.security.zonal.ReportingAccess;
 import org.di.digital.service.admin.RegAdminService;
 import org.di.digital.service.cases.CaseService;
 import org.di.digital.service.cases.ChatService;
@@ -30,6 +31,7 @@ import org.springframework.data.domain.Page;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.web.bind.annotation.*;
@@ -174,6 +176,7 @@ public class RegAdminController {
     }
 
     @GetMapping("/stats")
+    @PreAuthorize(ReportingAccess.ADMIN_OR_AFM_REG_ADMIN)
     public ResponseEntity<RegionStatsDto> getStats(Authentication authentication) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
         return ResponseEntity.ok(regAdminService.getMyRegionStats(userDetails.getId()));
