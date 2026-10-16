@@ -35,4 +35,13 @@ public interface CasePlanRepository extends JpaRepository<CasePlan, Long> {
 
     @Query("SELECT p FROM CasePlan p WHERE p.status IN :statuses")
     List<CasePlan> findByStatusIn(@Param("statuses") List<PlanStatus> statuses);
+
+    @Query("SELECT p FROM CasePlan p " +
+            "WHERE p.status = :status " +
+            "AND p.caseEntity.owner.region.id IN :regionIds " +
+            "ORDER BY p.approvedAt DESC NULLS LAST")
+    List<CasePlan> findByStatusAndOwnerRegionIdInOrderByApprovedAtDesc(
+            @Param("status") PlanStatus status,
+            @Param("regionIds") List<Long> regionIds
+    );
 }

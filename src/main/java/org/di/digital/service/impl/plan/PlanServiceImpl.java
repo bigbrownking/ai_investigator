@@ -406,6 +406,29 @@ public class PlanServiceImpl implements PlanService {
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public List<ManagementPendingPlanDto> getManagementApprovePlans(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        List<Long> regionIds = regionRepository.findByAdminsContaining(user)
+                .stream()
+                .map(Region::getId)
+                .toList();
+
+        if (regionIds.isEmpty()) {
+            return List.of();
+        }
+
+
+        return casePlanRepository
+                .findByStatusAndOwnerRegionIdInOrderByApprovedAtDesc(PlanStatus.APPROVED_L3, regionIds)
+                .stream()
+                .map(p -> mapper.toManagementPendingPlanDto(p, enrichPlanWithStatus(p.getContent())))
+                .toList();
+    }
+
     private int pendingPriority(PlanStatus status) {
         if (status == null) {
             return Integer.MAX_VALUE;

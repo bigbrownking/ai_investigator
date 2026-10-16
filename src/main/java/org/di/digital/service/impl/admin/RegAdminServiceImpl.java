@@ -6,6 +6,7 @@ import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.LogDto;
+import org.di.digital.dto.response.admin.AdminStatsDto;
 import org.di.digital.dto.response.admin.AppealDto;
 import org.di.digital.dto.response.admin.RegionStatsDto;
 import org.di.digital.dto.response.cases.*;
@@ -41,6 +42,7 @@ import org.di.digital.service.admin.RegAdminService;
 import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.core.MinioService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
+import org.di.digital.util.LocalizationHelper;
 import org.di.digital.util.admin.RegionStatsService;
 import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.mapper.InterrogationMapper;
@@ -58,6 +60,7 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.io.IOException;
 import java.io.InputStream;
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
@@ -87,6 +90,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final CaseReportRepository caseReportRepository;
     private final MinioService minioService;
     private final RegionStatsService regionStatsService;
+    private final LocalizationHelper localizationHelper;
     private static final String ZONAL_ROLE_NAME = "ZONAL";
     private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
 
@@ -278,7 +282,7 @@ public class RegAdminServiceImpl implements RegAdminService {
 
     @Override
     @Transactional(readOnly = true)
-    public RegionStatsDto getMyRegionStats(Long adminId) {
+    public RegionStatsDto getMyRegionStats(Long adminId, LocalDate from, LocalDate to) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
 
@@ -286,11 +290,42 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         List<Long> regionIds = adminRegions.stream().map(Region::getId).toList();
 
+        long totalUsers = 0, totalCases = 0, totalInterrogations = 0, totalPages = 0, totalAudios = 0,
+                totalQualifications = 0, totalIndictments = 0, totalAiMessages = 0,
+                totalSelectedMessages = 0, totalReformulatedMessages = 0;
+
+        for (Long id : regionIds) {
+            AdminStatsDto s = regionStatsService.getStats(from, to, id);
+            totalUsers += s.getTotalUsers();
+            totalCases += s.getTotalCases();
+            totalInterrogations += s.getTotalInterrogations();
+            totalPages += s.getTotalPages();
+            totalAudios += s.getTotalAudios();
+            totalQualifications += s.getTotalQualifications();
+            totalIndictments += s.getTotalIndictments();
+            totalAiMessages += s.getTotalAiMessages();
+            totalSelectedMessages += s.getTotalSelectedMessages();
+            totalReformulatedMessages += s.getTotalReformulatedMessages();
+        }
+
+        Region single = adminRegions.size() == 1 ? adminRegions.get(0) : null;
+
         return RegionStatsDto.builder()
-                .totalUsers(userRepository.countByRegionIdIn(regionIds))
+                .regionId(single != null ? single.getId() : null)
+                .mapCode(single != null ? single.getMapCode() : null)
+                .regionName(single != null ? localizationHelper.getLocalizedName(single, currentLang()) : null)
+                .totalUsers(totalUsers)
                 .activeUsers(userRepository.countByRegionIdInAndActiveTrue(regionIds))
-                .totalCases(caseRepository.countByRegionIdIn(regionIds))
+                .totalCases(totalCases)
                 .pendingAppeals(appealRepository.countByRegionIdInAndStatus(regionIds, AppealStatus.PENDING))
+                .totalInterrogations(totalInterrogations)
+                .totalPages(totalPages)
+                .totalAudios(totalAudios)
+                .totalQualifications(totalQualifications)
+                .totalIndictments(totalIndictments)
+                .totalAiMessages(totalAiMessages)
+                .totalSelectedMessages(totalSelectedMessages)
+                .totalReformulatedMessages(totalReformulatedMessages)
                 .build();
     }
 

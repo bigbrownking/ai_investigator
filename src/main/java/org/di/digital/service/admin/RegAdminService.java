@@ -1,24 +1,22 @@
 package org.di.digital.service.admin;
 
-import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
-import org.di.digital.dto.response.*;
+import org.di.digital.dto.response.LogDto;
 import org.di.digital.dto.response.admin.AppealDto;
 import org.di.digital.dto.response.admin.RegionStatsDto;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
 import org.di.digital.dto.response.cases.CaseUserResponse;
 import org.di.digital.dto.response.cases.RejectionReasonResponse;
-import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
-import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 
@@ -45,7 +43,7 @@ public interface RegAdminService {
 
     byte[] downloadMyRegionInterrogation(Long adminId, Long interrogationId);
 
-    RegionStatsDto getMyRegionStats(Long adminId);
+    RegionStatsDto getMyRegionStats(Long adminId, LocalDate from, LocalDate to);
     List<RegionStatsDto> getRegionMapStats();
 
     void changeOwner(Long adminId, Long caseId, Long id);

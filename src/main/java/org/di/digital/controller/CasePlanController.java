@@ -56,6 +56,15 @@ public class CasePlanController {
         );
     }
 
+    @GetMapping("/management/approve")
+    @PreAuthorize("hasAnyAuthority('REG_ADMIN')")
+    public ResponseEntity<List<ManagementPendingPlanDto>> getManagementApprovePlans(
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                planService.getManagementApprovePlans(authentication.getName())
+        );
+    }
+
     @PatchMapping(value = "/action", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.TEXT_PLAIN_VALUE})
     public ResponseEntity<CasePlanResponse> updatePlanField(
             @RequestParam String caseNumber,

@@ -17,4 +17,12 @@ public class RegionStatsDto {
     private long activeUsers;
     private long totalCases;
     private long pendingAppeals;
+    private long totalInterrogations;
+    private long totalPages;
+    private long totalAudios;
+    private long totalQualifications;
+    private long totalIndictments;
+    private long totalAiMessages;
+    private long totalSelectedMessages;
+    private long totalReformulatedMessages;
 }

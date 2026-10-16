@@ -20,7 +20,6 @@ import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.appeal.AppealStatus;
-import org.di.digital.model.enums.cases.MessageRole;
 import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.interrogation.CaseInterrogation;
@@ -29,12 +28,10 @@ import org.di.digital.model.support.Review;
 import org.di.digital.model.support.SupportTicket;
 import org.di.digital.model.user.*;
 import org.di.digital.repository.LogRepository;
-import org.di.digital.repository.cases.*;
-import org.di.digital.repository.indictment.CaseIndictmentRepository;
-import org.di.digital.repository.interrogation.CaseInterrogationQARepository;
+import org.di.digital.repository.cases.CaseRepository;
+import org.di.digital.repository.cases.RejectionReasonStatusRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.osmotr.OsmotrResultRepository;
-import org.di.digital.repository.qualification.CaseQualificationRepository;
 import org.di.digital.repository.review.CaseReportRepository;
 import org.di.digital.repository.search.*;
 import org.di.digital.repository.support.ReviewRepository;
@@ -86,8 +83,6 @@ public class AdminServiceImpl implements AdminService {
     private final UserRepository userRepository;
     private final PlanService planService;
     private final CaseRepository caseRepository;
-    private final CaseQualificationRepository caseQualificationRepository;
-    private final CaseIndictmentRepository caseIndictmentRepository;
     private final RoleRepository roleRepository;
     private final AppealRepository appealRepository;
     private final RegionRepository regionRepository;
@@ -95,11 +90,7 @@ public class AdminServiceImpl implements AdminService {
     private final AdministrationRepository administrationRepository;
     private final RankRepository rankRepository;
     private final LogRepository logRepository;
-    private final CaseChatMessageRepository chatMessageRepository;
-    private final CaseInterrogationQARepository caseInterrogationQARepository;
     private final CaseInterrogationRepository caseInterrogationRepository;
-    private final CaseFileRepository caseFileRepository;
-    private final CaseAnalyticsRepository caseAnalyticsRepository;
     private final UserMapper userMapper;
     private final CaseMapper caseMapper;
     private final InterrogationMapper interrogationMapper;
@@ -246,50 +237,7 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     public AdminStatsDto getStats(LocalDate from, LocalDate to, Long regionId) {
-        LocalDateTime start = from != null ? from.atStartOfDay() : LocalDateTime.of(1970, 1, 1, 0, 0);
-        LocalDateTime end = to != null ? to.plusDays(1).atStartOfDay() : LocalDateTime.now().plusDays(1);
-
-        LocalDate fromDate = from != null ? from : LocalDate.of(1970, 1, 1);
-        LocalDate toDate = to != null ? to : LocalDate.now();
-
-        long totalUsers = userRepository.countByCreatedDateBetweenAndRegion(start, end, regionId);
-        long totalCases = caseRepository.countByCreatedDateBetweenAndRegion(start, end, regionId);
-        long totalInterrogations = caseInterrogationRepository.countByDateBetweenAndRegion(fromDate, toDate, regionId);
-
-        long totalQualifications = caseQualificationRepository.countNonEmptyBetweenAndRegion(start, end, regionId);
-        long totalIndictments = caseIndictmentRepository.countNonEmptyBetweenAndRegion(start, end, regionId);
-        long totalAudios = caseInterrogationRepository.countWithAudioBetweenAndRegion(fromDate, toDate, regionId);
-
-        Long totalPagesRaw  = caseFileRepository.countPagesBetweenAndRegion(start, end, regionId);
-        long totalPages = totalPagesRaw != null ? totalPagesRaw : 0L;
-
-        Double avgQualificationScore = caseAnalyticsRepository.getAverageQualificationScorePercentBetweenAndRegion(start, end, regionId);
-
-        long totalAiMessages = chatMessageRepository.countByRoleAndInterrogationChatIsNotNullAndCreatedDateBetweenAndRegion(MessageRole.ASSISTANT, start, end, regionId) / 5;
-        long totalSelectedMessages = chatMessageRepository.countByIsSelectedTrueAndCreatedDateBetweenAndRegion(start, end, regionId);
-        long totalReformulatedMessages = caseInterrogationQARepository.countByIsReformulatedTrueAndCreatedAtBetweenAndRegion(start, end, regionId);
-
-        long qualificationModifier = (regionId == null) ? 193L : 0L;
-        long indictmentModifier = (regionId == null) ? 25L : 0L;
-
-        return AdminStatsDto.builder()
-                .totalUsers(totalUsers)
-                //.activeUsers(activeUsers)
-                //.inactiveUsers(inactiveUsers)
-                .totalCases(totalCases)
-                //.pendingAppeals(pendingAppeals)
-                //.approvedAppeals(approvedAppeals)
-                //.rejectedAppeals(rejectedAppeals)
-                .totalInterrogations(totalInterrogations)
-                .totalAudios(totalAudios)
-                .totalPages(totalPages)
-                .totalQualifications(totalQualifications + qualificationModifier)
-                .totalIndictments(totalIndictments + indictmentModifier)
-                .totalAiMessages(totalAiMessages)
-                .totalSelectedMessages(totalSelectedMessages)
-                .totalReformulatedMessages(totalReformulatedMessages)
-                .avgQualificationScorePercent(avgQualificationScore)
-                .build();
+        return regionStatsService.getStats(from, to, regionId);
     }
 
     @Override

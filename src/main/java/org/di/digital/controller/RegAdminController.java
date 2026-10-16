@@ -28,6 +28,7 @@ import org.di.digital.service.cases.ChatService;
 import org.di.digital.service.impl.core.sse.SseHeartbeatUtil;
 import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
+import org.springframework.format.annotation.DateTimeFormat;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
@@ -38,6 +39,7 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.nio.charset.StandardCharsets;
+import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
@@ -176,9 +178,13 @@ public class RegAdminController {
     }
 
     @GetMapping("/stats")
-    public ResponseEntity<RegionStatsDto> getStats(Authentication authentication) {
+    public ResponseEntity<RegionStatsDto> getStats(
+            Authentication authentication,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate from,
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate to
+    ) {
         UserDetailsImpl userDetails = (UserDetailsImpl) authentication.getPrincipal();
-        return ResponseEntity.ok(regAdminService.getMyRegionStats(userDetails.getId()));
+        return ResponseEntity.ok(regAdminService.getMyRegionStats(userDetails.getId(), from, to));
     }
 
     @GetMapping("/map/stats")
