@@ -227,8 +227,16 @@ public class AdminController {
     }
 
     @PutMapping("/users/assign-advanced")
-    public ResponseEntity<Void> assignAdvanced(@RequestParam String email) {
-        adminService.assignAdvancedUserRole(email);
+    public ResponseEntity<Void> assignAdvanced(
+            @RequestParam String email,
+            @RequestParam Long professionId) {
+        adminService.assignAdvancedUserRole(email, professionId);
+        return ResponseEntity.ok().build();
+    }
+
+    @PutMapping("/users/assign-user")
+    public ResponseEntity<Void> assignUser(@RequestParam String email) {
+        adminService.assignUserRole(email);
         return ResponseEntity.ok().build();
     }
 

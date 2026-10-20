@@ -940,6 +940,7 @@ public class CaseServiceImpl implements CaseService {
     public void deleteCaseById(Long caseId, String currentUserEmail) {
         caseWriter.authorizeOwnerForDelete(caseId, currentUserEmail);
 
+        caseAccessService.revokeAllForCase(caseId);
         deleteAllFiles(caseId, currentUserEmail);
 
         caseWriter.deleteCaseRecord(caseId, currentUserEmail);

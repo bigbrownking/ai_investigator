@@ -14,4 +14,5 @@ public interface RegionRepository extends JpaRepository<Region, Long> {
     Optional<Region> findByRuName(String ruName);
     long countByAdminsContaining(User user);
     List<Region> findByAdminsContaining(User user);
+    List<Region> findAllByAdmins_Id(Long userId);
 }

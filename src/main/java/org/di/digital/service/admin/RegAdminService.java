@@ -49,6 +49,9 @@ public interface RegAdminService {
     void changeOwner(Long adminId, Long caseId, Long id);
     List<UserSuggestionResponse> searchUsers(Long adminId, String query);
     void assignZonalUserRole(Long adminId, String email);
+    void assignAdvancedUserRole(Long adminId, String email, Long professionId);
+    void assignUserRole(Long adminId, String email);
+
     void addParticipant(Long adminId, Long caseId, Long userId);
 
     void removeParticipant(Long adminId, Long caseId, Long userId);
