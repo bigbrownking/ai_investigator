@@ -46,6 +46,7 @@ public interface AdminService {
     void assignAdvancedUserRole(String email, Long professionId);
     void assignUserRole(String email);
     void assignRegAdminRole(String email, List<String> regions);
+    void assignRegAdminRole(String email);
     void removeRegAdminRole(String email, List<String> regions);
     void changeOwner(Long caseId, Long id);
     void assignZonalUserRole(String email);

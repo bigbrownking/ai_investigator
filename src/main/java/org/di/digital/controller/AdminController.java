@@ -243,8 +243,12 @@ public class AdminController {
     @PutMapping("/users/assign-reg-admin")
     public ResponseEntity<Void> assignRegAdmin(
             @RequestParam String email,
-            @RequestParam List<String> regions) {
-        adminService.assignRegAdminRole(email, regions);
+            @RequestParam(required = false) List<String> regions) {
+        if (regions == null || regions.isEmpty()) {
+            adminService.assignRegAdminRole(email);
+        } else {
+            adminService.assignRegAdminRole(email, regions);
+        }
         return ResponseEntity.ok().build();
     }
 

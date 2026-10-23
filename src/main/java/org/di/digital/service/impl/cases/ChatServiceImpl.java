@@ -48,6 +48,7 @@ import java.io.IOException;
 import java.util.List;
 import java.util.concurrent.CompletableFuture;
 
+import static org.di.digital.util.mapper.UserMapper.AFM_REGION_ID;
 import static org.di.digital.util.requests.RequestBodyBuilder.generalChatBody;
 import static org.di.digital.util.requests.RequestUrlBuilder.generalChatUrl;
 import static org.di.digital.util.requests.RequestUrlBuilder.qualificationChatUrl;
@@ -183,7 +184,9 @@ public class ChatServiceImpl implements ChatService {
     public void streamRegAdminCaseChat(Long caseId, ChatRequest request, Long adminId, SseEmitter emitter) {
         Case caseEntity = findCaseById(caseId);
         User admin = findUserById(adminId);
-        userUtil.validateRegionAccess(admin, caseEntity);
+        if (admin.getRegion().getId() != null && admin.getRegion().getId() != AFM_REGION_ID) {
+            userUtil.validateRegionAccess(admin, caseEntity);
+        }
 
         doStreamCaseChat(caseEntity, admin, request, emitter, ChatActor.REG_ADMIN);
     }
@@ -193,7 +196,9 @@ public class ChatServiceImpl implements ChatService {
     public CaseChatHistoryResponse getRegAdminChatHistory(Long caseId, Long adminId, int page, int size) {
         Case caseEntity = findCaseById(caseId);
         User admin = findUserById(adminId);
-        userUtil.validateRegionAccess(admin, caseEntity);
+        if (admin.getRegion().getId() != null && admin.getRegion().getId() != AFM_REGION_ID) {
+            userUtil.validateRegionAccess(admin, caseEntity);
+        }
 
         return getChatHistory(caseEntity.getId(), admin.getId(), page, size);
     }

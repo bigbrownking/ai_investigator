@@ -19,4 +19,5 @@ public class ZonalConsolidatedRegion {
     private Long submissionId;
     private LocalDateTime submittedAt;
     private List<Map<String, Object>> rows;
+    private boolean agency;
 }

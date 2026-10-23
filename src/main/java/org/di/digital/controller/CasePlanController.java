@@ -57,7 +57,7 @@ public class CasePlanController {
     }
 
     @GetMapping("/management/approve")
-    @PreAuthorize("hasAnyAuthority('REG_ADMIN')")
+    @PreAuthorize("hasAnyAuthority('REG_ADMIN', 'ADVANCED_USER')")
     public ResponseEntity<List<ManagementPendingPlanDto>> getManagementApprovePlans(
             Authentication authentication) {
         return ResponseEntity.ok(
@@ -206,5 +206,10 @@ public class CasePlanController {
     @GetMapping("/notifications/unread-count")
     public ResponseEntity<Map<String, Long>> unreadCount(Authentication authentication) {
         return ResponseEntity.ok(Map.of("count", planService.getUnreadCount(authentication.getName())));
+    }
+
+    @GetMapping("/notifications/unread")
+    public ResponseEntity<List<PlanNotification>> getUnreadNotifications(Authentication authentication) {
+        return ResponseEntity.ok(planService.getUnreadNotifications(authentication.getName()));
     }
 }

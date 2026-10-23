@@ -74,6 +74,15 @@ public class MinioServiceImpl implements MinioService {
     }
 
     @Override
+    public String uploadReportFile(byte[] bytes, String caseNumber, String fileName) {
+        String objectName = String.format("%s/report/%s", caseNumber, fileName);
+        byte[] storedBytes = encryptBytes(bytes);
+        String storedObjectName = storedObjectName(objectName);
+        return storage.putObject(storedObjectName, new ByteArrayInputStream(storedBytes), storedBytes.length,
+                "application/vnd.openxmlformats-officedocument.wordprocessingml.document");
+    }
+
+    @Override
     public CaseInterrogationApplicationFile uploadApplicationFile(MultipartFile file, String folder, String fio) {
         String storedFileName = generateFileName(file.getOriginalFilename());
         String objectName = folder + "/application/" + fio + "/" + storedFileName;

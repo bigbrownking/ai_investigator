@@ -80,8 +80,13 @@ public class ZonalConsolidatedExcelWriter {
             writeTitle();
             writeHeader();
             List<ZonalConsolidatedRegion> regions = table.getRegions() == null ? List.of() : table.getRegions();
+            boolean wroteRegion = false;
             for (ZonalConsolidatedRegion region : regions) {
+                if (region.isAgency() && wroteRegion) {
+                    rowIndex++;   // пустая строка между списком департаментов и Агентством
+                }
                 writeRegion(region);
+                wroteRegion = true;
             }
             writeTotals();
             applyWidths();
@@ -113,7 +118,9 @@ public class ZonalConsolidatedExcelWriter {
             int count = Math.max(rows.size(), 1);
             for (int r = 0; r < count; r++) {
                 Row row = sheet.createRow(rowIndex++);
-                writeRegionCells(row, region);
+                if (r == 0) {
+                    writeRegionCells(row, region);
+                }
                 Map<String, Object> cells = r < rows.size() ? rows.get(r) : Map.of();
                 for (int i = 0; i < columns.size(); i++) {
                     writeValue(row, FIXED_COLUMNS + i, columns.get(i), cells.get(columns.get(i).getKey()));

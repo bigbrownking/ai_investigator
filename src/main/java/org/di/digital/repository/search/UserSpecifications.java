@@ -34,6 +34,7 @@ public class UserSpecifications {
                 .and(hasEmail(req.getEmail()))
                 .and(hasProfession(req.getProfession()))
                 .and(hasAdministration(req.getAdministration()))
+                .and(hasRegion(req.getRegion()))
                 .and(isActive(req.getActive()));
     }
 

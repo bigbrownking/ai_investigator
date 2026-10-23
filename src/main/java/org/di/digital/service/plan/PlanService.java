@@ -30,6 +30,7 @@ public interface PlanService {
     void markAllRead(String email);
     void markOneRead(Long id, String email);
     long getUnreadCount(String email);
+    List<PlanNotification> getUnreadNotifications(String email);
 
     boolean canWithdraw(PlanStatus status);
     String getApproverName(Case caseEntity);

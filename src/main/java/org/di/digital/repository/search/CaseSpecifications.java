@@ -34,6 +34,7 @@ public class CaseSpecifications {
                 .and(isActive(req.getStatus()))
                 .and(createdAfter(req.getFrom()))
                 .and(createdBefore(req.getTo()))
+                .and(hasRegion(req.getRegion()))
                 .and(hasOwnerName(req.getOwnerName()));
     }
 

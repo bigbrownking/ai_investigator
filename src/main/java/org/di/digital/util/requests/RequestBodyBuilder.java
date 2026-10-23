@@ -129,4 +129,13 @@ public class RequestBodyBuilder {
         body.put("language", request.getLanguage());
         return body;
     }
+
+    public static Map<String, Object> reportBody(String caseNumber, String language, long PersonСhargeId, long userId) {
+        Map<String, Object> body = new HashMap<>();
+        body.put("language", language);
+        body.put("rag_id", caseNumber);
+        body.put("isp_id", PersonСhargeId);
+        body.put("user_id", userId);
+        return body;
+    }
 }

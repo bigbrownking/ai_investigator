@@ -5,6 +5,7 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.exception.message.AccessDeniedMessage;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.enums.plan.ApprovalLevel;
 import org.di.digital.model.enums.settings.UserSettingsLanguage;
 import org.di.digital.model.user.Appeal;
 import org.di.digital.model.user.Region;
@@ -24,6 +25,8 @@ import org.springframework.web.context.request.ServletRequestAttributes;
 
 import java.util.List;
 import java.util.StringTokenizer;
+
+import static org.di.digital.util.mapper.UserMapper.AFM_REGION_ID;
 
 @Slf4j
 @Component
@@ -53,12 +56,33 @@ public class UserUtil {
         }
         return null;
     }
+
     public static UserSettingsLanguage getCurrentLang() {
+        UserSettingsLanguage requested = requestedLang();
+        if (requested != null) {
+            return requested;
+        }
         try {
             UserSettingsLanguage l = getCurrentUser().getSettings().getLanguage();
             return l != null ? l : UserSettingsLanguage.KZ;
         } catch (Exception e) {
             return UserSettingsLanguage.KZ;
+        }
+    }
+
+    private static UserSettingsLanguage requestedLang() {
+        try {
+            String raw = getCurrentHttpRequest().getParameter("lang");
+            if (raw == null || raw.isBlank()) {
+                return null;
+            }
+            String value = raw.trim();
+            if ("kk".equalsIgnoreCase(value)) {
+                return UserSettingsLanguage.KZ;
+            }
+            return UserSettingsLanguage.fromDisplayName(value);
+        } catch (Exception e) {
+            return null;
         }
     }
 
@@ -154,17 +178,59 @@ public class UserUtil {
     }
 
     public List<Long> getAdminRegionIds(User admin) {
-        return regionRepository.findByAdminsContaining(admin)
-                .stream().map(Region::getId).toList();
+        return getOwnRegionIds(admin);          // метод getOwnRegionIds уже есть
+    }
+
+    public List<Long> getVisibleRegionIds(User user) {
+        return getOwnRegionIds(user);
     }
 
     public List<Region> getAdminRegions(User admin) {
-        List<Region> regions = regionRepository.findByAdminsContaining(admin);
-        if (regions.isEmpty()) {
+        if (admin.getRegion() == null) {
             throw new IllegalStateException(AccessDeniedMessage.ADMIN_NO_REGION.localized(currentLang()));
         }
-        return regions;
+        return List.of(admin.getRegion());
     }
+
+//    public List<Long> getAdminRegionIds(User admin) {
+//        return regionRepository.findByAdminsContaining(admin)
+//                .stream().map(Region::getId).toList();
+//    }
+
+    /** REG_ADMIN, сотрудник АФМ (регион АФМ): видит данные по всем регионам. */
+    public boolean isRegAdminAfm(User user) {
+        return hasRole(user, "REG_ADMIN")
+                && user.getRegion() != null
+                && user.getRegion().getId() != null
+                && user.getRegion().getId() == AFM_REGION_ID;
+    }
+
+    /** REG_ADMIN с профессией «Зам. руководителя департамента»: видит данные только своего региона. */
+    public boolean isRegAdminDeputy(User user) {
+        return hasRole(user, "REG_ADMIN")
+                && user.getProfession() != null
+                && ApprovalLevel.LEVEL_FINAL.getProfessionId().equals(user.getProfession().getId());
+    }
+
+    /** Собственный регион пользователя, поле users.region_id. */
+    public List<Long> getOwnRegionIds(User user) {
+        if (user.getRegion() == null) {
+            throw new IllegalStateException(AccessDeniedMessage.ADMIN_NO_REGION.localized(currentLang()));
+        }
+        return List.of(user.getRegion().getId());
+    }
+
+    private static boolean hasRole(User user, String roleName) {
+        return user.getRoles().stream().anyMatch(r -> roleName.equals(r.getName()));
+    }
+
+//    public List<Region> getAdminRegions(User admin) {
+//        List<Region> regions = regionRepository.findByAdminsContaining(admin);
+//        if (regions.isEmpty()) {
+//            throw new IllegalStateException(AccessDeniedMessage.ADMIN_NO_REGION.localized(currentLang()));
+//        }
+//        return regions;
+//    }
 
     public boolean isRegAdmin(User user) {
         return user.getRoles().stream()

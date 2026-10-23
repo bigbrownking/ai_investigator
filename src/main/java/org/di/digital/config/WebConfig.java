@@ -89,7 +89,7 @@ public class WebConfig {
                         /// TODO организовать правильно роли в системе
                         .requestMatchers("/admin/zonal/**").hasAnyAuthority("ADMIN", "REG_ADMIN")
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
-                        .requestMatchers("/reg-admin/**").hasAnyAuthority("REG_ADMIN", "ADVANCED_USER")
+                        .requestMatchers("/reg-admin/**").hasAnyAuthority("REG_ADMIN", "ADVANCED_USER", "ZONAL")
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())

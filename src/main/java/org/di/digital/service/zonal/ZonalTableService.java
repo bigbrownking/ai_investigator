@@ -1,5 +1,6 @@
 package org.di.digital.service.zonal;
 
+import org.di.digital.dto.request.search.ZonalSearchRequest;
 import org.di.digital.dto.request.zonal.ZonalRowsRequest;
 import org.di.digital.dto.response.zonal.ZonalFormResponse;
 import org.di.digital.dto.response.zonal.ZonalFormSummaryResponse;
@@ -11,7 +12,7 @@ import java.util.List;
 
 public interface ZonalTableService {
 
-    List<ZonalFormSummaryResponse> listForms();
+    List<ZonalFormSummaryResponse> listForms(ZonalSearchRequest zonalSearchRequest);
 
     ZonalFormResponse getForm(Long templateId);
 

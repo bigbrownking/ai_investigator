@@ -2,9 +2,13 @@ package org.di.digital.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.search.ZonalSearchRequest;
 import org.di.digital.dto.request.zonal.ZonalTemplateRequest;
 import org.di.digital.dto.response.zonal.ZonalTemplateResponse;
 import org.di.digital.dto.response.zonal.ZonalTemplateSummaryResponse;
+import org.di.digital.model.enums.plan.ApprovalLevel;
+import org.di.digital.model.user.User;
 import org.di.digital.security.zonal.ReportingAccess;
 import org.di.digital.service.zonal.ZonalTemplateAdminService;
 import org.springframework.http.HttpStatus;
@@ -14,7 +18,9 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 
+import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
+@Slf4j
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/admin/zonal/templates")
@@ -24,8 +30,10 @@ public class ZonalTemplateAdminController {
     private final ZonalTemplateAdminService templateService;
 
     @GetMapping
-    public ResponseEntity<List<ZonalTemplateSummaryResponse>> listTemplates() {
-        return ResponseEntity.ok(templateService.listTemplates());
+    @PreAuthorize(ReportingAccess.VIEW_ZONAL_TABLES)
+    public ResponseEntity<List<ZonalTemplateSummaryResponse>> listTemplates(
+            @ModelAttribute ZonalSearchRequest zonalSearchRequest) {
+        return ResponseEntity.ok(templateService.listTemplates(zonalSearchRequest));
     }
 
     @PostMapping

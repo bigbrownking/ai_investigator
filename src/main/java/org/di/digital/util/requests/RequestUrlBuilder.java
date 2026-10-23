@@ -131,4 +131,8 @@ public class RequestUrlBuilder {
         String endpoint = moduleType.getEndpoint(caseNumber);
         return String.format(HTTP_PROTOCOL + "%s:%s%s", host, port, endpoint);
     }
+
+    public static String reportGeneratorUrl(String host, String port) {
+        return buildUrl(host, port, "/api/report");
+    }
 }

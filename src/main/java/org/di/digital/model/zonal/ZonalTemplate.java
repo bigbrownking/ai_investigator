@@ -38,6 +38,9 @@ public class ZonalTemplate {
     @Column(nullable = false)
     private boolean active;
 
+    @Column(name = "is_deleted", nullable = false)
+    private boolean isDeleted;
+
     private Long createdBy;
     private Long updatedBy;
     private LocalDateTime createdAt;

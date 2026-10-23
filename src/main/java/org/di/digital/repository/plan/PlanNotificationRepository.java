@@ -10,4 +10,5 @@ import java.util.List;
 public interface PlanNotificationRepository extends JpaRepository<PlanNotification, Long> {
     List<PlanNotification> findTop4ByUserEmailOrderByCreatedAtDesc(String userEmail);
     long countByUserEmailAndIsReadFalse(String userEmail);
+    List<PlanNotification> findByUserEmailAndIsReadFalse(String userEmail);
 }

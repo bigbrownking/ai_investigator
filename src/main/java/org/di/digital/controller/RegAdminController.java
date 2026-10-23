@@ -334,4 +334,12 @@ public class RegAdminController {
         chatService.clearRegAdminChatHistory(caseId, userDetails.getId());
         return ResponseEntity.noContent().build();
     }
+
+//    @PutMapping("/users/assign-advanced")
+//    public ResponseEntity<Void> assignAdvanced(
+//            @AuthenticationPrincipal UserDetailsImpl userDetails,
+//            @RequestParam String email) {
+//        regAdminService.assignAdvancedUserRole(userDetails.getId(), email);
+//        return ResponseEntity.ok().build();
+//    }
 }

@@ -22,7 +22,7 @@ import java.time.LocalDate;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/admin/zonal")
-@PreAuthorize(ReportingAccess.ADMIN_OR_AFM_REG_ADMIN)
+@PreAuthorize(ReportingAccess.VIEW_ZONAL_TABLES)
 public class ZonalReportAdminController {
 
     private final ZonalReportAdminService reportService;
@@ -39,15 +39,16 @@ public class ZonalReportAdminController {
     }
 
     @GetMapping("/submissions/{id}")
-    public ResponseEntity<ZonalSubmissionResponse> getSubmission(@PathVariable Long id) {
+    public ResponseEntity<ZonalSubmissionResponse> getRegion(@PathVariable Long id) {
         return ResponseEntity.ok(reportService.getSubmission(id));
     }
 
     @GetMapping("/templates/{templateId}/consolidated")
     public ResponseEntity<ZonalConsolidatedResponse> getConsolidated(
             @PathVariable Long templateId,
-            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date) {
-        return ResponseEntity.ok(reportService.getConsolidated(templateId, date));
+            @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) LocalDate date,
+            @RequestParam(required = false) String regionName) {
+        return ResponseEntity.ok(reportService.getConsolidated(templateId, date, regionName));
     }
 
     @GetMapping("/templates/{templateId}/consolidated/export")

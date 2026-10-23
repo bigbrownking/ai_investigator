@@ -1,5 +1,6 @@
 package org.di.digital.service.zonal;
 
+import org.di.digital.dto.request.search.ZonalSearchRequest;
 import org.di.digital.dto.request.zonal.ZonalTemplateRequest;
 import org.di.digital.dto.response.zonal.ZonalTemplateResponse;
 import org.di.digital.dto.response.zonal.ZonalTemplateSummaryResponse;
@@ -8,7 +9,7 @@ import java.util.List;
 
 public interface ZonalTemplateAdminService {
 
-    List<ZonalTemplateSummaryResponse> listTemplates();
+    List<ZonalTemplateSummaryResponse> listTemplates(ZonalSearchRequest zonalSearchRequest);
 
     ZonalTemplateResponse getTemplate(Long templateId);
 

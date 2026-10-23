@@ -50,7 +50,7 @@ public class RegionStatsService {
                         .mapCode(region.getMapCode())
                         .totalUsers(userRepository.countByRegionId(region.getId()))
                         .activeUsers(userRepository.countByRegionIdAndActiveTrue(region.getId()))
-                        .totalCases(caseRepository.countByRegionIdAndStatus(region.getId(), false))
+                        .totalCases(caseRepository.countByRegionIdAndStatus(region.getId(), true))
                         .pendingAppeals(appealRepository.countByRegionIdAndStatus(region.getId(), AppealStatus.PENDING))
                         .build())
                 .toList();

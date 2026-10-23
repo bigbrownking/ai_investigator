@@ -38,7 +38,8 @@ import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.cases.RejectionReasonStatusRepository;
 import org.di.digital.repository.LogRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
-import org.di.digital.repository.review.CaseReportRepository;
+//import org.di.digital.repository.review.CaseReportRepository;
+import org.di.digital.service.impl.report.CaseReportResolver;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
@@ -75,6 +76,7 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
 
+import static org.di.digital.util.mapper.UserMapper.AFM_REGION_ID;
 import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
@@ -98,14 +100,14 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final UserUtil userUtil;
     private final CaseAccessService caseAccessService;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
-    private final CaseReportRepository caseReportRepository;
+//    private final CaseReportRepository caseReportRepository;
+    private final CaseReportResolver caseReportResolver;
     private final MinioService minioService;
     private final RegionStatsService regionStatsService;
     private final LocalizationHelper localizationHelper;
     private static final String ZONAL_ROLE_NAME = "ZONAL";
     private static final String USER_ROLE_NAME = "USER";
     private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
-    private static final String ZONAL_ROLE_NAME = "ZONAL";
     private static final String ADMIN_ROLE_NAME = "ADMIN";
     private static final String REG_ADMIN_ROLE_NAME = "REG_ADMIN";
     private static final Set<Long> ADVANCED_PROFESSION_IDS = Set.of(3L, 4L);
@@ -128,14 +130,27 @@ public class RegAdminServiceImpl implements RegAdminService {
     public Page<UserProfile> getMyRegionUsers(Long adminId, int page, int size, UserSearchRequest req) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
-
-        List<Region> adminRegions = userUtil.getAdminRegions(admin);
-
-        List<Long> regionIds = adminRegions.stream().map(Region::getId).toList();
+        Specification<User> spec;
+        if (userUtil.isRegAdminAfm(admin)) {
+            // сотрудник АФМ: все пользователи по всем регионам
+            spec = UserSpecifications.build(req);
+        } else {
+            List<Long> regionIds = userUtil.getOwnRegionIds(admin);
+            spec = UserSpecifications.buildForRegions(regionIds, req);
+        }
 
         Pageable pageable = PageRequest.of(page, size);
-        Specification<User> spec = UserSpecifications.buildForRegions(regionIds, req);
         return userRepository.findAll(spec, pageable).map(userMapper::toProfile);
+
+
+
+//        List<Region> adminRegions = userUtil.getAdminRegions(admin);
+//
+//        List<Long> regionIds = adminRegions.stream().map(Region::getId).toList();
+//
+//        Pageable pageable = PageRequest.of(page, size);
+//        Specification<User> spec = UserSpecifications.buildForRegions(regionIds, req);
+//        return userRepository.findAll(spec, pageable).map(userMapper::toProfile);
     }
 
     @Override
@@ -147,7 +162,9 @@ public class RegAdminServiceImpl implements RegAdminService {
         User user = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
 
-        userUtil.validateUserRegionAccess(admin, user);
+        if (admin.getRegion().getId() != null && admin.getRegion().getId() != AFM_REGION_ID) {
+            userUtil.validateUserRegionAccess(admin, user);
+        }
 
         Specification<Case> spec = CaseSpecifications.build(req)
                 .and(CaseSpecifications.hasOwner(userId));
@@ -223,11 +240,18 @@ public class RegAdminServiceImpl implements RegAdminService {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
 
-        List<Long> regionIds = userUtil.getAdminRegions(admin).stream()
-                .map(Region::getId)
-                .toList();
+//        List<Long> regionIds = userUtil.getAdminRegions(admin).stream()
+//                .map(Region::getId)
+//                .toList();
 
-        Specification<Case> spec = CaseSpecifications.buildForRegions(regionIds, req);
+        Specification<Case> spec;
+        if (userUtil.isRegAdminAfm(admin)) {
+            // сотрудник АФМ: все дела по всем регионам
+            spec = CaseSpecifications.build(req);
+        } else {
+            List<Long> regionIds = userUtil.getOwnRegionIds(admin);
+            spec = CaseSpecifications.buildForRegions(regionIds, req);
+        }
 
         Page<CaseListResponse> casePage = caseRepository
                 .findAll(spec, PageRequest.of(page, size))
@@ -245,7 +269,9 @@ public class RegAdminServiceImpl implements RegAdminService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
-        userUtil.validateRegionAccess(admin, caseEntity);
+        if (admin.getRegion().getId() != null && admin.getRegion().getId() != AFM_REGION_ID) {
+            userUtil.validateRegionAccess(admin, caseEntity);
+        }
 
         return caseMapper.toResponse(caseEntity);
     }
@@ -559,24 +585,28 @@ public class RegAdminServiceImpl implements RegAdminService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
-        userUtil.validateRegionAccess(admin, caseEntity);
-
-        CaseReport report = caseReportRepository.findByCaseEntityNumber(caseEntity.getNumber())
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.REPORT.localized(currentLang(), caseId.toString())));
-
-        if (report.getStatus() != CaseFileStatusEnum.COMPLETED) {
-            throw new IllegalStateException(
-                    IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), report.getStatus().getLabel()));
-        }
-        if (report.getReportFileUrl() == null || report.getReportFileUrl().isBlank()) {
-            throw new NotFoundException(NotFoundMessage.FILE.localized(currentLang()));
+        if (admin.getRegion().getId() != null && admin.getRegion().getId() != AFM_REGION_ID) {
+            userUtil.validateRegionAccess(admin, caseEntity);
         }
 
-        try (InputStream stream = minioService.downloadFile(report.getReportFileUrl())) {
-            return new ByteArrayResource(stream.readAllBytes());
-        } catch (IOException e) {
-            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
-        }
+        return caseReportResolver.getOrGenerate(admin.getId(), caseEntity);
+
+//        CaseReport report = caseReportRepository.findByCaseEntityNumber(caseEntity.getNumber())
+//                .orElseThrow(() -> new NotFoundException(NotFoundMessage.REPORT.localized(currentLang(), caseId.toString())));
+//
+//        if (report.getStatus() != CaseFileStatusEnum.COMPLETED) {
+//            throw new IllegalStateException(
+//                    IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), report.getStatus().getLabel()));
+//        }
+//        if (report.getReportFileUrl() == null || report.getReportFileUrl().isBlank()) {
+//            throw new NotFoundException(NotFoundMessage.FILE.localized(currentLang()));
+//        }
+//
+//        try (InputStream stream = minioService.downloadFile(report.getReportFileUrl())) {
+//            return new ByteArrayResource(stream.readAllBytes());
+//        } catch (IOException e) {
+//            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
+//        }
     }
 
     @Override
@@ -658,5 +688,32 @@ public class RegAdminServiceImpl implements RegAdminService {
             log.info("Админ {} удалил участника {} из дела {}", adminId, userId, caseId);
         }
         caseAccessService.revokeAll(caseId, userId);
+    }
+
+    @Override
+    @Transactional
+    public void assignAdvancedUserRole(Long adminId, String email) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        // пользователь должен быть из региона этого рег-админа
+        userUtil.validateUserRegionAccess(admin, user);
+
+        if (!user.isActive()) {
+            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang()));
+        }
+
+//        addRoleIfMissing(user, ADVANCED_ROLE_NAME);
+
+        // как и у ADMIN: регион пользователя попадает в его responsibleRegions
+        Region region = user.getRegion();
+        if (region.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
+            region.getAdmins().add(user);
+        }
+
+        log.info("User {} assigned {} role by admin {}", email, ADVANCED_ROLE_NAME, adminId);
     }
 }

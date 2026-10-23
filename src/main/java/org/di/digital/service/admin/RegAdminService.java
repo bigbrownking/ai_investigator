@@ -63,4 +63,5 @@ public interface RegAdminService {
     Map<String, Object> getMyRegionPlan(Long adminId, Long caseId);
     Resource getMyRegionReport(Long adminId, Long caseId);
     List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long adminId,Long caseId, String email);
+    void assignAdvancedUserRole(Long adminId, String email);
 }

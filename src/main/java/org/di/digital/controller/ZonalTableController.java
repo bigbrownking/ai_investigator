@@ -2,11 +2,13 @@ package org.di.digital.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import org.di.digital.dto.request.search.ZonalSearchRequest;
 import org.di.digital.dto.request.zonal.ZonalRowsRequest;
 import org.di.digital.dto.response.zonal.ZonalFormResponse;
 import org.di.digital.dto.response.zonal.ZonalFormSummaryResponse;
 import org.di.digital.dto.response.zonal.ZonalSubmissionResponse;
 import org.di.digital.dto.response.zonal.ZonalSubmissionSummaryResponse;
+import org.di.digital.security.zonal.ReportingAccess;
 import org.di.digital.service.zonal.ZonalTableService;
 import org.springframework.data.domain.Page;
 import org.springframework.http.ResponseEntity;
@@ -18,14 +20,14 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/zonal")
-@PreAuthorize("hasAuthority('ZONAL')")
+@PreAuthorize(ReportingAccess.ZONAL_TABLE_ACCESS)
 public class ZonalTableController {
 
     private final ZonalTableService zonalTableService;
 
     @GetMapping("/forms")
-    public ResponseEntity<List<ZonalFormSummaryResponse>> listForms() {
-        return ResponseEntity.ok(zonalTableService.listForms());
+    public ResponseEntity<List<ZonalFormSummaryResponse>> listForms(@ModelAttribute ZonalSearchRequest zonalSearchRequest) {
+        return ResponseEntity.ok(zonalTableService.listForms(zonalSearchRequest));
     }
 
     @GetMapping("/forms/{templateId}")

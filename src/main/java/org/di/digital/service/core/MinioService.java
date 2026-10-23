@@ -19,4 +19,5 @@ public interface MinioService {
     String uploadOsmotrFile(byte[] bytes, String caseNumber, String fileName, String subfolder);
     String uploadOsmotrGeneratedFile(byte[] bytes, String caseNumber, String fileName, String subfolder);
     boolean fileExists(String objectPath);
+    String uploadReportFile(byte[] bytes, String caseNumber, String fileName);
 }

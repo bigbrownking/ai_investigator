@@ -32,7 +32,8 @@ import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.cases.RejectionReasonStatusRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.osmotr.OsmotrResultRepository;
-import org.di.digital.repository.review.CaseReportRepository;
+//import org.di.digital.repository.review.CaseReportRepository;
+import org.di.digital.service.impl.report.CaseReportResolver;
 import org.di.digital.repository.search.*;
 import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
@@ -104,7 +105,8 @@ public class AdminServiceImpl implements AdminService {
     private final CaseAccessService caseAccessService;
     private final CaseRejectionEnricher caseRejectionEnricher;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
-    private final CaseReportRepository caseReportRepository;
+//    private final CaseReportRepository caseReportRepository;
+    private final CaseReportResolver caseReportResolver;
     private final MinioService minioService;
     private static final String USER_ROLE_NAME = "USER";
     private final OsmotrResultRepository osmotrResultRepository;
@@ -515,6 +517,26 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
+    public void assignRegAdminRole(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        replaceRoles(user, REG_ADMIN_ROLE_NAME);
+        String region = user.getRegion().getRuName();
+        Region reg = regionRepository.findByRuName(region)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.REGION.localized(currentLang(), region)));
+
+        if (reg.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
+            reg.getAdmins().add(user);
+            regionRepository.save(reg);
+        }
+
+        userRepository.save(user);
+        log.info("User {} assigned REG_ADMIN role for region {}", email, region);
+    }
+
+    @Override
+    @Transactional
     public void assignZonalUserRole(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
@@ -691,23 +713,22 @@ public class AdminServiceImpl implements AdminService {
     public Resource getCaseReport(Long caseId) {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+        User admin = getCurrentUser();
+        return caseReportResolver.getOrGenerate(admin.getId(), caseEntity);
 
-        CaseReport report = caseReportRepository.findByCaseEntityNumber(caseEntity.getNumber())
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.REPORT.localized(currentLang(), caseId.toString())));
-
-        if (report.getStatus() != CaseFileStatusEnum.COMPLETED) {
-            throw new IllegalStateException(
-                    IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), report.getStatus().getLabel()));
-        }
-        if (report.getReportFileUrl() == null || report.getReportFileUrl().isBlank()) {
-            throw new NotFoundException(NotFoundMessage.FILE.localized(currentLang()));
-        }
-
-        try (InputStream stream = minioService.downloadFile(report.getReportFileUrl())) {
-            return new ByteArrayResource(stream.readAllBytes());
-        } catch (IOException e) {
-            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
-        }
+//        if (report.getStatus() != CaseFileStatusEnum.COMPLETED) {
+//            throw new IllegalStateException(
+//                    IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), report.getStatus().getLabel()));
+//        }
+//        if (report.getReportFileUrl() == null || report.getReportFileUrl().isBlank()) {
+//            throw new NotFoundException(NotFoundMessage.FILE.localized(currentLang()));
+//        }
+//
+//        try (InputStream stream = minioService.downloadFile(report.getReportFileUrl())) {
+//            return new ByteArrayResource(stream.readAllBytes());
+//        } catch (IOException e) {
+//            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
+//        }
     }
 
     @Override

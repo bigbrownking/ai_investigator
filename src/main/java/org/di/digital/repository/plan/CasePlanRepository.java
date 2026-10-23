@@ -21,7 +21,7 @@ public interface CasePlanRepository extends JpaRepository<CasePlan, Long> {
             "AND p.caseEntity.owner.administration.id = :administrationId")
     List<CasePlan> findByStatusInAndOwnerRegionIdInAndOwnerAdministrationId(
             @Param("statuses") List<PlanStatus> statuses,
-            @Param("regionIds") List<Long> regionIds,
+            @Param("regionIds") Long regionIds,
             @Param("administrationId") Long administrationId
     );
 
@@ -30,7 +30,7 @@ public interface CasePlanRepository extends JpaRepository<CasePlan, Long> {
             "AND p.caseEntity.owner.region.id IN :regionIds")
     List<CasePlan> findByStatusInAndOwnerRegionIdIn(
             @Param("statuses") List<PlanStatus> statuses,
-            @Param("regionIds") List<Long> regionIds
+            @Param("regionIds") Long regionIds
     );
 
     @Query("SELECT p FROM CasePlan p WHERE p.status IN :statuses")

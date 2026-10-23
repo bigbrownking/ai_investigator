@@ -15,7 +15,7 @@ public interface ZonalReportAdminService {
 
     ZonalSubmissionResponse getSubmission(Long submissionId);
 
-    ZonalConsolidatedResponse getConsolidated(Long templateId, LocalDate asOf);
+    ZonalConsolidatedResponse getConsolidated(Long templateId, LocalDate asOf, String regionName);
 
     ExportFile exportConsolidated(Long templateId, LocalDate asOf);
 

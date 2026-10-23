@@ -379,12 +379,9 @@ public class PlanServiceImpl implements PlanService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        List<Long> regionIds = regionRepository.findByAdminsContaining(user)
-                .stream()
-                .map(Region::getId)
-                .toList();
+        Long regionId = regionRepository.findById(user.getRegion().getId()).get().getId();
 
-        if (regionIds.isEmpty()) {
+        if (regionId == null) {
             return List.of();
         }
 
@@ -392,12 +389,12 @@ public class PlanServiceImpl implements PlanService {
         if (user.hasRole("ADVANCED_USER")) {
             plans = casePlanRepository.findByStatusInAndOwnerRegionIdInAndOwnerAdministrationId(
                     List.of(PlanStatus.PENDING, PlanStatus.APPROVED_L1, PlanStatus.APPROVED_L2, PlanStatus.APPROVED_L3),
-                    regionIds,
+                    regionId,
                     user.getAdministration().getId());
         } else {
             plans = casePlanRepository.findByStatusInAndOwnerRegionIdIn(
                     List.of(PlanStatus.APPROVED_L1, PlanStatus.APPROVED_L2, PlanStatus.APPROVED_L3),
-                    regionIds);
+                    regionId);
         }
 
         return plans.stream()
@@ -412,7 +409,7 @@ public class PlanServiceImpl implements PlanService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        List<Long> regionIds = regionRepository.findByAdminsContaining(user)
+        List<Long> regionIds = regionRepository.findById(user.getRegion().getId())
                 .stream()
                 .map(Region::getId)
                 .toList();
@@ -606,7 +603,7 @@ public class PlanServiceImpl implements PlanService {
     @Override
     public void markAllRead(String email) {
         List<PlanNotification> notifications = planNotificationRepository
-                .findTop4ByUserEmailOrderByCreatedAtDesc(email);
+                .findByUserEmailAndIsReadFalse(email);
         notifications.forEach(n -> n.setRead(true));
         planNotificationRepository.saveAll(notifications);
     }
@@ -626,6 +623,12 @@ public class PlanServiceImpl implements PlanService {
     public long getUnreadCount(String email) {
         return planNotificationRepository.countByUserEmailAndIsReadFalse(email);
     }
+
+    @Override
+    public List<PlanNotification> getUnreadNotifications(String email) {
+        return planNotificationRepository.findByUserEmailAndIsReadFalse(email);
+    }
+
     private void validateEditAccess(User user, PlanStatus status) {
         boolean isAdvancedUser = user.hasRole("ADVANCED_USER");
         boolean isRegAdmin = user.hasRole("REG_ADMIN");

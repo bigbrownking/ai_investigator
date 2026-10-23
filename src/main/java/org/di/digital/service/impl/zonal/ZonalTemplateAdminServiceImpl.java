@@ -2,6 +2,8 @@ package org.di.digital.service.impl.zonal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.search.ZonalSearchRequest;
+import org.di.digital.dto.response.cases.CaseListResponse;
 import org.di.digital.dto.response.zonal.SelectOptionDto;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.config.ReportingClock;
@@ -10,6 +12,7 @@ import org.di.digital.dto.request.zonal.ZonalTemplateRequest;
 import org.di.digital.dto.response.zonal.ZonalTemplateResponse;
 import org.di.digital.dto.response.zonal.ZonalTemplateSummaryResponse;
 import org.di.digital.model.enums.zonal.ColumnType;
+import org.di.digital.repository.search.ZonalSpecifications;
 import org.di.digital.util.mapper.TemplateMapper;
 import org.di.digital.util.mapper.ZonalMapper;
 import org.di.digital.model.zonal.ColumnDefinition;
@@ -22,6 +25,9 @@ import org.di.digital.repository.zonal.ZonalWorksheetRepository;
 import org.di.digital.service.zonal.ZonalTemplateAdminService;
 import org.di.digital.exception.ReportingValidationException;
 import org.di.digital.exception.TemplateDefinitionValidator;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
+import org.springframework.data.domain.Sort;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -48,8 +54,12 @@ public class ZonalTemplateAdminServiceImpl implements ZonalTemplateAdminService 
     private final ReportingClock clock;
 
     @Override
-    public List<ZonalTemplateSummaryResponse> listTemplates() {
-        return templateRepository.findAllByOrderByNameAsc().stream()
+    public List<ZonalTemplateSummaryResponse> listTemplates(ZonalSearchRequest req) {
+        return templateRepository
+                .findAll(
+                        ZonalSpecifications.build(req.getName(), req.getActive(), Boolean.FALSE),
+                        Sort.by(Sort.Direction.ASC, "name")
+                ).stream()
                 .map(zonalMapper::toSummary)
                 .toList();
     }
@@ -152,11 +162,12 @@ public class ZonalTemplateAdminServiceImpl implements ZonalTemplateAdminService 
     public void deleteTemplate(Long templateId) {
         ZonalTemplate template = find(templateId);
         if (submissionRepository.existsByTemplateId(templateId)) {
-            throw new IllegalStateException("Template '" + template.getName()
-                    + "' has already been sent by regions and is kept for history; deactivate it instead");
+            template.setDeleted(true);
+            templateRepository.save(template);
+        } else {
+            worksheetRepository.deleteByTemplateId(templateId);
+            templateRepository.delete(template);
         }
-        worksheetRepository.deleteByTemplateId(templateId);
-        templateRepository.delete(template);
         log.info("Zonal template {} '{}' deleted by admin {}", templateId, template.getName(), currentUserId());
     }
 

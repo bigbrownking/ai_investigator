@@ -34,4 +34,9 @@ public interface CaseFileRepository extends JpaRepository<CaseFile, Long> {
 
     @Query("SELECT cf.id FROM CaseFile cf WHERE cf.id IN :ids")
     List<Long> findExistingIds(@Param("ids") List<Long> ids);
+
+    /** Время последнего завершения обработки файла дела с указанным статусом (null, если таких файлов нет). */
+    @Query("SELECT MAX(COALESCE(f.completedAt, f.uploadedAt)) FROM CaseFile f " +
+            "WHERE f.caseEntity.id = :caseId AND f.status = :status")
+    LocalDateTime findLatestChangeAt(@Param("caseId") Long caseId, @Param("status") CaseFileStatusEnum status);
 }

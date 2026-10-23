@@ -2,12 +2,14 @@ package org.di.digital.service.impl.zonal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.di.digital.dto.request.search.ZonalSearchRequest;
 import org.di.digital.dto.response.zonal.*;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.model.user.Region;
 import org.di.digital.model.user.User;
 import org.di.digital.config.ReportingClock;
 import org.di.digital.dto.request.zonal.ZonalRowsRequest;
+import org.di.digital.repository.search.ZonalSpecifications;
 import org.di.digital.util.mapper.TemplateMapper;
 import org.di.digital.util.mapper.ZonalMapper;
 import org.di.digital.model.zonal.TableRow;
@@ -55,11 +57,13 @@ public class ZonalTableServiceImpl implements ZonalTableService {
     private final ReportingClock clock;
 
     @Override
-    public List<ZonalFormSummaryResponse> listForms() {
+    public List<ZonalFormSummaryResponse> listForms(ZonalSearchRequest req) {
         Long regionId = currentRegion().getId();
         Map<Long, ZonalWorksheet> worksheets = worksheetRepository.findByRegionId(regionId).stream()
                 .collect(Collectors.toMap(ZonalWorksheet::getTemplateId, Function.identity()));
-        return templateRepository.findByActiveTrueOrderByNameAsc().stream()
+        return templateRepository.findAll(
+                        ZonalSpecifications.build(req.getName(), true, false),
+                        Sort.by(Sort.Direction.ASC, "name")).stream()
                 .map(t -> zonalMapper.toFormSummary(t, worksheets.get(t.getId())))
                 .toList();
     }

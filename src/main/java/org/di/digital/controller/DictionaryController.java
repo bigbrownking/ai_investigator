@@ -1,5 +1,7 @@
 package org.di.digital.controller;
 
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.enums.ParameterIn;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.dictionary.ModuleDto;
@@ -91,6 +93,7 @@ public class DictionaryController {
     }
 
     @GetMapping("/regions")
+    @Parameter(in = ParameterIn.QUERY, name = "lang", description = "Язык: RU, KZ", example = "RU")
     public ResponseEntity<List<RegionDto>> getRegions() {
         return ResponseEntity.ok(
                 regionRepository.findAllByOrderByRuNameAsc().stream()
@@ -99,6 +102,7 @@ public class DictionaryController {
     }
 
     @GetMapping("/administrations")
+    @Parameter(in = ParameterIn.QUERY, name = "lang", description = "Язык: RU, KZ", example = "RU")
     public ResponseEntity<List<AdministrationDto>> getAdministrations() {
         return ResponseEntity.ok(
                 administrationRepository.findAll().stream()
@@ -107,6 +111,7 @@ public class DictionaryController {
     }
 
     @GetMapping("/professions")
+    @Parameter(in = ParameterIn.QUERY, name = "lang", description = "Язык: RU, KZ", example = "RU")
     public ResponseEntity<List<ProfessionDto>> getProfessions() {
         return ResponseEntity.ok(
                 professionRepository.findAllOrdered().stream()
@@ -123,6 +128,7 @@ public class DictionaryController {
     }
 
     @GetMapping("/ranks")
+    @Parameter(in = ParameterIn.QUERY, name = "lang", description = "Язык: RU, KZ, EN", example = "RU")
     public ResponseEntity<List<RankDto>> getRanks() {
         return ResponseEntity.ok(
                 rankRepository.findAll().stream()
