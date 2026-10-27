@@ -36,6 +36,8 @@ public class PlanMapper {
         Case c = p.getCaseEntity();
         return ManagementPendingPlanDto.builder()
                 .author(c.getOwner().getFio())
+                .reviewedBy(p.getReviewedBy() != null ? p.getReviewedBy().getFio() : null)
+                .approvedBy(p.getApprovedBy() != null ? p.getApprovedBy().getFio() : null)
                 .caseNumber(c.getNumber())
                 .caseTitle(c.getTitle())
                 .planStatus(p.getStatus())

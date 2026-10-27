@@ -70,6 +70,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -565,6 +566,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Map<String, Object> getMyRegionPlan(Long adminId, Long caseId) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
@@ -574,7 +576,17 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         userUtil.validateRegionAccess(admin, caseEntity);
 
-        return caseEntity.getPlan();
+        Map<String, Object> plan = caseEntity.getPlan();
+        if (plan == null) {
+            return null;
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>(plan);
+        User reviewer = caseEntity.getPlanReviewedBy();
+        User approver = caseEntity.getPlanApprovedBy();
+        response.put("reviewedBy", reviewer != null ? reviewer.getFio() : null);
+        response.put("approvedBy", approver != null ? approver.getFio() : null);
+        return response;
     }
     @Override
     @Transactional(readOnly = true)
