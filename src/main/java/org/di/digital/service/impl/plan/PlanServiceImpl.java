@@ -82,6 +82,7 @@ public class PlanServiceImpl implements PlanService {
     private final PlanActionWriter planActionWriter;
     private final UserUtil userUtil;
     private final PlanResponseAssembler assembler;
+    private final PlanApproverResolver approverResolver;
     private final CaseAccessService caseAccessService;
 
     private final PlanMapper mapper;
@@ -670,9 +671,7 @@ public class PlanServiceImpl implements PlanService {
     }
 
     public String getApproverName(Case caseEntity) {
-        User approver = caseEntity.getPlanApprovedBy();
-        if (approver == null) return null;
-        return approver.getFio();
+        return approverResolver.getApproverName(caseEntity.getCasePlan());
     }
 
     private UserSettingsLanguage currentLang(){

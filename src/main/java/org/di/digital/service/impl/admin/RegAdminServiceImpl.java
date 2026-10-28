@@ -40,6 +40,7 @@ import org.di.digital.repository.LogRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 //import org.di.digital.repository.review.CaseReportRepository;
 import org.di.digital.service.impl.report.CaseReportResolver;
+import org.di.digital.service.impl.plan.PlanApproverResolver;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
@@ -103,6 +104,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
 //    private final CaseReportRepository caseReportRepository;
     private final CaseReportResolver caseReportResolver;
+    private final PlanApproverResolver approverResolver;
     private final MinioService minioService;
     private final RegionStatsService regionStatsService;
     private final LocalizationHelper localizationHelper;
@@ -583,9 +585,8 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         Map<String, Object> response = new LinkedHashMap<>(plan);
         User reviewer = caseEntity.getPlanReviewedBy();
-        User approver = caseEntity.getPlanApprovedBy();
         response.put("reviewedBy", reviewer != null ? reviewer.getFio() : null);
-        response.put("approvedBy", approver != null ? approver.getFio() : null);
+        response.put("approvedBy", approverResolver.getApproverName(caseEntity.getCasePlan()));
         return response;
     }
     @Override

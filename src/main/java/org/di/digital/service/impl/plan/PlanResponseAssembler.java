@@ -6,6 +6,7 @@ import org.di.digital.model.cases.Case;
 import org.di.digital.model.enums.plan.PlanStatus;
 import org.di.digital.model.user.User;
 import org.springframework.stereotype.Component;
+import lombok.RequiredArgsConstructor;
 
 import java.time.LocalDate;
 import java.time.format.DateTimeFormatter;
@@ -16,7 +17,10 @@ import java.util.Map;
 
 @Slf4j
 @Component
+@RequiredArgsConstructor
 public class PlanResponseAssembler {
+
+    private final PlanApproverResolver approverResolver;
 
     public CasePlanResponse build(Case caseEntity) {
         return CasePlanResponse.builder()
@@ -41,9 +45,7 @@ public class PlanResponseAssembler {
     }
 
     public String getApproverName(Case caseEntity) {
-        User approver = caseEntity.getPlanApprovedBy();
-        if (approver == null) return null;
-        return approver.getFio();
+        return approverResolver.getApproverName(caseEntity.getCasePlan());
     }
 
     @SuppressWarnings("unchecked")
