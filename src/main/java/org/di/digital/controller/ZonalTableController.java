@@ -20,7 +20,7 @@ import java.util.List;
 @RestController
 @RequiredArgsConstructor
 @RequestMapping("/zonal")
-@PreAuthorize(ReportingAccess.ZONAL_TABLE_ACCESS)
+@PreAuthorize(ReportingAccess.ZONAL_TABLE_ACCESS + " or " + ReportingAccess.VIEW_ZONAL_TABLES)
 public class ZonalTableController {
 
     private final ZonalTableService zonalTableService;

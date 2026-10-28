@@ -8,6 +8,7 @@ import java.util.Map;
 @Getter
 @Setter
 @Builder
+@EqualsAndHashCode
 @NoArgsConstructor
 @AllArgsConstructor
 public class TableRow {
