@@ -9,7 +9,7 @@ import java.util.Map;
 
 @Getter
 @Builder
-public class ManagementPlanDto {
+public class ManagementPendingPlanDto {
     private String author;
     private String reviewedBy;
     private String approvedBy;

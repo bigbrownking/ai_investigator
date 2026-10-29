@@ -1,7 +1,7 @@
 package org.di.digital.util.mapper;
 
 import lombok.RequiredArgsConstructor;
-import org.di.digital.dto.response.plan.ManagementPlanDto;
+import org.di.digital.dto.response.plan.ManagementPendingPlanDto;
 import org.di.digital.dto.response.plan.PlanApprovalHistoryDto;
 import org.di.digital.dto.response.plan.PlanEditHistoryDto;
 import org.di.digital.model.cases.Case;
@@ -35,9 +35,9 @@ public class PlanMapper {
                 .build();
     }
 
-    public ManagementPlanDto toManagementPlanDto(CasePlan p, Map<String, Object> enrichedPlan) {
+    public ManagementPendingPlanDto toManagementPendingPlanDto(CasePlan p, Map<String, Object> enrichedPlan) {
         Case c = p.getCaseEntity();
-        return ManagementPlanDto.builder()
+        return ManagementPendingPlanDto.builder()
                 .author(c.getOwner().getFio())
                 .reviewedBy(p.getReviewedBy() != null ? p.getReviewedBy().getFio() : null)
                 .approvedBy(approverResolver.getApproverName(p))
