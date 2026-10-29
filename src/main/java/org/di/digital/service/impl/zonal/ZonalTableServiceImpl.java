@@ -10,6 +10,8 @@ import org.di.digital.model.user.User;
 import org.di.digital.config.ReportingClock;
 import org.di.digital.dto.request.zonal.ZonalRowsRequest;
 import org.di.digital.repository.search.ZonalSpecifications;
+import org.di.digital.repository.user.RegionRepository;
+import org.di.digital.security.zonal.ReportingAccess;
 import org.di.digital.util.mapper.TemplateMapper;
 import org.di.digital.util.mapper.ZonalMapper;
 import org.di.digital.model.zonal.TableRow;
@@ -55,6 +57,8 @@ public class ZonalTableServiceImpl implements ZonalTableService {
     private final TemplateMapper templateMapper;
     private final ZonalMapper zonalMapper;
     private final ReportingClock clock;
+    private final RegionRepository regionRepository;
+    private final ReportingAccess reportingAccess;
 
     @Override
     public List<ZonalFormSummaryResponse> listForms(ZonalSearchRequest req) {
@@ -94,40 +98,12 @@ public class ZonalTableServiceImpl implements ZonalTableService {
         ZonalTemplate template = findActive(templateId);
         Region region = currentRegion();
         ZonalWorksheet worksheet = findOrCreate(templateId, region.getId());
-        checkLockVersion(worksheet, request.getLockVersion());
-        if (request.getRows() != null) {
-            applyDraftRows(template, worksheet, request.getRows());
-        }
-
-        List<TableRow> validated = validateForSubmit(template, worksheet.getRows());
-        LocalDateTime now = clock.now();
-        Long userId = currentUserId();
-
-        ZonalSubmission submission = submissionRepository.save(ZonalSubmission.builder()
-                .templateId(template.getId())
-                .regionId(region.getId())
-                .name(template.getName())
-                .columns(templateMapper.copyColumns(template.getColumns()))
-                .rows(validated)
-                .rowCount(validated.size())
-                .reportDate(clock.today())
-                .submittedAt(now)
-                .submittedBy(userId)
-                .comment(request.getComment() == null || request.getComment().isBlank() ? null : request.getComment().trim())
-                .build());
-
-        worksheet.setLastSubmittedAt(now);
-        if (worksheet.getUpdatedAt() == null) {
-            worksheet.setUpdatedAt(now);
-            worksheet.setUpdatedBy(userId);
-        }
-        ZonalWorksheet savedWorksheet = worksheetRepository.saveAndFlush(worksheet);
-
-        log.info("Zonal template {} '{}' sent by region {} (user {}): {} rows, submission {}",
-                template.getId(), template.getName(), region.getId(), userId, validated.size(), submission.getId());
-        ZonalSubmissionResponse response = zonalMapper.toSubmission(submission, region);
-        response.setFormLockVersion(savedWorksheet.getLockVersion());
-        return response;
+        return createSubmission(
+                template,
+                region,
+                worksheet,
+                request
+        );
     }
 
     @Override
@@ -264,5 +240,190 @@ public class ZonalTableServiceImpl implements ZonalTableService {
                 throw new ReportingValidationException(flat, byCell);
             }
         }
+    }
+
+    @Override
+    public ZonalFormResponse getFormForRegion(
+            Long templateId,
+            Long regionId
+    ) {
+        // Проверяем, имеет ли пользователь доступ к региону.
+        reportingAccess.assertCanEditRegion(regionId);
+
+        Region region = getRegionOrThrow(regionId);
+        ZonalTemplate template = findActive(templateId);
+
+        ZonalWorksheet worksheet =
+                worksheetRepository
+                        .findByTemplateIdAndRegionId(
+                                templateId,
+                                region.getId()
+                        )
+                        .orElse(null);
+
+        // Возвращаем текущий черновик, а не отправленный отчёт.
+        return zonalMapper.toForm(
+                template,
+                region.getId(),
+                worksheet
+        );
+    }
+
+    @Override
+    @Transactional
+    public ZonalSubmissionResponse submitForRegion(
+            Long templateId,
+            Long regionId,
+            ZonalRowsRequest request
+    ) {
+        // Проверяем права до чтения и изменения данных.
+        reportingAccess.assertCanEditRegion(regionId);
+
+        Region region = getRegionOrThrow(regionId);
+        ZonalTemplate template = findActive(templateId);
+
+        ZonalWorksheet worksheet =
+                findOrCreate(templateId, region.getId());
+
+        // Для существующего черновика версия обязательна.
+        if (worksheet.getId() != null
+                && request.getLockVersion() == null) {
+            throw new ReportingValidationException(
+                    List.of("lockVersion is required")
+            );
+        }
+
+        // Для пустой формы фронтенд должен прислать rows: [].
+        if (request.getRows() == null) {
+            throw new ReportingValidationException(
+                    List.of("rows is required; use [] for an empty form")
+            );
+        }
+
+        return createSubmission(
+                template,
+                region,
+                worksheet,
+                request
+        );
+
+//        // Не сохраняем данные поверх новой версии формы.
+//        checkLockVersion(
+//                worksheet,
+//                request.getLockVersion()
+//        );
+//
+//        // Используем существующую проверку ячеек и строк.
+//        applyDraftRows(
+//                template,
+//                worksheet,
+//                request.getRows()
+//        );
+//
+//        ZonalWorksheet savedWorksheet =
+//                worksheetRepository.saveAndFlush(worksheet);
+//
+//        return zonalMapper.toForm(
+//                template,
+//                region.getId(),
+//                savedWorksheet
+//        );
+    }
+
+    private Region getRegionOrThrow(Long regionId) {
+        return regionRepository.findById(regionId)
+                .orElseThrow(() ->
+                        new NotFoundException(
+                                "Region not found: " + regionId
+                        )
+                );
+    }
+
+    private ZonalSubmissionResponse createSubmission(
+            ZonalTemplate template,
+            Region region,
+            ZonalWorksheet worksheet,
+            ZonalRowsRequest request
+    ) {
+        checkLockVersion(
+                worksheet,
+                request.getLockVersion()
+        );
+
+        // Если строки переданы, обновляем черновик.
+        if (request.getRows() != null) {
+            applyDraftRows(
+                    template,
+                    worksheet,
+                    request.getRows()
+            );
+        }
+
+        // Проверяем обязательные поля перед отправкой.
+        List<TableRow> validated =
+                validateForSubmit(
+                        template,
+                        worksheet.getRows()
+                );
+
+        LocalDateTime now = clock.now();
+        Long userId = currentUserId();
+
+        // Создаём НОВУЮ запись с копией данных.
+        ZonalSubmission submission =
+                submissionRepository.saveAndFlush(
+                        ZonalSubmission.builder()
+                                .templateId(template.getId())
+                                .regionId(region.getId())
+                                .name(template.getName())
+                                .columns(
+                                        templateMapper.copyColumns(
+                                                template.getColumns()
+                                        )
+                                )
+                                .rows(validated)
+                                .rowCount(validated.size())
+                                .reportDate(clock.today())
+                                .submittedAt(now)
+                                .submittedBy(userId)
+                                .comment(
+                                        request.getComment() == null
+                                                || request.getComment().isBlank()
+                                                ? null
+                                                : request.getComment().trim()
+                                )
+                                .build()
+                );
+
+        // Обновляем состояние черновика.
+        worksheet.setLastSubmittedAt(now);
+
+        if (worksheet.getUpdatedAt() == null) {
+            worksheet.setUpdatedAt(now);
+            worksheet.setUpdatedBy(userId);
+        }
+
+        ZonalWorksheet savedWorksheet =
+                worksheetRepository.saveAndFlush(worksheet);
+
+        log.info(
+                "Zonal template {} '{}' submitted for region {} "
+                        + "by user {}: {} rows, submission {}",
+                template.getId(),
+                template.getName(),
+                region.getId(),
+                userId,
+                validated.size(),
+                submission.getId()
+        );
+
+        ZonalSubmissionResponse response =
+                zonalMapper.toSubmission(submission, region);
+
+        response.setFormLockVersion(
+                savedWorksheet.getLockVersion()
+        );
+
+        return response;
     }
 }

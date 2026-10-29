@@ -2,31 +2,28 @@ package org.di.digital.service.impl.zonal;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import org.di.digital.dto.request.search.ZonalSearchRequest;
-import org.di.digital.dto.response.cases.CaseListResponse;
-import org.di.digital.dto.response.zonal.SelectOptionDto;
-import org.di.digital.exception.NotFoundException;
 import org.di.digital.config.ReportingClock;
+import org.di.digital.dto.request.search.ZonalSearchRequest;
 import org.di.digital.dto.request.zonal.ZonalColumnRequest;
+import org.di.digital.dto.request.zonal.ZonalRowsRequest;
 import org.di.digital.dto.request.zonal.ZonalTemplateRequest;
-import org.di.digital.dto.response.zonal.ZonalTemplateResponse;
-import org.di.digital.dto.response.zonal.ZonalTemplateSummaryResponse;
+import org.di.digital.dto.response.zonal.*;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.ReportingValidationException;
+import org.di.digital.exception.TemplateDefinitionValidator;
 import org.di.digital.model.enums.zonal.ColumnType;
-import org.di.digital.repository.search.ZonalSpecifications;
-import org.di.digital.util.mapper.TemplateMapper;
-import org.di.digital.util.mapper.ZonalMapper;
 import org.di.digital.model.zonal.ColumnDefinition;
 import org.di.digital.model.zonal.TableRow;
 import org.di.digital.model.zonal.ZonalTemplate;
 import org.di.digital.model.zonal.ZonalWorksheet;
+import org.di.digital.repository.search.ZonalSpecifications;
 import org.di.digital.repository.zonal.ZonalSubmissionRepository;
 import org.di.digital.repository.zonal.ZonalTemplateRepository;
 import org.di.digital.repository.zonal.ZonalWorksheetRepository;
+import org.di.digital.service.zonal.ZonalTableService;
 import org.di.digital.service.zonal.ZonalTemplateAdminService;
-import org.di.digital.exception.ReportingValidationException;
-import org.di.digital.exception.TemplateDefinitionValidator;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
+import org.di.digital.util.mapper.TemplateMapper;
+import org.di.digital.util.mapper.ZonalMapper;
 import org.springframework.data.domain.Sort;
 import org.springframework.orm.ObjectOptimisticLockingFailureException;
 import org.springframework.stereotype.Service;
@@ -52,6 +49,7 @@ public class ZonalTemplateAdminServiceImpl implements ZonalTemplateAdminService 
     private final TemplateMapper templateMapper;
     private final ZonalMapper zonalMapper;
     private final ReportingClock clock;
+    private final ZonalTableService zonalTableService;
 
     @Override
     public List<ZonalTemplateSummaryResponse> listTemplates(ZonalSearchRequest req) {
@@ -245,5 +243,30 @@ public class ZonalTemplateAdminServiceImpl implements ZonalTemplateAdminService 
 
     private static Long currentUserId() {
         return getCurrentUser().getId();
+    }
+
+    @Override
+    public ZonalFormResponse getFormForRegion(
+            Long templateId,
+            Long regionId
+    ) {
+        return zonalTableService.getFormForRegion(
+                templateId,
+                regionId
+        );
+    }
+
+    @Override
+    @Transactional
+    public ZonalSubmissionResponse submitForRegion(
+            Long templateId,
+            Long regionId,
+            ZonalRowsRequest request
+    ) {
+        return zonalTableService.submitForRegion(
+                templateId,
+                regionId,
+                request
+        );
     }
 }

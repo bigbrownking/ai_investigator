@@ -23,4 +23,15 @@ public interface ZonalTableService {
     Page<ZonalSubmissionSummaryResponse> getHistory(Long templateId, int page, int size);
 
     ZonalSubmissionResponse getSubmission(Long submissionId);
+
+    ZonalFormResponse getFormForRegion(
+            Long templateId,
+            Long regionId
+    );
+
+    ZonalSubmissionResponse  submitForRegion(
+            Long templateId,
+            Long regionId,
+            ZonalRowsRequest request
+    );
 }
