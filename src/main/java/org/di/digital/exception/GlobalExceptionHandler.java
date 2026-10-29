@@ -2,6 +2,8 @@ package org.di.digital.exception;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.springframework.dao.OptimisticLockingFailureException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ProblemDetail;
 import org.springframework.http.ResponseEntity;
@@ -103,6 +105,23 @@ public class GlobalExceptionHandler {
         ProblemDetail problem = ProblemDetail.forStatusAndDetail(
                 HttpStatus.INTERNAL_SERVER_ERROR, "Внутренняя ошибка сервера");
         problem.setTitle("Internal Server Error");
+        return problem;
+    }
+
+    @ExceptionHandler({
+            OptimisticLockingFailureException.class,
+            DataIntegrityViolationException.class
+    })
+    public ProblemDetail handleWriteConflict(RuntimeException ex) {
+        log.warn("Zonal form conflict: {}", ex.getMessage());
+
+        ProblemDetail problem = ProblemDetail.forStatusAndDetail(
+                HttpStatus.CONFLICT,
+                "Форма была изменена другим пользователем. "
+                        + "Обновите данные и повторите попытку."
+        );
+
+        problem.setTitle("Конфликт");
         return problem;
     }
 }

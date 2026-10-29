@@ -34,7 +34,8 @@ public class ReportingAccess {
 
     public static final long AFM_REGION_ID = 1L;
 
-    private final RegionRepository regionRepository;
+    public static final String ADMIN_OR_REG_ADMIN =
+            "hasAuthority('ADMIN') or hasAuthority('REG_ADMIN')";
 
     public boolean isRegAfm() {
         User user = getCurrentUser();
@@ -81,16 +82,54 @@ public class ReportingAccess {
             throw new AccessDeniedException(AccessDeniedMessage.ADMIN_NO_REGION.localized(getCurrentLang()));
         }
         return Set.of(user.getRegion().getId());
-//        Set<Long> ids = regionRepository.findByAdminsContaining(user).stream()
-//                .map(Region::getId)
-//                .collect(Collectors.toSet());
-//        if (ids.isEmpty()) {
-//            throw new AccessDeniedException(AccessDeniedMessage.ADMIN_NO_REGION.localized(getCurrentLang()));
-//        }
-//        return ids;
     }
 
     private static boolean hasAuthority(Authentication auth, String authority) {
         return auth != null && auth.getAuthorities().stream().anyMatch(a -> authority.equals(a.getAuthority()));
+    }
+
+    public void assertCanEditRegion(Long targetRegionId) {
+        Authentication auth =
+                SecurityContextHolder.getContext().getAuthentication();
+
+        // ADMIN может редактировать любой регион.
+        if (hasAuthority(auth, "ADMIN")) {
+            return;
+        }
+
+        // REG_ADMIN из АФМ также может редактировать любой регион.
+        if (hasAuthority(auth, "REG_ADMIN") && isRegAfm()) {
+            return;
+        }
+
+        // Другим ролям этот метод недоступен.
+        if (!hasAuthority(auth, "REG_ADMIN")) {
+            throw new AccessDeniedException(
+                    AccessDeniedMessage.REGION_OUT_OF_REGION
+                            .localized(getCurrentLang())
+            );
+        }
+
+        User user = getCurrentUser();
+
+        if (user == null) {
+            throw new AccessDeniedException(
+                    AccessDeniedMessage.REGION_OUT_OF_REGION
+                            .localized(getCurrentLang())
+            );
+        }
+
+        // Регион, указанный у пользователя.
+        boolean isOwnRegion =
+                user.getRegion() != null
+                        && targetRegionId.equals(user.getRegion().getId());
+
+
+        if (!isOwnRegion) {
+            throw new AccessDeniedException(
+                    AccessDeniedMessage.REGION_OUT_OF_REGION
+                            .localized(getCurrentLang())
+            );
+        }
     }
 }

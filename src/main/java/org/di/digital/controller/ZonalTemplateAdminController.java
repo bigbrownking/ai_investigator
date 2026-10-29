@@ -4,7 +4,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.search.ZonalSearchRequest;
+import org.di.digital.dto.request.zonal.ZonalRowsRequest;
 import org.di.digital.dto.request.zonal.ZonalTemplateRequest;
+import org.di.digital.dto.response.zonal.ZonalFormResponse;
+import org.di.digital.dto.response.zonal.ZonalSubmissionResponse;
 import org.di.digital.dto.response.zonal.ZonalTemplateResponse;
 import org.di.digital.dto.response.zonal.ZonalTemplateSummaryResponse;
 import org.di.digital.model.enums.plan.ApprovalLevel;
@@ -66,5 +69,32 @@ public class ZonalTemplateAdminController {
     public ResponseEntity<Void> deleteTemplate(@PathVariable Long id) {
         templateService.deleteTemplate(id);
         return ResponseEntity.noContent().build();
+    }
+
+    @GetMapping("/{templateId}/regions/{regionId}/form")
+    @PreAuthorize(ReportingAccess.ADMIN_OR_REG_ADMIN)
+    public ResponseEntity<ZonalFormResponse> getRegionForm(
+            @PathVariable Long templateId,
+            @PathVariable Long regionId
+    ) {
+        return ResponseEntity.ok(
+                templateService.getFormForRegion(templateId, regionId)
+        );
+    }
+
+    @PutMapping("/{templateId}/regions/{regionId}/rows")
+    @PreAuthorize(ReportingAccess.ADMIN_OR_REG_ADMIN)
+    public ResponseEntity<ZonalSubmissionResponse> saveRegionRows(
+            @PathVariable Long templateId,
+            @PathVariable Long regionId,
+            @Valid @RequestBody ZonalRowsRequest request
+    ) {
+        return ResponseEntity.ok(
+                templateService.submitForRegion(
+                        templateId,
+                        regionId,
+                        request
+                )
+        );
     }
 }
