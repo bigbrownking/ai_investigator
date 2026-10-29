@@ -1,6 +1,8 @@
 package org.di.digital.util.mapper;
 
 import lombok.RequiredArgsConstructor;
+import org.di.digital.dto.response.plan.PlanApprovalDetailDto;
+import org.di.digital.dto.response.plan.PlanApprovalHeaderDto;
 import org.di.digital.dto.response.plan.ManagementPlanDto;
 import org.di.digital.dto.response.plan.PlanApprovalHistoryDto;
 import org.di.digital.dto.response.plan.PlanEditHistoryDto;
@@ -12,6 +14,7 @@ import org.di.digital.model.user.User;
 import org.di.digital.service.impl.plan.PlanApproverResolver;
 import org.springframework.stereotype.Component;
 
+import java.util.List;
 import java.util.Map;
 
 @Component
@@ -49,6 +52,33 @@ public class PlanMapper {
                 .build();
     }
 
+    public PlanApprovalHeaderDto toPlanApprovalHeaderDto(CasePlan p) {
+        Case c = p.getCaseEntity();
+        Object actions = p.getContent() != null ? p.getContent().get("actions") : null;
+        int actionCount = actions instanceof List<?> list ? list.size() : 0;
+        return PlanApprovalHeaderDto.builder()
+                .author(c.getOwner().getFio())
+                .caseNumber(c.getNumber())
+                .caseTitle(c.getTitle())
+                .planStatus(p.getStatus())
+                .planSubmittedAt(p.getSubmittedAt())
+                .actionCount(actionCount)
+                .build();
+    }
+    public PlanApprovalDetailDto toPlanApprovalDetailDto(CasePlan p, Map<String, Object> enrichedPlan) {
+        Case c = p.getCaseEntity();
+        return PlanApprovalDetailDto.builder()
+                .author(c.getOwner().getFio())
+                .reviewedBy(p.getReviewedBy() != null ? p.getReviewedBy().getFio() : null)
+                .approvedBy(approverResolver.getApproverName(p))
+                .caseNumber(c.getNumber())
+                .caseTitle(c.getTitle())
+                .region(c.getOwner().getRegion().getRuName())
+                .planStatus(p.getStatus())
+                .planSubmittedAt(p.getSubmittedAt())
+                .plan(enrichedPlan)
+                .build();
+    }
     public PlanEditHistoryDto toEditHistoryDto(PlanEditHistory h) {
         return PlanEditHistoryDto.builder()
                 .id(h.getId())

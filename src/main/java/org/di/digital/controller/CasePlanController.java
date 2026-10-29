@@ -58,13 +58,22 @@ public class CasePlanController {
 
     @GetMapping("/management/approve")
     @PreAuthorize("hasAnyAuthority('REG_ADMIN', 'ADVANCED_USER')")
-    public ResponseEntity<List<ManagementPlanDto>> getManagementApprovePlans(
+    public ResponseEntity<List<PlanApprovalHeaderDto>> getManagementApprovePlans(
             Authentication authentication) {
         return ResponseEntity.ok(
                 planService.getManagementApprovePlans(authentication.getName())
         );
     }
 
+    @GetMapping("/management/approve/{caseNumber}")
+    @PreAuthorize("hasAnyAuthority('REG_ADMIN', 'ADVANCED_USER')")
+    public ResponseEntity<PlanApprovalDetailDto> getManagementApprovedPlan(
+            @PathVariable String caseNumber,
+            Authentication authentication) {
+        return ResponseEntity.ok(
+                planService.getManagementApprovedPlan(caseNumber, authentication.getName())
+        );
+    }
     @PatchMapping(value = "/action", consumes = {MediaType.APPLICATION_JSON_VALUE, MediaType.TEXT_PLAIN_VALUE})
     public ResponseEntity<CasePlanResponse> updatePlanField(
             @RequestParam String caseNumber,

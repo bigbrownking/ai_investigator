@@ -406,7 +406,7 @@ public class PlanServiceImpl implements PlanService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ManagementPlanDto> getManagementApprovePlans(String email) {
+    public List<PlanApprovalHeaderDto> getManagementApprovePlans(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
@@ -423,10 +423,23 @@ public class PlanServiceImpl implements PlanService {
         return casePlanRepository
                 .findByStatusAndOwnerRegionIdInOrderByApprovedAtDesc(PlanStatus.APPROVED_L3, regionIds)
                 .stream()
-                .map(p -> mapper.toManagementPlanDto(p, enrichPlanWithStatus(p.getContent())))
+                .map(mapper::toPlanApprovalHeaderDto)
                 .toList();
     }
 
+    @Override
+    @Transactional(readOnly = true)
+    public PlanApprovalDetailDto getManagementApprovedPlan(String caseNumber, String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        Long regionId = user.getRegion().getId();
+        CasePlan plan = casePlanRepository.findApprovedByCaseNumberAndOwnerRegionIdIn(
+                        caseNumber, PlanStatus.APPROVED_L3, List.of(regionId))
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
+
+        return mapper.toPlanApprovalDetailDto(plan, enrichPlanWithStatus(plan.getContent()));
+    }
     private int pendingPriority(PlanStatus status) {
         if (status == null) {
             return Integer.MAX_VALUE;
