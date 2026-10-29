@@ -5,4 +5,5 @@ import lombok.Getter;
 @Getter
 public class CreateQARequest {
     private String question;
+    private String answer;
 }

@@ -125,7 +125,6 @@ public class ApplicationFileWriter {
 
         caseInterrogationRepository.saveAndFlush(interrogation);
 
-        // задачи в очередь — после flush, чтобы у caseFile был id
         for (CaseFile caseFile : newCaseFiles) {
             taskQueueService.addTaskToQueue(
                     email, caseEntity.getId(), caseEntity.getNumber(),

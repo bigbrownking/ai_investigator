@@ -8,6 +8,7 @@ import org.di.digital.exception.NotFoundException;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.enums.permission.CaseAction;
 import org.di.digital.model.enums.permission.CaseModule;
@@ -89,7 +90,7 @@ public class CaseFileServiceImpl implements CaseFileService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), email)));
 
         if (!CaseFileStatusEnum.FAILED.equals(caseFile.getStatus())) {
-            throw new IllegalStateException("Повторная обработка доступна только для файлов со статусом ОШИБКА");
+            throw new IllegalStateException(MessageConstant.ONLY_FAILED_FILES_CAN_BE_REPROCESSED.localized(currentLang(), caseFile.getCaseEntity().getNumber()));
         }
 
         caseFile.setStatus(CaseFileStatusEnum.QUEUED);

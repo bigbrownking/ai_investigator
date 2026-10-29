@@ -3,6 +3,7 @@ package org.di.digital.service.osmotr;
 import org.di.digital.dto.request.osmotr.DistributionRequest;
 import org.di.digital.dto.response.osmotr.OsmotrResultDto;
 import org.di.digital.dto.response.osmotr.OsmotrResultSegmentDto;
+import org.di.digital.dto.response.osmotr.OsmotrSearchResultItem;
 import org.springframework.web.multipart.MultipartFile;
 
 import java.util.List;

@@ -8,6 +8,7 @@ import lombok.NoArgsConstructor;
 import org.di.digital.dto.response.osmotr.OsmotrDataItemDto;
 
 import java.util.List;
+import java.util.Map;
 
 @Getter
 @Builder
@@ -17,10 +18,5 @@ public class OsmotrSubmitDecisionsRequest {
     @JsonProperty("session_id")
     private String sessionId;
 
-    @JsonProperty("user_id")
-    private Long userId;
-
-    private List<OsmotrDataItemDto> results;
-    private List<OsmotrDataItemDto> data;
-    private List<OsmotrDecisionDto> decisions;
+    private Map<String, Boolean> decisions;
 }

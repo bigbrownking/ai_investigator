@@ -8,40 +8,41 @@ import org.di.digital.dto.request.search.UserSearchRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.AppealDto;
 import org.di.digital.dto.response.admin.RegionStatsDto;
-import org.di.digital.dto.response.cases.CaseListResponse;
-import org.di.digital.dto.response.cases.CasePageResponse;
-import org.di.digital.dto.response.cases.CaseResponse;
-import org.di.digital.dto.response.cases.RejectionReasonResponse;
+import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.enums.MessageConstant;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
 import org.di.digital.model.enums.settings.UserSettingsLanguage;
-import org.di.digital.model.user.Appeal;
+import org.di.digital.model.report.CaseReport;
+import org.di.digital.model.user.*;
 import org.di.digital.model.cases.Case;
-import org.di.digital.model.user.Region;
-import org.di.digital.model.user.User;
 import org.di.digital.model.enums.appeal.AppealStatus;
 import org.di.digital.model.interrogation.CaseInterrogation;
-import org.di.digital.repository.user.AppealRepository;
+import org.di.digital.repository.review.CaseReportRepository;
+import org.di.digital.repository.user.*;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.cases.RejectionReasonStatusRepository;
 import org.di.digital.repository.LogRepository;
-import org.di.digital.repository.user.RegionRepository;
-import org.di.digital.repository.user.UserRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
 import org.di.digital.service.admin.RegAdminService;
+import org.di.digital.service.cases.CaseAccessService;
+import org.di.digital.service.core.MinioService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
 import org.di.digital.util.mapper.CaseMapper;
 import org.di.digital.util.mapper.InterrogationMapper;
 import org.di.digital.util.mapper.SupportMapper;
 import org.di.digital.util.mapper.UserMapper;
 import org.di.digital.util.requests.UserUtil;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
@@ -49,10 +50,14 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
+import java.io.IOException;
+import java.io.InputStream;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
@@ -64,7 +69,10 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final AppealRepository appealRepository;
     private final CaseRepository caseRepository;
     private final UserRepository userRepository;
+    private final RegionRepository regionRepository;
     private final LogRepository logRepository;
+    private final RoleRepository roleRepository;
+    private final ProfessionRepository professionRepository;
     private final UserMapper userMapper;
     private final CaseMapper caseMapper;
     private final InterrogationMapper interrogationMapper;
@@ -72,7 +80,16 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final InterrogationExportService interrogationExportService;
     private final UserUtil userUtil;
+    private final CaseAccessService caseAccessService;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
+    private final CaseReportRepository caseReportRepository;
+    private final MinioService minioService;
+    private static final String USER_ROLE_NAME = "USER";
+    private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
+    private static final String ZONAL_ROLE_NAME = "ZONAL";
+    private static final String ADMIN_ROLE_NAME = "ADMIN";
+    private static final String REG_ADMIN_ROLE_NAME = "REG_ADMIN";
+    private static final Set<Long> ADVANCED_PROFESSION_IDS = Set.of(3L, 4L);
 
     @Override
     public Page<AppealDto> getMyRegionAppeals(Long adminId, int page, int size, AppealSearchRequest req) {
@@ -121,6 +138,22 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .map(caseMapper::toListResponse);
 
         return caseMapper.build(spec, casePage);
+    }
+
+    @Override
+    @Transactional(readOnly = true)
+    public List<CaseUserResponse> getCaseUsers(Long adminId, Long caseId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        userUtil.validateRegionAccess(admin, caseEntity);
+
+        return caseEntity.getUsers().stream()
+                .map(user -> caseMapper.toUserResponse(user, caseEntity))
+                .toList();
     }
 
     @Override
@@ -266,7 +299,6 @@ public class RegAdminServiceImpl implements RegAdminService {
     public void changeOwner(Long adminId, Long caseId, Long id) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
-
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
@@ -274,28 +306,12 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         User newOwner = userRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), id.toString())));
-
         if (!newOwner.isActive()) {
-            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang()));
+            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang(), newOwner.getEmail()));
         }
-
         userUtil.validateUserRegionAccess(admin, newOwner);
 
-        User oldOwner = caseEntity.getOwner();
-        caseEntity.setOwner(newOwner);
-
-        if (oldOwner != null && caseEntity.hasUser(oldOwner)) {
-            caseEntity.removeUser(oldOwner);
-        }
-
-        if (!caseEntity.hasUser(newOwner)) {
-            caseEntity.addUser(newOwner);
-        }
-
-        caseRepository.save(caseEntity);
-
-        log.info("Case {} owner changed from {} to {} by admin {}",
-                caseId, oldOwner != null ? oldOwner.getEmail() : "null", newOwner.getEmail(), adminId);
+        caseAccessService.reassignOwner(caseEntity, newOwner, admin.getEmail());
     }
 
     @Override
@@ -323,6 +339,122 @@ public class RegAdminServiceImpl implements RegAdminService {
                         .email(user.getEmail())
                         .build())
                 .toList();
+    }
+
+    @Override
+    @Transactional
+    public void assignZonalUserRole(Long adminId, String email) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        userUtil.validateUserRegionAccess(admin, user);
+
+        if (!user.isActive()) {
+            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang()));
+        }
+        ensureRoleCanBeChanged(user);
+        Region region = user.getRegion();
+
+        userRepository.findByRegionIdAndRoles_Name(region.getId(), ZONAL_ROLE_NAME).stream()
+                .filter(previous -> !previous.getId().equals(user.getId()))
+                .forEach(previous -> {
+                    replaceRoles(previous, USER_ROLE_NAME);
+                    detachFromRegions(previous, null);
+
+                    log.info("User {} lost {} role in region {}: replaced by {} (admin {})",
+                            previous.getEmail(), ZONAL_ROLE_NAME, region.getId(), email, adminId);
+                });
+
+        replaceRoles(user, ZONAL_ROLE_NAME);
+
+        detachFromRegions(user, region.getId());
+
+        if (region.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
+            region.getAdmins().add(user);
+        }
+
+        log.info("User {} assigned {} role by admin {}", email, ZONAL_ROLE_NAME, adminId);
+    }
+    @Override
+    @Transactional
+    public void assignAdvancedUserRole(Long adminId, String email, Long professionId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        userUtil.validateUserRegionAccess(admin, user);
+
+        if (!user.isActive()) {
+            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang()));
+        }
+
+        ensureRoleCanBeChanged(user);
+        Profession profession = resolveAdvancedProfession(professionId);
+
+        replaceRoles(user, ADVANCED_ROLE_NAME);
+        user.setProfession(profession);
+
+        Region region = user.getRegion();
+        detachFromRegions(user, region != null ? region.getId() : null);
+
+        if (region != null && region.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
+            region.getAdmins().add(user);
+        }
+
+        log.info("User {} assigned {} role with profession {} by admin {}",
+                email, ADVANCED_ROLE_NAME, professionId, adminId);
+    }
+
+    @Override
+    @Transactional
+    public void assignUserRole(Long adminId, String email) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        userUtil.validateUserRegionAccess(admin, user);
+        ensureRoleCanBeChanged(user);
+
+        replaceRoles(user, USER_ROLE_NAME);
+        detachFromRegions(user, null);
+
+        log.info("User {} assigned {} role by admin {}", email, USER_ROLE_NAME, adminId);
+    }
+
+    private Profession resolveAdvancedProfession(Long professionId) {
+        if (professionId == null || !ADVANCED_PROFESSION_IDS.contains(professionId)) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
+        }
+        return professionRepository.findById(professionId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.PROFESSION.localized(currentLang(), professionId.toString())));
+    }
+
+    private void ensureRoleCanBeChanged(User user) {
+        boolean isProtected = user.getRoles().stream()
+                .anyMatch(r -> ADMIN_ROLE_NAME.equals(r.getName()) || REG_ADMIN_ROLE_NAME.equals(r.getName()));
+        if (isProtected) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
+        }
+    }
+    private void replaceRoles(User user, String roleName) {
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
+
+        user.getRoles().clear();
+        user.getRoles().add(role);
+    }
+
+    private void detachFromRegions(User user, Long keepRegionId) {
+        regionRepository.findAllByAdmins_Id(user.getId()).stream()
+                .filter(r -> keepRegionId == null || !r.getId().equals(keepRegionId))
+                .forEach(r -> r.getAdmins().removeIf(a -> a.getId().equals(user.getId())));
     }
 
     @Override
@@ -363,6 +495,34 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         return caseEntity.getPlan();
     }
+    @Override
+    @Transactional(readOnly = true)
+    public Resource getMyRegionReport(Long adminId, Long caseId) {
+        User admin = userRepository.findById(adminId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
+
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        userUtil.validateRegionAccess(admin, caseEntity);
+
+        CaseReport report = caseReportRepository.findByCaseEntityNumber(caseEntity.getNumber())
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.REPORT.localized(currentLang(), caseId.toString())));
+
+        if (report.getStatus() != CaseFileStatusEnum.COMPLETED) {
+            throw new IllegalStateException(
+                    IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), report.getStatus().getLabel()));
+        }
+        if (report.getReportFileUrl() == null || report.getReportFileUrl().isBlank()) {
+            throw new NotFoundException(NotFoundMessage.FILE.localized(currentLang()));
+        }
+
+        try (InputStream stream = minioService.downloadFile(report.getReportFileUrl())) {
+            return new ByteArrayResource(stream.readAllBytes());
+        } catch (IOException e) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
+        }
+    }
 
     @Override
     @Transactional(readOnly = true)
@@ -389,7 +549,7 @@ public class RegAdminServiceImpl implements RegAdminService {
                 .toList();
     }
 
-    private UserSettingsLanguage currentLang(){
+    private UserSettingsLanguage currentLang() {
         return getCurrentLang();
     }
 
@@ -417,6 +577,7 @@ public class RegAdminServiceImpl implements RegAdminService {
             caseRepository.save(caseEntity);
             log.info("Админ {} добавил участника {} в дело {}", adminId, userId, caseId);
         }
+        caseAccessService.grantInitialAccess(caseEntity, userToAdd, null);
     }
 
     @Override
@@ -433,10 +594,17 @@ public class RegAdminServiceImpl implements RegAdminService {
         User userToRemove = userRepository.findById(userId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
 
+        if (caseEntity.isOwner(userToRemove)) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
+        }
         if (caseEntity.hasUser(userToRemove)) {
             caseEntity.removeUser(userToRemove);
             caseRepository.save(caseEntity);
             log.info("Админ {} удалил участника {} из дела {}", adminId, userId, caseId);
         }
+<<<<<<< HEAD
+=======
+        caseAccessService.revokeAll(caseId, userId);
+>>>>>>> c8ab1a304c3c4115ef47d7662c2b8c93f9cfc7a3
     }
 }

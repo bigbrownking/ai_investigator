@@ -2,6 +2,11 @@ package org.di.digital.util.requests;
 
 import lombok.experimental.UtilityClass;
 import org.di.digital.model.enums.cases.TreeModuleType;
+import org.springframework.web.util.UriComponentsBuilder;
+
+import java.net.URI;
+import java.util.HashMap;
+import java.util.Map;
 
 @UtilityClass
 public class RequestUrlBuilder {
@@ -35,6 +40,27 @@ public class RequestUrlBuilder {
 
     public static String qualificationChatUrl(String host, String port, String caseNumber) {
         return buildUrl(host, port, "/query/" + caseNumber);
+    }
+
+    public static URI qualificationCheckUrl(String host, String port, String caseNumber,
+                                            String language, String article) {
+        UriComponentsBuilder b = UriComponentsBuilder
+                .fromUriString(host.trim() + ":" + port.trim())
+                .path("/qualification/{caseNumber}/corpus-delicti")
+                .queryParam("language", "{language}");
+
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("caseNumber", caseNumber);
+        vars.put("language", language);
+
+        if (article != null && !article.isBlank()) {
+            b.queryParam("article", "{article}");
+            vars.put("article", article.strip());
+        }
+
+        return b.encode()
+                .buildAndExpand(vars)
+                .toUri();
     }
 
     public static String indictmentUrl(String host, String port) {
@@ -74,8 +100,17 @@ public class RequestUrlBuilder {
     public static String osmotrDecisionUrl(String host, String port) {
         return buildUrl(host, port, "/api/submit-decisions");
     }
+    public static String osmotrResolutionUrl(String host, String port) {
+        return buildUrl(host, port, "/api/generate-resolution");
+    }
     public static String osmotrDownloadUrl(String host, String port, String sessionId, String fileType) {
         return buildUrl(host, port, String.format("/api/download/%s/%s", sessionId, fileType));
+    }
+    public static String osmotrSearchUrl(String host, String port){
+        return buildUrl(host, port, "/api/search");
+    }
+    public static String osmotrTimelineUrl(String host, String port){
+        return buildUrl(host, port, "/api/analyze-timeline");
     }
 
     public static String interrogationReformulateUrl(String host, String port) {

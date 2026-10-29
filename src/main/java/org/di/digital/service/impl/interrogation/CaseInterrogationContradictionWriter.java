@@ -3,6 +3,8 @@ package org.di.digital.service.impl.interrogation;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.interrogation.ContradictionResponse;
+import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.interrogation.CaseInterrogationChat;
 import org.di.digital.model.interrogation.CaseInterrogationContradiction;
 import org.di.digital.repository.interrogation.CaseInterrogationChatRepository;
@@ -11,6 +13,8 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -31,14 +35,14 @@ public class CaseInterrogationContradictionWriter {
         }
 
         CaseInterrogationChat chat = chatRepository.findById(chatId)
-                .orElseThrow(() -> new IllegalStateException("Чат не найден: " + chatId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CHAT.localized(getCurrentLang(), String.valueOf(chatId))));
 
         log.info("Saving {} contradictions for chatId={}, sourceMessageId={}, indication='{}'",
                 items.size(), chatId, sourceMessageId, truncate(indication, 100));
 
         List<CaseInterrogationContradiction> entities = items.stream()
                 .map(i -> {
-                    log.info("  contradiction: confidence={}%, refs={}, text='{}'",
+                    log.info("contradiction: confidence={}%, refs={}, text='{}'",
                             i.getConfidencePercent(),
                             i.getReferences() == null ? 0 : i.getReferences().size(),
                             truncate(i.getText(), 120));

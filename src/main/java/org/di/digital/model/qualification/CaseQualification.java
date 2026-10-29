@@ -30,6 +30,10 @@ public class CaseQualification {
     @JdbcTypeCode(SqlTypes.JSON)
     private List<Map<String, Object>> sections;
 
+    @Column(name = "corpus_delicti", columnDefinition = "jsonb")
+    @JdbcTypeCode(SqlTypes.JSON)
+    private Map<String, Object> corpusDelicti;
+
     private LocalDateTime generatedAt;
 
     @OneToOne(fetch = FetchType.LAZY)

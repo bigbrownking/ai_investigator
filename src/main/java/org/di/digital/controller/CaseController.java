@@ -239,6 +239,19 @@ public class CaseController {
                 .body(resource);
     }
 
+    @GetMapping("/{caseId}/files/by-name")
+    public ResponseEntity<CaseFileResponse> getFileByName(
+            @PathVariable Long caseId,
+            @RequestParam String fileName,
+            Authentication authentication
+    ) {
+        log.info("Getting file '{}' from case: {} for user: {}",
+                fileName, caseId, authentication.getName());
+        return ResponseEntity.ok(
+                caseService.getFileByName(caseId, fileName, authentication.getName()));
+    }
+
+
     @PostMapping("/{caseId}/users")
     public ResponseEntity<CaseUserResponse> addUserToCase(
             @PathVariable Long caseId,
@@ -251,6 +264,20 @@ public class CaseController {
         CaseUserResponse response = caseService.addUserToCase(caseId, request.getId(), authentication.getName());
         return ResponseEntity.ok(response);
     }
+
+    @PostMapping("/{caseId}/sog")
+    public ResponseEntity<CaseUserResponse> addSogToCase(
+            @PathVariable Long caseId,
+            @Valid @RequestBody AddSogToCaseRequest request,
+            Authentication authentication
+    ) {
+        log.info("Adding SOG member {} to case: {} by user: {}",
+                request.getId(), caseId, authentication.getName());
+
+        return ResponseEntity.ok(caseService.addSogToCase(
+                caseId, request.getId(), request.getFileGrants(), authentication.getName()));
+    }
+
     @GetMapping("/{caseId}/users/history")
     public ResponseEntity<List<CaseMemberHistoryDto>> getMemberHistory(
             @PathVariable Long caseId,

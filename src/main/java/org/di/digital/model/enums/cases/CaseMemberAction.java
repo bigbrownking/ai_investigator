@@ -5,6 +5,7 @@ import lombok.Getter;
 @Getter
 public enum CaseMemberAction {
     ADD("Добавлен"),
+    ADD_SOG("Добавлен СОГ"),
     REMOVE("Удалён");
 
     private final String description;

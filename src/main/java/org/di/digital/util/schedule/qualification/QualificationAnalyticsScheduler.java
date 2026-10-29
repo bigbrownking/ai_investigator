@@ -17,7 +17,7 @@ public class QualificationAnalyticsScheduler {
     private final CaseAnalyticsService caseAnalyticsService;
     private final CaseQualificationRepository caseQualificationRepository;
 
-    @Scheduled(cron = "${scheduler.qualification.analytics}", zone = "Asia/Almaty")
+    @Scheduled(cron = "${scheduler.qualification.analytics}", zone = "${reporting.time-zone}")
     public void recalculateAllQualificationAnalytics() {
         log.info("Starting scheduled qualification analytics.txt recalculation");
 

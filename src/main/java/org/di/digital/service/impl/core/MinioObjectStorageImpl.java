@@ -9,6 +9,7 @@ import io.minio.messages.Item;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.security.crypto.FileCipher;
 import org.di.digital.service.core.MinioObjectStorage;
 import org.springframework.beans.factory.annotation.Value;
@@ -19,6 +20,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.TimeUnit;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 
 @Slf4j
 @Service
@@ -53,7 +56,7 @@ public class MinioObjectStorageImpl implements MinioObjectStorage {
             return bucketName + "/" + objectName;
         } catch (Exception e) {
             log.error("Error uploading object: {}", objectName, e);
-            throw new IllegalStateException("Failed to upload object: " + objectName, e);
+            throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(getCurrentLang(), objectName));
         }
     }
 
@@ -66,7 +69,7 @@ public class MinioObjectStorageImpl implements MinioObjectStorage {
                     .build());
         } catch (Exception e) {
             log.error("Error downloading object: {}", objectName, e);
-            throw new IllegalStateException("Failed to download object", e);
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(getCurrentLang()));
         }
     }
 
@@ -117,7 +120,7 @@ public class MinioObjectStorageImpl implements MinioObjectStorage {
             }
         } catch (Exception e) {
             log.error("Error listing objects: {}", prefix, e);
-            throw new IllegalStateException("Failed to list objects", e);
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(getCurrentLang()));
         }
         return names;
     }
@@ -166,10 +169,19 @@ public class MinioObjectStorageImpl implements MinioObjectStorage {
     public String presignedGetUrl(String objectName, Map<String, String> headers) {
         try {
             if (fileCipher.isEnabled() && fileCipher.isEncryptedName(objectName)) {
-                log.warn("Presigned URL requested for encrypted object: {}. " +
-                        "Client won't be able to preview it directly. Use backend proxy endpoint instead.", objectName);
+                String backendUrl = minioPublicUrl.replaceAll("/+$", "");
 
-                return toPublicUrl("//files/preview?objectName=" + objectName);
+                boolean isDownload = headers.containsKey("response-content-disposition")
+                        && headers.get("response-content-disposition").startsWith("attachment");
+
+                if (isDownload) {
+                    String fileName = objectName.contains("/")
+                            ? objectName.substring(objectName.lastIndexOf("/") + 1)
+                            : objectName;
+                    return backendUrl + "/api/files/download?path=" + objectName + "&name=" + fileName;
+                }
+
+                return backendUrl + "/api/files/preview?path=" + objectName;
             }
 
             String presignedUrl = minioClient.getPresignedObjectUrl(GetPresignedObjectUrlArgs.builder()
@@ -182,7 +194,7 @@ public class MinioObjectStorageImpl implements MinioObjectStorage {
 
             return toPublicUrl(presignedUrl);
         } catch (Exception e) {
-            log.error("Error generating presigned URL for: {}", objectName, e);
+            log.error("Ошибка генерации presigned URL для: {}", objectName, e);
             throw new IllegalStateException("Failed to generate presigned URL", e);
         }
     }

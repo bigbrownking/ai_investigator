@@ -3,6 +3,7 @@ package org.di.digital.repository.user;
 import org.di.digital.model.user.User;
 import org.di.digital.repository.search.UserSpecifications;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.data.jpa.repository.JpaRepository;
@@ -26,6 +27,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     @Query("SELECT u FROM User u LEFT JOIN FETCH u.settings WHERE u.email = :email")
     Optional<User> findByEmailWithSettings(@Param("email") String email);
+
+    @Query("SELECT u.email FROM User u JOIN u.roles r WHERE u.active = true AND u.deleted = false AND r.name <> 'ADMIN'")
+    List<String> findAllActiveNonAdminEmails();
 
     boolean existsByEmail(String email);
 
@@ -107,10 +111,31 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     List<User> searchAllUsersByRegions(@Param("regionIds") List<Long> regionIds,
                                        @Param("query") String query);
 
-    @Query(value = "SELECT user_id FROM region_admins WHERE region_id = :regionId LIMIT 1", nativeQuery = true)
-    Optional<Long> findAdminUserIdByRegionId(@Param("regionId") Long regionId);
+    @Query("""
+    SELECT u.id
+    FROM Region reg
+    JOIN reg.admins u
+    JOIN u.roles r
+    WHERE reg.id = :regionId
+      AND r.name = 'REG_ADMIN'
+      AND u.active = true
+      AND u.deleted = false
+    ORDER BY u.id
+    """)
+    List<Long> findRegAdminIds(@Param("regionId") Long regionId, Pageable pageable);
 
-    @Query(value = "SELECT EXISTS(SELECT 1 FROM region_admins WHERE user_id = :userId) " +
-            "OR EXISTS(SELECT 1 FROM regions WHERE admin_id = :userId)", nativeQuery = true)
+    default Optional<Long> findAdminUserIdByRegionId(Long regionId) {
+        return findRegAdminIds(regionId, PageRequest.of(0, 1)).stream().findFirst();
+    }
+
+    @Query("""
+    SELECT CASE WHEN COUNT(u) > 0 THEN true ELSE false END
+    FROM Region reg
+    JOIN reg.admins u
+    JOIN u.roles r
+    WHERE u.id = :userId
+      AND r.name = 'REG_ADMIN'
+    """)
     boolean isRegionAdmin(@Param("userId") Long userId);
+    List<User> findByRegionIdAndRoles_Name(Long regionId, String roleName);
 }

@@ -29,6 +29,7 @@ public class UserProfile {
     private boolean faceEnabled;
     private boolean active;
     private boolean online;
+    private Boolean isRegAfm;
     private String lastSeenAt;
 }
 

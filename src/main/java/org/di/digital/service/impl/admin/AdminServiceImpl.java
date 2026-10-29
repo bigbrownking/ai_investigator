@@ -6,11 +6,7 @@ import org.di.digital.dto.request.search.*;
 import org.di.digital.dto.request.user.UpdateProfileRequest;
 import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.*;
-import org.di.digital.dto.response.cases.CaseListResponse;
-import org.di.digital.dto.response.cases.CasePageResponse;
-import org.di.digital.dto.response.cases.CasePreviewResponse;
-import org.di.digital.dto.response.cases.CaseResponse;
-import org.di.digital.dto.response.cases.RejectionReasonResponse;
+import org.di.digital.dto.response.cases.*;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.plan.CasePlanResponse;
 import org.di.digital.dto.response.support.ReviewDto;
@@ -40,12 +36,15 @@ import org.di.digital.repository.indictment.CaseIndictmentRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationQARepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 import org.di.digital.repository.qualification.CaseQualificationRepository;
+import org.di.digital.repository.review.CaseReportRepository;
 import org.di.digital.repository.search.*;
 import org.di.digital.repository.support.ReviewRepository;
 import org.di.digital.repository.support.SupportTicketRepository;
 import org.di.digital.repository.user.*;
 import org.di.digital.service.admin.AdminService;
+import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.service.cases.CaseService;
+import org.di.digital.service.core.MinioService;
 import org.di.digital.service.impl.cases.CaseRejectionEnricher;
 import org.di.digital.service.plan.PlanService;
 import org.di.digital.service.export.interrogation.InterrogationExportService;
@@ -61,6 +60,14 @@ import org.springframework.data.domain.Sort;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.di.digital.model.report.CaseReport;
+import org.di.digital.model.enums.file.CaseFileStatusEnum;
+import org.di.digital.service.core.MinioService;
+import org.di.digital.repository.review.CaseReportRepository;
+import org.springframework.core.io.ByteArrayResource;
+import org.springframework.core.io.Resource;
+import java.io.IOException;
+import java.io.InputStream;
 
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -69,6 +76,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import static org.di.digital.repository.search.CaseSpecifications.hasOwner;
 import static org.di.digital.util.requests.UserUtil.*;
@@ -104,8 +113,17 @@ public class AdminServiceImpl implements AdminService {
     private final ReviewRepository reviewRepository;
     private final InterrogationExportService interrogationExportService;
     private final CaseService caseService;
+    private final CaseAccessService caseAccessService;
     private final CaseRejectionEnricher caseRejectionEnricher;
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
+    private final CaseReportRepository caseReportRepository;
+    private final MinioService minioService;
+    private static final String USER_ROLE_NAME = "USER";
+    private static final String ADVANCED_ROLE_NAME = "ADVANCED_USER";
+    private static final String ZONAL_ROLE_NAME = "ZONAL";
+    private static final String REG_ADMIN_ROLE_NAME = "REG_ADMIN";
+    private static final Set<Long> ADVANCED_PROFESSION_IDS = Set.of(3L, 4L);
+
 
     @Override
     public PagedUserResponse getAllUsers(int page, int size, UserSearchRequest req) {
@@ -149,6 +167,16 @@ public class AdminServiceImpl implements AdminService {
                 .map(caseMapper::toListResponse);
 
         return caseMapper.build(spec, casePage);
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public List<CaseUserResponse> getCaseUsers(Long caseId) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        return caseEntity.getUsers().stream()
+                .map(user -> caseMapper.toUserResponse(user, caseEntity))
+                .collect(Collectors.toList());
     }
 
     @Override
@@ -316,12 +344,13 @@ public class AdminServiceImpl implements AdminService {
             caseService.updateCaseStatus(c.getId(), false, user.getEmail(), null);
 
             if (regionAdmin != null) {
-                c.setOwner(regionAdmin);
+                caseAccessService.reassignOwner(c, regionAdmin, "system:user-deleted");
                 user.getOwnedCases().remove(c);
             }
         }
 
         caseRepository.removeUserFromAllCases(userId);
+        caseAccessService.revokeAllForUser(userId);
 
         user.setActive(false);
         user.setDeleted(true);
@@ -470,23 +499,38 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
-    public void assignAdvancedUserRole(String email) {
+    public void assignAdvancedUserRole(String email, Long professionId) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        Role role = roleRepository.findByName("ADVANCED_USER")
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
+        Profession profession = resolveAdvancedProfession(professionId);
 
-        user.getRoles().add(role);
+        replaceRoles(user, ADVANCED_ROLE_NAME);
+        user.setProfession(profession);
 
-        if (user.getRegion() != null && !user.getRegion().getAdmins().contains(user)) {
-            user.getRegion().getAdmins().add(user);
-            regionRepository.save(user.getRegion());
+        Region region = user.getRegion();
+        detachFromRegions(user, region != null ? region.getId() : null);
+
+        if (region != null && region.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
+            region.getAdmins().add(user);
         }
 
         userRepository.save(user);
-        log.info("User {} assigned ADVANCED_USER role", email);
+        log.info("User {} assigned {} role with profession {}", email, ADVANCED_ROLE_NAME, professionId);
     }
+
+    @Override
+    @Transactional
+    public void assignUserRole(String email) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
+
+        replaceRoles(user, USER_ROLE_NAME);
+        detachFromRegions(user, null);
+
+        log.info("User {} assigned {} role", email, USER_ROLE_NAME);
+    }
+
 
     @Override
     @Transactional
@@ -494,16 +538,13 @@ public class AdminServiceImpl implements AdminService {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        Role regAdminRole = roleRepository.findByName("REG_ADMIN")
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
-
-        user.getRoles().add(regAdminRole);
+        replaceRoles(user, REG_ADMIN_ROLE_NAME);
 
         for (String regionName : regions) {
             Region reg = regionRepository.findByRuName(regionName)
                     .orElseThrow(() -> new NotFoundException(NotFoundMessage.REGION.localized(currentLang(), regionName)));
 
-            if (!reg.getAdmins().contains(user)) {
+            if (reg.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
                 reg.getAdmins().add(user);
                 regionRepository.save(reg);
             }
@@ -515,29 +556,81 @@ public class AdminServiceImpl implements AdminService {
 
     @Override
     @Transactional
-    public void removeRegAdminRole(String email, List<String> regions) {
+    public void assignZonalUserRole(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
-        Role regAdminRole = roleRepository.findByName("REG_ADMIN")
+        if (!user.isActive()) {
+            throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang(), user.getEmail()));
+        }
+
+        Region region = user.getRegion();
+        if (region == null) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
+        }
+
+        userRepository.findByRegionIdAndRoles_Name(region.getId(), ZONAL_ROLE_NAME).stream()
+                .filter(previous -> !previous.getId().equals(user.getId()))
+                .forEach(previous -> {
+                    replaceRoles(previous, USER_ROLE_NAME);
+                    detachFromRegions(previous, null);
+
+                    log.info("User {} lost {} role in region {}: replaced by {}",
+                            previous.getEmail(), ZONAL_ROLE_NAME, region.getId(), email);
+                });
+
+        replaceRoles(user, ZONAL_ROLE_NAME);
+        detachFromRegions(user, region.getId());
+
+        if (region.getAdmins().stream().noneMatch(a -> a.getId().equals(user.getId()))) {
+            region.getAdmins().add(user);
+        }
+
+        log.info("User {} assigned {} role", email, ZONAL_ROLE_NAME);
+    }
+
+    private void replaceRoles(User user, String roleName) {
+        Role role = roleRepository.findByName(roleName)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.ROLE.localized(currentLang())));
+
+        user.getRoles().clear();
+        user.getRoles().add(role);
+    }
+
+    private void detachFromRegions(User user, Long keepRegionId) {
+        regionRepository.findAllByAdmins_Id(user.getId()).stream()
+                .filter(r -> keepRegionId == null || !r.getId().equals(keepRegionId))
+                .forEach(r -> r.getAdmins().removeIf(a -> a.getId().equals(user.getId())));
+    }
+    private Profession resolveAdvancedProfession(Long professionId) {
+        if (professionId == null || !ADVANCED_PROFESSION_IDS.contains(professionId)) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
+        }
+        return professionRepository.findById(professionId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.PROFESSION.localized(currentLang(), professionId.toString())));
+    }
+
+    @Override
+    @Transactional
+    public void removeRegAdminRole(String email, List<String> regions) {
+        User user = userRepository.findByEmail(email)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
         for (String regionName : regions) {
             Region reg = regionRepository.findByRuName(regionName)
                     .orElseThrow(() -> new NotFoundException(NotFoundMessage.REGION.localized(currentLang(), regionName)));
 
-            if (!reg.getAdmins().contains(user)) {
+            boolean removed = reg.getAdmins().removeIf(a -> a.getId().equals(user.getId()));
+            if (!removed) {
                 throw new IllegalStateException(MessageConstant.USER_IS_NOT_REG_ADMIN.format(currentLang(), email));
             }
-
-            reg.getAdmins().remove(user);
-            regionRepository.save(reg);
         }
 
+        regionRepository.flush();
+
         if (regionRepository.countByAdminsContaining(user) == 0) {
-            user.getRoles().remove(regAdminRole);
-            userRepository.save(user);
-            log.info("User {} removed from REG_ADMIN role (no regions left)", email);
+            replaceRoles(user, USER_ROLE_NAME);
+            log.info("User {} downgraded from REG_ADMIN to USER (no regions left)", email);
         }
 
         log.info("User {} removed from regions {}", email, regions);
@@ -555,21 +648,7 @@ public class AdminServiceImpl implements AdminService {
             throw new IllegalStateException(MessageConstant.USER_IS_NOT_ACTIVE.format(currentLang(), newOwner.getEmail()));
         }
 
-        User oldOwner = caseEntity.getOwner();
-        caseEntity.setOwner(newOwner);
-
-        if (oldOwner != null && caseEntity.hasUser(oldOwner)) {
-            caseEntity.removeUser(oldOwner);
-        }
-
-        if (!caseEntity.hasUser(newOwner)) {
-            caseEntity.addUser(newOwner);
-        }
-
-        caseRepository.save(caseEntity);
-
-        log.info("Case {} owner changed from {} to {} by admin",
-                caseId, oldOwner != null ? oldOwner.getEmail() : "null", newOwner.getEmail());
+        caseAccessService.reassignOwner(caseEntity, newOwner, getCurrentUser().getEmail());
     }
 
     @Override
@@ -660,6 +739,29 @@ public class AdminServiceImpl implements AdminService {
                 .canWithdraw(planService.canWithdraw(caseEntity.getPlanStatus()))
                 .plan(planService.enrichPlanWithStatus(caseEntity.getPlan()))
                 .build();
+    }
+    @Override
+    @Transactional(readOnly = true)
+    public Resource getCaseReport(Long caseId) {
+        Case caseEntity = caseRepository.findById(caseId)
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
+
+        CaseReport report = caseReportRepository.findByCaseEntityNumber(caseEntity.getNumber())
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.REPORT.localized(currentLang(), caseId.toString())));
+
+        if (report.getStatus() != CaseFileStatusEnum.COMPLETED) {
+            throw new IllegalStateException(
+                    IllegalStateMessage.INVALID_OUTPUT.localized(currentLang(), report.getStatus().getLabel()));
+        }
+        if (report.getReportFileUrl() == null || report.getReportFileUrl().isBlank()) {
+            throw new NotFoundException(NotFoundMessage.FILE.localized(currentLang()));
+        }
+
+        try (InputStream stream = minioService.downloadFile(report.getReportFileUrl())) {
+            return new ByteArrayResource(stream.readAllBytes());
+        } catch (IOException e) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(currentLang()));
+        }
     }
 
     @Override

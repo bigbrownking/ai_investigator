@@ -20,6 +20,7 @@ public interface CaseAccessService {
     void grantFiles(Case caseEntity, User user, List<FileGrantDto> fileGrants);
     void revokeFile(Long fileId, Long userId);
     void revokeAll(Long caseId, Long userId);
+    void revokeAllForCase(Long caseId);
     boolean can(Case caseEntity, User user, CaseModule module, CaseAction action);
     void require(Case caseEntity, User user, CaseModule module, CaseAction action);
     boolean canAccessFile(CaseFile file, User user, CaseAction action);
@@ -28,4 +29,9 @@ public interface CaseAccessService {
     void grantAccess(Long caseId, Long userId, GrantAccessRequest request, String ownerEmail);
     void revokeAccess(Long caseId, Long userId, String ownerEmail);
     void updateFileAccess(Long caseId, Long userId, UpdateFileAccessRequest request, String ownerEmail);
+    void grantSogAccess(Case caseEntity, User user, List<FileGrantDto> fileGrants);
+    boolean isSog(Case caseEntity, User user);
+    void transferOwnership(Case caseEntity, User oldOwner, User newOwner, String changedBy);
+    void reassignOwner(Case caseEntity, User newOwner, String changedBy);
+    void revokeAllForUser(Long userId);
 }

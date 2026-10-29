@@ -35,6 +35,7 @@ public class Case {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(columnDefinition = "TEXT")
     private String title;
 
     private String number;
@@ -304,5 +305,9 @@ public class Case {
     }
     public void setPlanApprovedAt(LocalDateTime dt) {
         ensurePlan().setApprovedAt(dt);
+    }
+
+    public String getAdequateLanguage(){
+        return language.equals("russian") ? "ru" : "kz";
     }
 }

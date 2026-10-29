@@ -11,6 +11,8 @@ import lombok.NoArgsConstructor;
 @AllArgsConstructor
 public class ReferenceLinkDto {
     private String referenceId;
+    private Long fileId;
+    private String name;
     private String link;
     private String opis;
 }

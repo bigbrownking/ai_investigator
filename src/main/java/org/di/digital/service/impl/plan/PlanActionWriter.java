@@ -9,6 +9,7 @@ import org.di.digital.dto.response.plan.ManualStatusResponse;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.permission.CaseAction;
 import org.di.digital.model.enums.permission.CaseModule;
 import org.di.digital.model.enums.plan.ActionStatus;
@@ -155,8 +156,7 @@ public class PlanActionWriter {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseNumber)));
 
         if (caseEntity.getPlanStatus() != PlanStatus.APPROVED_L3) {
-            throw new IllegalStateException(
-                    "Изменение статуса действий доступно только для утверждённого плана");
+            throw new IllegalStateException(MessageConstant.PLAN_EDIT.format(currentLang()));
         }
 
         Map<String, Object> plan = caseEntity.getPlan();
@@ -167,12 +167,11 @@ public class PlanActionWriter {
         Map<String, Object> action = actions.stream()
                 .filter(a -> ((Number) a.get("номер")).intValue() == request.getActionNumber())
                 .findFirst()
-                .orElseThrow(() -> new NotFoundException(
-                        "Действие №" + request.getActionNumber() + " не найдено"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ACTION.localized(currentLang())));
 
         Boolean locked = (Boolean) action.get("статус_заблокирован");
         if (Boolean.TRUE.equals(locked)) {
-            throw new IllegalStateException("Статус действия заблокирован для изменения");
+            throw new IllegalStateException(MessageConstant.PLAN_EDIT_LOCK.format(currentLang()));
         }
 
         boolean isManager = user.hasRole("ADVANCED_USER") || user.hasRole("REG_ADMIN");
@@ -198,8 +197,7 @@ public class PlanActionWriter {
         Map<String, Object> action = actions.stream()
                 .filter(a -> ((Number) a.get("номер")).intValue() == request.getActionNumber())
                 .findFirst()
-                .orElseThrow(() -> new NotFoundException(
-                        "Действие №" + request.getActionNumber() + " не найдено"));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.ACTION.localized(currentLang())));
 
         String oldStatus = String.valueOf(aiResponse.get("old_status"));
         String newStatus = String.valueOf(aiResponse.get("new_status"));

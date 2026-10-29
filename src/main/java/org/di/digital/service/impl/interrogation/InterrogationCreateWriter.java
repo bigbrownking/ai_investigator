@@ -131,15 +131,12 @@ public class InterrogationCreateWriter {
         if (isDop) {
             LocalDateTime finishedAt = previous.get().getFinishedAt();
             if (finishedAt == null) {
-                throw new IllegalStateException(
-                        "Предыдущий допрос ещё не завершён — дополнительный допрос недоступен");
+                throw new IllegalStateException(MessageConstant.INTERROGATION_IS_NOT_END.format(currentLang()));
             }
             Duration elapsed = Duration.between(finishedAt, now);
             if (elapsed.compareTo(MIN_DOP_INTERVAL) < 0) {
                 long minutesLeft = MIN_DOP_INTERVAL.minus(elapsed).toMinutes();
-                throw new IllegalStateException(
-                        "Дополнительный допрос можно начать не ранее чем через 2 часа после окончания предыдущего. Осталось: "
-                                + minutesLeft + " мин.");
+                throw new IllegalStateException(MessageConstant.INTERROGATION_PLUS.format(currentLang(), minutesLeft));
             }
         }
 

@@ -19,7 +19,7 @@ public interface CaseFileRepository extends JpaRepository<CaseFile, Long> {
     boolean existsByCaseEntityIdAndStatusNotIn(Long caseId, List<CaseFileStatusEnum> statuses);
 
     List<CaseFile> findByPagesIsNull();
-
+    List<CaseFile> findAllByCaseEntityId(Long caseId);
     Optional<CaseFile> findByOriginalFileNameAndCaseEntityId(String originalFileName, Long caseId);
 
     @Query("SELECT SUM(f.pages) FROM CaseFile f WHERE f.status = 'COMPLETED' AND f.pages IS NOT NULL AND f.completedAt BETWEEN :start AND :end")

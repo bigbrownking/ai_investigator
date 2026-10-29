@@ -1,9 +1,11 @@
 package org.di.digital.service.impl.qualification;
 
+import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.model.qualification.CaseQualification;
@@ -101,6 +103,26 @@ public class QualificationWriter {
         } catch (Exception e) {
             log.error("Failed to parse qualification section response for case {}", caseNumber, e);
         }
+    }
+    @Transactional
+    public Map<String, Object> saveCorpusDelicti(String caseNumber, String rawJson) {
+        if (rawJson == null || rawJson.isBlank()) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(getCurrentLang()));
+        }
+
+        Map<String, Object> corpusDelicti;
+        try {
+            corpusDelicti = mapper.readValue(rawJson, new TypeReference<Map<String, Object>>() {});
+        } catch (Exception e) {
+            log.error("Failed to parse corpus delicti response for case {}: {}", caseNumber, rawJson, e);
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OUTPUT.localized(getCurrentLang()), e);
+        }
+
+        CaseQualification qualification = getOrCreate(caseNumber);
+        qualification.setCorpusDelicti(corpusDelicti);
+        caseQualificationRepository.save(qualification);
+
+        return corpusDelicti;
     }
 
     private CaseQualification getOrCreate(String caseNumber) {

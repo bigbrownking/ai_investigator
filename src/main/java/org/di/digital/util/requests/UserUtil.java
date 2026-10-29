@@ -11,6 +11,7 @@ import org.di.digital.model.user.Region;
 import org.di.digital.model.user.User;
 import org.di.digital.model.enums.log.LogAction;
 import org.di.digital.model.enums.log.LogLevel;
+import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.RegionRepository;
 import org.di.digital.security.UserDetailsImpl;
 import org.di.digital.service.LogService;
@@ -31,6 +32,7 @@ public class UserUtil {
     private static final String ROLE_REG_ADMIN = "REG_ADMIN";
     private final LogService logService;
     private final RegionRepository regionRepository;
+    private final CaseRepository caseRepository;
 
     public static String getClientIpAddress(HttpServletRequest request) {
         String forwardHeader = request.getHeader("X-Forwarded-For");
@@ -65,29 +67,58 @@ public class UserUtil {
     }
 
     public void validateUserAccess(Case caseEntity, User user) {
-        if (!caseEntity.isOwner(user) && !caseEntity.hasUser(user)) {
-            logService.log(
-                    String.format("No access for case %s", caseEntity.getNumber()),
-                    LogLevel.ERROR,
-                    LogAction.NO_ACCESS,
-                    caseEntity.getNumber(),
-                    user.getEmail()
-            );
-            throw new AccessDeniedException(AccessDeniedMessage.USER_ONLY.localized(currentLang()));
-        }
+        validateUserAccess(caseEntity.getId(), user.getId(), caseEntity.getNumber(), user.getEmail());
     }
 
-    public void validateOwnerAccess(Case caseEntity, User user) {
-        if (!caseEntity.isOwner(user)) {
+    public void validateUserAccess(Long caseId, Long userId, String caseNumber, String userEmail) {
+        if (!caseRepository.hasUserAccess(caseId, userId)) {
             logService.log(
-                    String.format("Non-owner user %s attempted to manage members of case %s",
-                            user.getEmail(), caseEntity.getNumber()),
+                    String.format("No access for case %s", caseNumber),
+                    LogLevel.ERROR,
+                    LogAction.NO_ACCESS,
+                    caseNumber,
+                    userEmail
+            );
+            throw new AccessDeniedException(
+                    AccessDeniedMessage.USER_ONLY.localized(currentLang())
+            );
+        }
+    }
+    public void validateOwnerAccess(Long caseId, Long userId, String caseNumber, String userEmail) {
+        if (!caseRepository.isOwner(caseId, userId)) {
+            logService.log(
+                    String.format(
+                            "Non-owner user %s attempted to manage members of case %s",
+                            userEmail,
+                            caseNumber
+                    ),
+                    LogLevel.ERROR,
+                    LogAction.NO_ACCESS,
+                    caseNumber,
+                    userEmail
+            );
+            throw new AccessDeniedException(
+                    AccessDeniedMessage.USER_ONLY.localized(currentLang())
+            );
+        }    }
+
+    public void validateOwnerAccess(Case caseEntity, User user) {
+        if (!caseRepository.isOwner(caseEntity.getId(), user.getId())) {
+            logService.log(
+                    String.format(
+                            "Non-owner user %s attempted to manage members of case %s",
+                            user.getEmail(),
+                            caseEntity.getNumber()
+                    ),
                     LogLevel.ERROR,
                     LogAction.NO_ACCESS,
                     caseEntity.getNumber(),
                     user.getEmail()
             );
-            throw new AccessDeniedException(AccessDeniedMessage.OWNER_ONLY.localized(currentLang()));
+
+            throw new AccessDeniedException(
+                    AccessDeniedMessage.OWNER_ONLY.localized(currentLang())
+            );
         }
     }
 

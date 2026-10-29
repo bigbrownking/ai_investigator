@@ -36,7 +36,7 @@ public class RoundRobinScheduler {
     @Value("${scheduler.round-robin.max-concurrent}")
     private int maxConcurrent;
 
-    @Scheduled(fixedDelayString = "${scheduler.round-robin.delay-seconds}", timeUnit = TimeUnit.SECONDS, zone = "Asia/Almaty")
+    @Scheduled(fixedDelayString = "${scheduler.round-robin.delay-seconds}", timeUnit = TimeUnit.SECONDS, zone = "${reporting.time-zone}")
     @Transactional
     public void processTasksRoundRobin() {
         long processingCount = taskQueueService.getProcessingTasksCount();

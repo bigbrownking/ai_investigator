@@ -9,8 +9,10 @@ import org.di.digital.model.cases.Case;
 import org.di.digital.model.cases.CaseFile;
 import org.di.digital.model.cases.CaseMemberHistory;
 import org.di.digital.model.cases.RejectionReasonStatus;
+import org.di.digital.model.enums.permission.CaseMemberType;
 import org.di.digital.model.interrogation.CaseFigurant;
 import org.di.digital.model.user.User;
+import org.di.digital.repository.assess.CaseUserAccessRepository;
 import org.di.digital.repository.cases.CaseIdOnly;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.service.impl.cases.CaseRejectionEnricher;
@@ -34,6 +36,8 @@ public class CaseMapper {
     private final InterrogationMapper interrogationMapper;
     private final CaseRepository caseRepository;
     private final CaseRejectionEnricher caseRejectionEnricher;
+    private final CaseUserAccessRepository accessRepository;
+
 
     public CaseResponse toResponse(Case c) {
         return CaseResponse.builder()
@@ -124,6 +128,10 @@ public class CaseMapper {
                 .build();
     }
     public CaseUserResponse toUserResponse(User user, Case c) {
+        boolean sog = accessRepository.findByCaseEntityIdAndUserId(c.getId(), user.getId())
+                .map(a -> a.getMemberType() == CaseMemberType.SOG)
+                .orElse(false);
+
         return CaseUserResponse.builder()
                 .id(user.getId())
                 .email(user.getEmail())
@@ -131,6 +139,7 @@ public class CaseMapper {
                 .surname(user.getSurname())
                 .fathername(user.getFathername())
                 .isOwner(c.isOwner(user))
+                .isSog(sog)
                 .build();
     }
 
@@ -142,8 +151,8 @@ public class CaseMapper {
                 .fileSize(f.getFileSize())
                 .status(f.getStatus().getLabel())
                 .language(f.getLanguage())
-                .previewUrl(fileUrls.preview(f.getFileUrl()))
-                .downloadUrl(fileUrls.download(f.getFileUrl(), f.getOriginalFileName()))
+                .previewUrl(fileUrls.preview(f.getFileUrl(), f.getOriginalFileName(), f.getContentType()))
+                .downloadUrl(fileUrls.download(f.getFileUrl(), f.getOriginalFileName(), f.getContentType()))
                 .uploadedAt(String.valueOf(f.getUploadedAt()))
                 .completedAt(String.valueOf(f.getCompletedAt()))
                 .isQualification(f.isQualification())

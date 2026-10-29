@@ -1,5 +1,6 @@
 package org.di.digital.service.admin;
 
+import org.di.digital.dto.request.cases.ChatRequest;
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;
@@ -8,11 +9,15 @@ import org.di.digital.dto.response.admin.AppealDto;
 import org.di.digital.dto.response.admin.RegionStatsDto;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.CaseUserResponse;
 import org.di.digital.dto.response.cases.RejectionReasonResponse;
+import org.di.digital.dto.response.chat.CaseChatHistoryResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
+import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 
 import java.util.List;
 import java.util.Map;
@@ -27,6 +32,8 @@ public interface RegAdminService {
     Page<UserProfile> getMyRegionUsers(Long adminId, int page, int size, UserSearchRequest userSearchRequest);
 
     CasePageResponse getUserCases(Long adminId, Long userId, int page, int size, CaseSearchRequest caseSearchRequest);
+    List<CaseUserResponse> getCaseUsers(Long adminId, Long caseId);
+
 
     CasePageResponse getMyRegionCases(Long adminId, int page, int size, CaseSearchRequest caseSearchRequest);
 
@@ -42,6 +49,9 @@ public interface RegAdminService {
 
     void changeOwner(Long adminId, Long caseId, Long id);
     List<UserSuggestionResponse> searchUsers(Long adminId, String query);
+    void assignZonalUserRole(Long adminId, String email);
+    void assignAdvancedUserRole(Long adminId, String email, Long professionId);
+    void assignUserRole(Long adminId, String email);
 
     void addParticipant(Long adminId, Long caseId, Long userId);
 
@@ -52,5 +62,6 @@ public interface RegAdminService {
     String getMyRegionQualification(Long adminId, Long caseId);
 
     Map<String, Object> getMyRegionPlan(Long adminId, Long caseId);
+    Resource getMyRegionReport(Long adminId, Long caseId);
     List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long adminId,Long caseId, String email);
 }

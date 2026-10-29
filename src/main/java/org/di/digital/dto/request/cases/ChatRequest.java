@@ -19,4 +19,5 @@ public class ChatRequest {
 
     @JsonProperty("answer")
     private String answer;
+    private Long qaId;
 }

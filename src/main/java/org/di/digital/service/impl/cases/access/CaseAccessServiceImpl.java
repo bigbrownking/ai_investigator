@@ -8,9 +8,14 @@ import org.di.digital.dto.response.access.FileGrantDto;
 import org.di.digital.dto.response.access.MyAccessDto;
 import org.di.digital.exception.NotFoundException;
 import org.di.digital.exception.message.AccessDeniedMessage;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.*;
+import org.di.digital.model.enums.MessageConstant;
+import org.di.digital.model.enums.log.LogAction;
+import org.di.digital.model.enums.log.LogLevel;
 import org.di.digital.model.enums.permission.CaseAction;
+import org.di.digital.model.enums.permission.CaseMemberType;
 import org.di.digital.model.enums.permission.CaseModule;
 import org.di.digital.model.enums.permission.DocumentAccessScope;
 import org.di.digital.model.enums.settings.UserSettingsLanguage;
@@ -20,6 +25,7 @@ import org.di.digital.repository.assess.CaseUserAccessRepository;
 import org.di.digital.repository.cases.CaseFileRepository;
 import org.di.digital.repository.cases.CaseRepository;
 import org.di.digital.repository.user.UserRepository;
+import org.di.digital.service.LogService;
 import org.di.digital.service.cases.CaseAccessService;
 import org.di.digital.util.mapper.PermissionMapper;
 import org.springframework.security.access.AccessDeniedException;
@@ -40,9 +46,24 @@ public class CaseAccessServiceImpl implements CaseAccessService {
     private final PermissionMapper permissionMapper;
     private final UserRepository userRepository;
     private final CaseRepository caseRepository;
+    private final LogService logService;
+
+    private static final Map<CaseModule, Set<CaseAction>> SOG_PERMISSIONS = Map.of(
+            CaseModule.CASE,          EnumSet.of(CaseAction.READ),
+            CaseModule.INTERROGATION, EnumSet.allOf(CaseAction.class),
+            CaseModule.CHAT,          EnumSet.allOf(CaseAction.class),
+            CaseModule.DOCUMENTS,     EnumSet.of(CaseAction.READ, CaseAction.DOWNLOAD)
+    );
+
+    private static final Set<CaseAction> SOG_FILE_ACTIONS =
+            EnumSet.of(CaseAction.READ, CaseAction.DOWNLOAD);
 
     @Transactional
     public void grantInitialAccess(Case caseEntity, User user, List<FileGrantDto> fileGrants) {
+        if (caseEntity.isOwner(user)
+                || accessRepository.existsByCaseEntityIdAndUserId(caseEntity.getId(), user.getId())) {
+            return;
+        }
         boolean restricted = fileGrants != null && !fileGrants.isEmpty();
         DocumentAccessScope scope = restricted
                 ? DocumentAccessScope.RESTRICTED
@@ -55,7 +76,13 @@ public class CaseAccessServiceImpl implements CaseAccessService {
                 .documentScope(scope)
                 .build();
         accessRepository.save(access);
-
+        logService.log(
+                String.format("User %s granted initial access", user.getEmail()),
+                LogLevel.INFO,
+                LogAction.INITIAL_ACCESS,
+                caseEntity.getNumber(),
+                user.getEmail()
+        );
         if (restricted) {
             grantFiles(caseEntity, user, fileGrants);
         }
@@ -68,12 +95,23 @@ public class CaseAccessServiceImpl implements CaseAccessService {
                         .caseEntity(caseEntity)
                         .user(user)
                         .permissions(new HashSet<>())
-                        .documentScope(DocumentAccessScope.ALL)
                         .build());
 
         access.setPermissions(allPermissions());
         access.setDocumentScope(DocumentAccessScope.ALL);
+        access.setMemberType(CaseMemberType.MEMBER);
         accessRepository.save(access);
+
+        fileAccessRepository.deleteAllActionsByCaseAndUser(caseEntity.getId(), user.getId());
+        fileAccessRepository.deleteAllByCaseAndUser(caseEntity.getId(), user.getId());
+
+        logService.log(
+                String.format("User %s granted full access", user.getEmail()),
+                LogLevel.INFO,
+                LogAction.FULL_ACCESS,
+                caseEntity.getNumber(),
+                user.getEmail()
+        );
     }
 
     private Set<CasePermission> allPermissions() {
@@ -93,7 +131,7 @@ public class CaseAccessServiceImpl implements CaseAccessService {
             CaseFile file = caseFileRepository.findById(grant.fileId())
                     .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang())));
             if (!file.getCaseEntity().getId().equals(caseEntity.getId())) {
-                throw new IllegalStateException("Файл не принадлежит делу");
+                throw new IllegalStateException(MessageConstant.FILE_NOT_BELONG_TO_CASE.localized(currentLang(), file.getId().toString()));
             }
             CaseFileAccess fa = fileAccessRepository
                     .findByFileIdAndUserId(file.getId(), user.getId())
@@ -114,6 +152,12 @@ public class CaseAccessServiceImpl implements CaseAccessService {
         fileAccessRepository.deleteAllActionsByCaseAndUser(caseId, userId);
         fileAccessRepository.deleteAllByCaseAndUser(caseId, userId);
     }
+    @Override
+    @Transactional
+    public void revokeAllForCase(Long caseId) {
+        accessRepository.findAllByCaseEntityId(caseId)
+                .forEach(a -> revokeAll(caseId, a.getUser().getId()));
+    }
     private Set<CasePermission> defaultPermissions() {
         Set<CasePermission> perms = new HashSet<>();
         for (CaseModule module : CaseModule.values()) {
@@ -133,6 +177,13 @@ public class CaseAccessServiceImpl implements CaseAccessService {
         if (!can(caseEntity, user, module, action)) {
             UserSettingsLanguage lang = getCurrentLang();
             String detail = module.localized(lang) + " / " + action.localized(lang);
+            logService.log(
+                    String.format("User %s tried to access case %s", user.getEmail(), caseEntity.getNumber()),
+                    LogLevel.WARNING,
+                    LogAction.NO_ACCESS,
+                    caseEntity.getNumber(),
+                    user.getEmail()
+            );
             throw new AccessDeniedException(AccessDeniedMessage.USER_ONLY.localized(lang, detail));
         }
     }
@@ -213,7 +264,7 @@ public class CaseAccessServiceImpl implements CaseAccessService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
 
         if (caseEntity.isOwner(target)) {
-            throw new IllegalStateException("Нельзя изменить доступ владельца дела");
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
         }
 
         CaseUserAccess access = accessRepository
@@ -243,6 +294,13 @@ public class CaseAccessServiceImpl implements CaseAccessService {
         }
 
         log.info("Access granted to user {} in case {} by {}", target.getEmail(), caseId, ownerEmail);
+        logService.log(
+                String.format("User %s granted access to case %s by %s", target.getEmail(), caseEntity.getNumber(), ownerEmail),
+                LogLevel.WARNING,
+                LogAction.GRANT_ACCESS,
+                caseEntity.getNumber(),
+                owner.getEmail()
+        );
     }
 
     @Transactional
@@ -260,11 +318,18 @@ public class CaseAccessServiceImpl implements CaseAccessService {
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), userId.toString())));
 
         if (caseEntity.isOwner(target)) {
-            throw new IllegalStateException("Нельзя отозвать доступ владельца дела");
+            throw new IllegalStateException(IllegalStateMessage.INVALID_OPERATION.localized(currentLang()));
         }
 
         revokeAll(caseId, userId);
         log.info("Access revoked for user {} in case {} by {}", userId, caseId, ownerEmail);
+        logService.log(
+                String.format("User %s revoked access to case %s by %s", target.getEmail(), caseEntity.getNumber(), ownerEmail),
+                LogLevel.WARNING,
+                LogAction.REVOKE_ACCESS,
+                caseEntity.getNumber(),
+                owner.getEmail()
+        );
     }
 
     @Transactional
@@ -286,6 +351,116 @@ public class CaseAccessServiceImpl implements CaseAccessService {
         grantFiles(caseEntity, target, request.getFileGrants());
 
         log.info("File access updated for user {} in case {} by {}", target.getEmail(), caseId, ownerEmail);
+        List<String> fileNames = request.getFileGrants() == null ? List.of() :
+                request.getFileGrants().stream()
+                        .map(g -> caseFileRepository.findById(g.fileId())
+                                .map(CaseFile::getOriginalFileName)
+                                .orElse("file#" + g.fileId()))
+                        .toList();
+        logService.log(
+                String.format("User %s updated file access to case %s by %s. Files: %s",
+                        target.getEmail(), caseEntity.getNumber(), ownerEmail, fileNames),
+                LogLevel.WARNING,
+                LogAction.GRANT_ACCESS,
+                caseEntity.getNumber(),
+                owner.getEmail()
+        );
+    }
+
+    @Override
+    @Transactional
+    public void grantSogAccess(Case caseEntity, User user, List<FileGrantDto> fileGrants) {
+        CaseUserAccess access = accessRepository
+                .findByCaseEntityIdAndUserId(caseEntity.getId(), user.getId())
+                .orElseGet(() -> CaseUserAccess.builder()
+                        .caseEntity(caseEntity)
+                        .user(user)
+                        .permissions(new HashSet<>())
+                        .build());
+
+        Set<CasePermission> perms = new HashSet<>();
+        SOG_PERMISSIONS.forEach((module, actions) -> actions.forEach(action ->
+                perms.add(CasePermission.builder().module(module).action(action).build())));
+
+        access.setPermissions(perms);
+        access.setDocumentScope(DocumentAccessScope.RESTRICTED);
+        access.setMemberType(CaseMemberType.SOG);
+        accessRepository.save(access);
+
+        fileAccessRepository.deleteAllActionsByCaseAndUser(caseEntity.getId(), user.getId());
+        fileAccessRepository.deleteAllByCaseAndUser(caseEntity.getId(), user.getId());
+
+        if (fileGrants != null && !fileGrants.isEmpty()) {
+            List<FileGrantDto> limited = fileGrants.stream()
+                    .map(g -> {
+                        Set<CaseAction> actions = EnumSet.noneOf(CaseAction.class);
+                        if (g.actions() != null) actions.addAll(g.actions());
+                        actions.retainAll(SOG_FILE_ACTIONS);
+                        if (actions.isEmpty()) actions.add(CaseAction.READ);
+                        return new FileGrantDto(g.fileId(), actions);
+                    })
+                    .toList();
+            grantFiles(caseEntity, user, limited);
+        }
+    }
+
+    @Override
+    public boolean isSog(Case caseEntity, User user) {
+        return accessRepository.findByCaseEntityIdAndUserId(caseEntity.getId(), user.getId())
+                .map(a -> a.getMemberType() == CaseMemberType.SOG)
+                .orElse(false);
+    }
+    @Override
+    @Transactional
+    public void transferOwnership(Case caseEntity, User oldOwner, User newOwner, String changedBy) {
+        boolean ownerChanged = oldOwner != null && !oldOwner.getId().equals(newOwner.getId());
+
+        if (ownerChanged) {
+            revokeAll(caseEntity.getId(), oldOwner.getId());
+        }
+        grantFullAccess(caseEntity, newOwner);
+
+        log.info("Ownership of case {} transferred from {} to {} by {}",
+                caseEntity.getNumber(),
+                oldOwner != null ? oldOwner.getEmail() : "null",
+                newOwner.getEmail(), changedBy);
+        logService.log(
+                String.format("Case %s ownership transferred from %s to %s by %s",
+                        caseEntity.getNumber(),
+                        oldOwner != null ? oldOwner.getEmail() : "null",
+                        newOwner.getEmail(), changedBy),
+                LogLevel.WARNING,
+                LogAction.FULL_ACCESS,
+                caseEntity.getNumber(),
+                changedBy
+        );
+    }
+
+    @Override
+    @Transactional
+    public void reassignOwner(Case caseEntity, User newOwner, String changedBy) {
+        User oldOwner = caseEntity.getOwner();
+        if (oldOwner != null && oldOwner.getId().equals(newOwner.getId())) {
+            return;
+        }
+
+        caseEntity.setOwner(newOwner);
+        if (oldOwner != null && caseEntity.hasUser(oldOwner)) {
+            caseEntity.removeUser(oldOwner);
+        }
+        if (!caseEntity.hasUser(newOwner)) {
+            caseEntity.addUser(newOwner);
+        }
+        caseRepository.save(caseEntity);
+
+        transferOwnership(caseEntity, oldOwner, newOwner, changedBy);
+    }
+
+    @Override
+    @Transactional
+    public void revokeAllForUser(Long userId) {
+        accessRepository.findAllByUserId(userId)
+                .forEach(a -> revokeAll(a.getCaseEntity().getId(), userId));
     }
 
     private UserSettingsLanguage currentLang(){

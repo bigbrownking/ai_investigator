@@ -6,6 +6,7 @@ import org.di.digital.dto.response.*;
 import org.di.digital.dto.response.admin.*;
 import org.di.digital.dto.response.cases.CasePageResponse;
 import org.di.digital.dto.response.cases.CaseResponse;
+import org.di.digital.dto.response.cases.CaseUserResponse;
 import org.di.digital.dto.response.cases.RejectionReasonResponse;
 import org.di.digital.dto.response.interrogation.CaseInterrogationFullResponse;
 import org.di.digital.dto.response.plan.CasePlanResponse;
@@ -13,6 +14,7 @@ import org.di.digital.dto.response.support.ReviewDto;
 import org.di.digital.dto.response.support.SupportTicketDto;
 import org.di.digital.dto.response.user.UserProfile;
 import org.di.digital.dto.response.user.UserSuggestionResponse;
+import org.springframework.core.io.Resource;
 import org.springframework.data.domain.Page;
 
 import java.time.LocalDate;
@@ -22,6 +24,7 @@ public interface AdminService {
     PagedUserResponse getAllUsers(int page, int size, UserSearchRequest userSearchRequest);
     CasePageResponse getAllCases(int page, int size, CaseSearchRequest caseSearchRequest);
     CasePageResponse getUserCases(Long userId, int page, int size, CaseSearchRequest caseSearchRequest);
+    List<CaseUserResponse> getCaseUsers(Long caseId);
     AdminStatsDto getStats(LocalDate from, LocalDate to);
     List<UserSuggestionResponse> searchUsers(String query);
     void activateUser(Long userId);
@@ -40,15 +43,18 @@ public interface AdminService {
     SupportTicketDto getSupportTicketDetail(Long id);
     Page<ReviewDto> getAllReviews(int page, int size, ReviewSearchRequest request);
     ReviewDto getReviewDetail(Long id);
-    void assignAdvancedUserRole(String email);
+    void assignAdvancedUserRole(String email, Long professionId);
+    void assignUserRole(String email);
     void assignRegAdminRole(String email, List<String> regions);
     void removeRegAdminRole(String email, List<String> regions);
     void changeOwner(Long caseId, Long id);
+    void assignZonalUserRole(String email);
     UserProfile updateUserProfile(Long id, UpdateProfileRequest request);
     List<RejectionReasonResponse> getRejectionReasonResponseHistory(Long caseId);
 
     String getIndictment(Long caseId);
     String getQualification(Long caseId);
     CasePlanResponse getPlan(Long caseId);
+    Resource getCaseReport(Long caseId);
 
 }

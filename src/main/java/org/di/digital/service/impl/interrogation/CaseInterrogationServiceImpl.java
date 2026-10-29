@@ -4,11 +4,13 @@ import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.response.interrogation.*;
 import org.di.digital.exception.NotFoundException;
+import org.di.digital.exception.message.IllegalStateMessage;
 import org.di.digital.exception.message.NotFoundMessage;
 import org.di.digital.model.cases.Case;
 import org.di.digital.dto.request.interrogation.AddInterrogationRequest;
 import org.di.digital.dto.request.interrogation.EditAudioTranscribedTextRequest;
 import org.di.digital.dto.request.interrogation.UpdateProtocolFieldRequest;
+import org.di.digital.model.enums.MessageConstant;
 import org.di.digital.model.enums.cases.MessageRole;
 import org.di.digital.model.enums.interrogation.CaseInterrogationStatusEnum;
 import org.di.digital.model.enums.interrogation.InterrogationLimitProfile;
@@ -59,6 +61,7 @@ import static org.di.digital.util.requests.UserUtil.getCurrentLang;
 @RequiredArgsConstructor
 public class CaseInterrogationServiceImpl implements CaseInterrogationService {
     private final CaseRepository caseRepository;
+    private final CaseInterrogationQARepository caseInterrogationQARepository;
     private final CaseInterrogationRepository caseInterrogationRepository;
     private final CaseInterrogationEducationRepository caseInterrogationEducationRepository;
     private final CaseInterrogationMilitaryRepository caseInterrogationMilitaryRepository;
@@ -149,41 +152,37 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
     @Override
     @Transactional
-    public QAResponse createQA(Long caseId, Long interrogationId, String question, String email) {
-        InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(caseId, interrogationId, email,
-                CaseModule.INTERROGATION, CaseAction.UPDATE);
+    public QAResponse createQA(Long caseId, Long interrogationId,
+                               String question, String answer, String email) {
+        InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(
+                caseId, interrogationId, email, CaseModule.INTERROGATION, CaseAction.UPDATE);
         CaseInterrogation interrogation = ctx.interrogation();
 
-        int orderIndex = interrogation.getQaList().size();
+        String q = trimToNull(question);
+        String a = trimToNull(answer);
+        boolean hasAnswer = a != null;
 
         CaseInterrogationQA qa = CaseInterrogationQA.builder()
-                .question(question)
-                .answer(null)
-                .status(QAStatusEnum.PENDING)
-                .orderIndex(orderIndex)
+                .question(q)
+                .answer(a)
+                .status(hasAnswer ? QAStatusEnum.TRANSCRIBED : QAStatusEnum.PENDING)
+                .orderIndex(nextOrderIndex(interrogation))
                 .isEdited(false)
+                .manuallyEdited(hasAnswer)
                 .isReformulated(false)
                 .createdAt(LocalDateTime.now())
                 .interrogation(interrogation)
                 .audioRecords(new ArrayList<>())
                 .build();
 
-        interrogation.getQaList().add(qa);
-        CaseInterrogation saved = caseInterrogationRepository.save(interrogation);
+        CaseInterrogationQA savedQa = caseInterrogationQARepository.saveAndFlush(qa);
+        interrogation.getQaList().add(savedQa);
 
-        CaseInterrogationQA savedQa = saved.getQaList().stream()
-                .filter(q -> q.getOrderIndex().equals(orderIndex))
-                .findFirst()
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.QA.localized(currentLang(), String.valueOf(orderIndex))));
-
+        String caseNumber = interrogation.getCaseEntity().getNumber();
         logService.log(
-                String.format("QA created in interrogation %d by %s in case %s",
-                        interrogationId, email, interrogation.getCaseEntity().getNumber()),
-                LogLevel.INFO,
-                LogAction.QA_CREATED,
-                interrogation.getCaseEntity().getNumber(),
-                email
-        );
+                String.format("QA %d created (manual answer=%s) in interrogation %d by %s in case %s",
+                        savedQa.getId(), hasAnswer, interrogationId, email, caseNumber),
+                LogLevel.INFO, LogAction.QA_CREATED, caseNumber, email);
 
         return mapper.toShortQAResponse(savedQa);
     }
@@ -307,7 +306,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 }
             }
             case "technical" -> protocol.setTechnical(request.getValue());
-            default -> throw new IllegalArgumentException("Unknown field: " + request.getField());
+            default -> throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang(), request.getField()));
         }
     }
 
@@ -365,7 +364,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             case "additionalText" -> interrogation.setAdditionalText(request.getValue());
             case "application" -> interrogation.setApplication(request.getValue());
 
-            default -> throw new IllegalArgumentException("Unknown field: " + request.getField());
+            default -> throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang()));
         }
     }
 
@@ -397,50 +396,44 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
     @Override
     @Transactional
-    public QAResponse editTranscribedText(Long caseId, Long interrogationId, EditAudioTranscribedTextRequest request, String email) {
-        InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(caseId, interrogationId, email,
-                CaseModule.INTERROGATION, CaseAction.UPDATE);
+    public QAResponse editTranscribedText(Long caseId, Long interrogationId,
+                                          EditAudioTranscribedTextRequest request, String email) {
+        InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(
+                caseId, interrogationId, email, CaseModule.INTERROGATION, CaseAction.UPDATE);
         CaseInterrogation interrogation = ctx.interrogation();
+
+        if (request.getQaId() == null) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang()));
+        }
 
         CaseInterrogationQA qa = interrogation.getQaList().stream()
                 .filter(q -> q.getId().equals(request.getQaId()))
                 .findFirst()
-                .orElseThrow(() -> new NotFoundException(NotFoundMessage.QA.localized(currentLang(), request.getQaId().toString())));
+                .orElseThrow(() -> new NotFoundException(
+                        NotFoundMessage.QA.localized(currentLang(), request.getQaId().toString())));
 
-        qa.setAnswer(request.getAnswer());
+        if (qa.getStatus() == QAStatusEnum.TRANSCRIBING) {
+            throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang()));
+        }
+
+        String answer = trimToNull(request.getAnswer());
+        qa.setAnswer(answer);
         qa.setManuallyEdited(true);
+        qa.setStatus(answer != null ? QAStatusEnum.TRANSCRIBED : QAStatusEnum.PENDING);
 
-        boolean assistantReplied = caseInterrogationChatRepository.findByInterrogationId(interrogationId)
-                .map(chat -> chat.getMessages().stream()
+        Optional<CaseInterrogationChat> chat = caseInterrogationChatRepository.findByInterrogationId(interrogationId);
+
+        boolean assistantReplied = chat
+                .map(c -> c.getMessages().stream()
                         .anyMatch(m -> m.getRole() == MessageRole.ASSISTANT && m.isComplete()))
                 .orElse(false);
-
         qa.setIsEdited(assistantReplied);
 
         if (assistantReplied && qa.getQuestion() != null) {
-            caseInterrogationChatRepository.findByInterrogationId(interrogationId).flatMap(chat -> chatMessageRepository.findByInterrogationChatId(chat.getId(), PageRequest.of(0, Integer.MAX_VALUE))
-                    .getContent()
-                    .stream()
-                    .filter(m -> m.getRole() == MessageRole.USER
-                            && m.getContent() != null
-                            && m.getContent().contains(qa.getQuestion()))
-                    .findFirst()).ifPresent(m -> {
-                m.setIsEdited(true);
-                m.setContent("Вопрос: " + qa.getQuestion() + "\n" + "Ответ: " + request.getAnswer());
-                chatMessageRepository.save(m);
-            });
+            chat.ifPresent(c -> syncChatMessage(c, qa));
         }
-        qa.setStatus(QAStatusEnum.TRANSCRIBED);
-        caseInterrogationRepository.save(interrogation);
 
-        return QAResponse.builder()
-                .id(qa.getId())
-                .question(qa.getQuestion())
-                .answer(qa.getAnswer())
-                .orderIndex(qa.getOrderIndex())
-                .status(qa.getStatus())
-                .edited(assistantReplied)
-                .build();
+        return mapper.toShortQAResponse(qa);
     }
 
     @Override
@@ -536,8 +529,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
         if ("start".equals(action)) {
             if (!Boolean.TRUE.equals(interrogation.getCategoryConfirmed())) {
-                throw new IllegalStateException(
-                        "Категория допроса не подтверждена — запуск таймера недоступен");
+                throw new IllegalStateException(MessageConstant.INTERROGATION_CATEGORY_NOT_CONFIRMED.localized(currentLang()));
             }
 
             boolean resumingAfterBreak = false;
@@ -547,7 +539,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 Duration passed = Duration.between(interrogation.getBreakStartedAt(), now);
                 if (passed.compareTo(CaseInterrogation.MANDATORY_BREAK) < 0) {
                     long left = CaseInterrogation.MANDATORY_BREAK.minus(passed).toMinutes();
-                    throw new IllegalStateException("Перерыв ещё не завершён. Осталось: " + left + " мин.");
+                    throw new IllegalStateException(MessageConstant.INTERROGATION_BREAK_STILL.format(currentLang(), left));
                 }
 
                 interrogation.setOnBreak(false);
@@ -586,13 +578,13 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                     || interrogation.getStatus() == CaseInterrogationStatusEnum.COMPLETED;
 
             if (isNotRunning) {
-                throw new IllegalStateException("Таймер не запущен");
+                throw new IllegalStateException(MessageConstant.INTERROGATION_TIMER_NOT_STARTED.format(currentLang()));
             }
 
             CaseInterrogationTimerSession lastSession = interrogation.getTimerSessions().stream()
                     .filter(s -> s.getPausedAt() == null)
                     .max(Comparator.comparing(CaseInterrogationTimerSession::getStartedAt))
-                    .orElseThrow(() -> new NotFoundException("Нет активной сессии таймера для паузы"));
+                    .orElseThrow(() -> new NotFoundException(NotFoundMessage.TIMER_SESSSION.localized(currentLang())));
 
             lastSession.setPausedAt(now);
 
@@ -605,7 +597,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
             interrogation.setIsPaused(true);
         } else {
             log.warn("Unknown action: {}", action);
-            throw new IllegalArgumentException("Unknown action: " + action);
+            throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang()));
         }
 
         CaseInterrogation saved = caseInterrogationRepository.save(interrogation);
@@ -651,9 +643,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                 for (ApplicationFileWriter.UploadedFile u : uploaded) {
                     minioService.deleteFile(u.fileUrl());
                 }
-                throw new IllegalStateException(
-                        String.format("Файл \"%s\" содержит %d страниц. Максимум — %d страниц на файл.",
-                                originalName, pages, maxPagesPerFile));
+                throw new IllegalStateException(MessageConstant.FILE_HAS_TOO_MUCH_PAGES.format(currentLang(), maxPagesPerFile));
             }
 
             CaseInterrogationApplicationFile appFile;
@@ -689,7 +679,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         CaseInterrogationApplicationFile file = interrogation.getApplicationFiles().stream()
                 .filter(f -> f.getId().equals(fileId))
                 .findFirst()
-                .orElseThrow(() -> new NotFoundException("Файл не найден: " + fileId));
+                .orElseThrow(() -> new NotFoundException(NotFoundMessage.FILE.localized(currentLang(), String.valueOf(fileId))));
 
         minioService.deleteFile(file.getFileUrl());
         interrogation.getApplicationFiles().remove(file);
@@ -747,7 +737,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
                                                            InterrogationSpecialGround ground,
                                                            String groundNote, String email) {
         if (ground == null) {
-            throw new IllegalStateException("Категория не выбрана");
+            throw new IllegalStateException(IllegalStateMessage.INVALID_INPUT.localized(currentLang()));
         }
         InterrogationAuthService.AuthorizedInterrogation ctx = interrogationAuthService.loadAndAuthorize(caseId, interrogationId, email,
                 CaseModule.INTERROGATION, CaseAction.UPDATE);
@@ -755,7 +745,7 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
 
         if (Boolean.TRUE.equals(interrogation.getCategoryConfirmed())
                 && interrogation.getStartedAt() != null) {
-            throw new IllegalStateException("Категория уже подтверждена, допрос запущен");
+            throw new IllegalStateException(MessageConstant.INTERROGATION_CATEGORY_CONFIRMED.format(currentLang()));
         }
         InterrogationLimitProfile profile = ground.isSpecial()
                 ? InterrogationLimitProfile.SPECIAL
@@ -790,12 +780,11 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         LocalDateTime now = LocalDateTime.now();
 
         if (Boolean.TRUE.equals(interrogation.getOnBreak())) {
-            throw new IllegalStateException(
-                    "Идёт обязательный перерыв — продолжение доступно после его завершения");
+            throw new IllegalStateException(MessageConstant.INTERROGATION_MUST_BREAK.format(currentLang()));
         }
 
         if (interrogation.getStatus() == CaseInterrogationStatusEnum.COMPLETED) {
-            throw new IllegalStateException("Допрос уже завершён");
+            throw new IllegalStateException(MessageConstant.INTERROGATION_ENDED.format(currentLang()));
         }
 
         interrogation.setContinuousOverrideConfirmed(true);
@@ -864,6 +853,31 @@ public class CaseInterrogationServiceImpl implements CaseInterrogationService {
         interrogation.setStatus(CaseInterrogationStatusEnum.COMPLETED);
 
         caseInterrogationRepository.save(interrogation);
+    }
+    private void syncChatMessage(CaseInterrogationChat chat, CaseInterrogationQA qa) {
+        String prefix = "Вопрос: " + qa.getQuestion() + "\n";
+        chat.getMessages().stream()
+                .filter(m -> m.getRole() == MessageRole.USER
+                        && m.getContent() != null
+                        && m.getContent().startsWith(prefix))
+                .findFirst()
+                .ifPresent(m -> {
+                    m.setIsEdited(true);
+                    m.setContent(prefix + "Ответ: " + (qa.getAnswer() != null ? qa.getAnswer() : ""));
+                });
+    }
+
+    private int nextOrderIndex(CaseInterrogation interrogation) {
+        return interrogation.getQaList().stream()
+                .map(CaseInterrogationQA::getOrderIndex)
+                .filter(Objects::nonNull)
+                .max(Integer::compare)
+                .map(i -> i + 1)
+                .orElse(0);
+    }
+
+    private static String trimToNull(String s) {
+        return (s == null || s.isBlank()) ? null : s.trim();
     }
 
     private UserSettingsLanguage currentLang(){

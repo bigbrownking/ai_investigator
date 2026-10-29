@@ -104,10 +104,12 @@ public class CaseInterrogation {
     @OneToMany(mappedBy = "interrogation", cascade = CascadeType.ALL, orphanRemoval = true)
     private List<CaseInterrogationApplicationFile> applicationFiles = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "interrogation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orderIndex ASC")
     private List<CaseInterrogationQA> qaList = new ArrayList<>();
 
+    @Builder.Default
     @OneToMany(mappedBy = "interrogation", cascade = CascadeType.ALL, orphanRemoval = true)
     @OrderBy("orderIndex ASC")
     private List<CaseInterrogationOtherAudio> otherAudios = new ArrayList<>();

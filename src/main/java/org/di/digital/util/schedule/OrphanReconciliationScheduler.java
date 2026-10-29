@@ -19,7 +19,7 @@ public class OrphanReconciliationScheduler {
     @Scheduled(
             fixedDelayString = "${scheduler.orphan-reconciliation.delay-seconds}",
             timeUnit = TimeUnit.SECONDS,
-            zone = "Asia/Almaty"
+            zone = "${reporting.time-zone}"
     )
     public void reconcile() {
         try {
@@ -36,7 +36,7 @@ public class OrphanReconciliationScheduler {
     @Scheduled(
             fixedDelayString = "${scheduler.stuck-task.delay-seconds}",
             timeUnit = TimeUnit.SECONDS,
-            zone = "Asia/Almaty"
+            zone = "${reporting.time-zone}"
     )
     public void resetStuck() {
         try {

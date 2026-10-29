@@ -56,7 +56,7 @@ public class UserSpecifications {
                         : null;
     }
 
-    // TODO use id instead of name
+
     private static Specification<User> hasProfession(String profession) {
         return (root, query, cb) -> {
             if (!StringUtils.hasText(profession)) return null;

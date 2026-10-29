@@ -16,7 +16,10 @@ public class CaseFigurantReference {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
+    @Column(name = "reference_id", columnDefinition = "TEXT")
     private String referenceId;
+
+    @Column(name = "file_path", columnDefinition = "TEXT")
     private String filePath;
 
     @ManyToOne(fetch = FetchType.LAZY)
