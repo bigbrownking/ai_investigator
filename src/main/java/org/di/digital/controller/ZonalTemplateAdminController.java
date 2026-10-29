@@ -7,6 +7,8 @@ import org.di.digital.dto.request.search.ZonalSearchRequest;
 import org.di.digital.dto.request.zonal.ZonalTemplateRequest;
 import org.di.digital.dto.response.zonal.ZonalTemplateResponse;
 import org.di.digital.dto.response.zonal.ZonalTemplateSummaryResponse;
+import org.di.digital.model.enums.plan.ApprovalLevel;
+import org.di.digital.model.user.User;
 import org.di.digital.security.zonal.ReportingAccess;
 import org.di.digital.service.zonal.ZonalTemplateAdminService;
 import org.springframework.http.HttpStatus;
@@ -15,6 +17,8 @@ import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
+
+import static org.di.digital.util.requests.UserUtil.getCurrentUser;
 
 @Slf4j
 @RestController
