@@ -113,7 +113,7 @@ public class ZonalTemplateAdminServiceImpl implements ZonalTemplateAdminService 
 
         String name = request.getName().trim();
         String nameKey = ZonalMapper.nameKey(name);
-        if (templateRepository.existsByNameKeyAndIdNot(nameKey, templateId)) {
+        if (templateRepository.existsByNameKeyAndIdNotAndIsDeleted(nameKey, templateId)) {
             throw new IllegalStateException("A template named '" + name + "' already exists");
         }
 
