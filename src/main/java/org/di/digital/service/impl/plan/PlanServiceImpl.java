@@ -376,7 +376,7 @@ public class PlanServiceImpl implements PlanService {
     }
     @Override
     @Transactional(readOnly = true)
-    public List<ManagementPendingPlanDto> getManagementPendingPlans(String email) {
+    public List<ManagementPlanDto> getManagementPendingPlans(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
@@ -400,13 +400,13 @@ public class PlanServiceImpl implements PlanService {
 
         return plans.stream()
                 .sorted(Comparator.comparingInt(p -> pendingPriority(p.getStatus())))
-                .map(p -> mapper.toManagementPendingPlanDto(p, enrichPlanWithStatus(p.getContent())))
+                .map(p -> mapper.toManagementPlanDto(p, enrichPlanWithStatus(p.getContent())))
                 .toList();
     }
 
     @Override
     @Transactional(readOnly = true)
-    public List<ManagementPendingPlanDto> getManagementApprovePlans(String email) {
+    public List<ManagementApprovedPlanDto> getManagementApprovePlans(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
@@ -423,7 +423,7 @@ public class PlanServiceImpl implements PlanService {
         return casePlanRepository
                 .findByStatusAndOwnerRegionIdInOrderByApprovedAtDesc(PlanStatus.APPROVED_L3, regionIds)
                 .stream()
-                .map(p -> mapper.toManagementPendingPlanDto(p, enrichPlanWithStatus(p.getContent())))
+                .map(p -> mapper.toManagementApprovedPlanDto(p, enrichPlanWithStatus(p.getContent())))
                 .toList();
     }
 
