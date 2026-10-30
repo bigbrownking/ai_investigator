@@ -90,6 +90,8 @@ public class WebConfig {
                         .requestMatchers("/admin/zonal/**").hasAnyAuthority("ADMIN", "REG_ADMIN")
                         .requestMatchers("/admin/**").hasAuthority("ADMIN")
                         .requestMatchers("/reg-admin/**").hasAnyAuthority("REG_ADMIN", "ADVANCED_USER")
+                        .requestMatchers("/api/v1/reporting/admin/**").hasAuthority("ADMIN")
+                        .requestMatchers("/api/v1/reporting/operator/**").hasAuthority("REG_ADMIN")
                         .anyRequest().authenticated()
                 )
                 .authenticationProvider(authenticationProvider())

@@ -4,7 +4,10 @@ import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import org.di.digital.dto.request.cases.ChangeOwnerRequest;
+<<<<<<< HEAD
+=======
 import org.di.digital.dto.request.cases.ChatRequest;
+>>>>>>> c8ab1a304c3c4115ef47d7662c2b8c93f9cfc7a3
 import org.di.digital.dto.request.search.AppealSearchRequest;
 import org.di.digital.dto.request.search.CaseSearchRequest;
 import org.di.digital.dto.request.search.UserSearchRequest;

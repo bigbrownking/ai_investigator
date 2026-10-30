@@ -602,6 +602,9 @@ public class RegAdminServiceImpl implements RegAdminService {
             caseRepository.save(caseEntity);
             log.info("Админ {} удалил участника {} из дела {}", adminId, userId, caseId);
         }
+<<<<<<< HEAD
+=======
         caseAccessService.revokeAll(caseId, userId);
+>>>>>>> c8ab1a304c3c4115ef47d7662c2b8c93f9cfc7a3
     }
 }

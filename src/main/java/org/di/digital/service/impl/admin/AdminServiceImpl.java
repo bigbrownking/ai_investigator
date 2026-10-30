@@ -74,6 +74,7 @@ import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 import java.util.Set;
 import java.util.stream.Collectors;
@@ -702,7 +703,7 @@ public class AdminServiceImpl implements AdminService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
-        return caseEntity.getIndictment();
+        return sectionsOrLegacy(caseEntity.getIndictmentSections(), caseEntity.getIndictment());
     }
 
     @Override
@@ -710,7 +711,20 @@ public class AdminServiceImpl implements AdminService {
         Case caseEntity = caseRepository.findById(caseId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.CASE.localized(currentLang(), caseId.toString())));
 
-        return caseEntity.getQualification();
+        return sectionsOrLegacy(caseEntity.getQualificationSections(), caseEntity.getQualification());
+    }
+
+    // New generations store text in sections and null out content; old ones only have content
+    private String sectionsOrLegacy(List<Map<String, Object>> sections, String legacyContent) {
+        if (sections == null) {
+            return legacyContent;
+        }
+        String joined = sections.stream()
+                .map(s -> s.get("text"))
+                .filter(t -> t instanceof String text && !text.isBlank())
+                .map(String.class::cast)
+                .collect(Collectors.joining("\n\n"));
+        return joined.isEmpty() ? legacyContent : joined;
     }
 
     @Override
