@@ -14,6 +14,6 @@ public interface ZonalTemplateRepository extends JpaRepository<ZonalTemplate, Lo
     List<ZonalTemplate> findByActiveTrueOrderByNameAsc();
     Optional<ZonalTemplate> findByIdAndActiveTrue(Long id);
     boolean existsByNameKeyAndIsDeleted(String nameKey, Boolean isDeleted);
-    boolean existsByNameKeyAndIdNotAndIsDeleted(String nameKey, Long id);
-    List<ZonalTemplate> findAllByDeletedFalse();
+    boolean existsByNameKeyAndIsDeletedFalseAndIdNot(String nameKey, Long id);
+    List<ZonalTemplate> findAllByIsDeletedFalse();
 }

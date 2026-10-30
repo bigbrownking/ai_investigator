@@ -16,8 +16,7 @@ import java.util.List;
 @NoArgsConstructor
 @AllArgsConstructor
 @Entity
-@Table(name = "reporting_zonal_templates",
-        uniqueConstraints = @UniqueConstraint(name = "uq_reporting_zonal_templates_name", columnNames = "name_key"))
+@Table(name = "reporting_zonal_templates")
 public class ZonalTemplate {
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
