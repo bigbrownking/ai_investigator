@@ -15,22 +15,26 @@ public interface CasePlanRepository extends JpaRepository<CasePlan, Long> {
 
     Optional<CasePlan> findByCaseEntityNumber(String caseNumber);
 
-    @Query("SELECT p FROM CasePlan p " +
-            "WHERE p.status IN :statuses " +
-            "AND p.caseEntity.owner.region.id IN :regionIds " +
-            "AND p.caseEntity.owner.administration.id = :administrationId")
-    List<CasePlan> findByStatusInAndOwnerRegionIdInAndOwnerAdministrationId(
+    @Query("""
+    SELECT p FROM CasePlan p
+    WHERE p.status IN :statuses
+      AND p.caseEntity.owner.region.id = :regionId
+      AND p.caseEntity.owner.administration.id = :administrationId
+    """)
+    List<CasePlan> findByStatusInAndOwnerRegionIdAndOwnerAdministrationId(
             @Param("statuses") List<PlanStatus> statuses,
-            @Param("regionIds") Long regionIds,
+            @Param("regionId") Long regionId,
             @Param("administrationId") Long administrationId
     );
 
-    @Query("SELECT p FROM CasePlan p " +
-            "WHERE p.status IN :statuses " +
-            "AND p.caseEntity.owner.region.id IN :regionIds")
-    List<CasePlan> findByStatusInAndOwnerRegionIdIn(
+    @Query("""
+    SELECT p FROM CasePlan p
+    WHERE p.status IN :statuses
+      AND p.caseEntity.owner.region.id = :regionId
+    """)
+    List<CasePlan> findByStatusInAndOwnerRegionId(
             @Param("statuses") List<PlanStatus> statuses,
-            @Param("regionIds") Long regionIds
+            @Param("regionId") Long regionId
     );
 
     @Query("SELECT p FROM CasePlan p WHERE p.status IN :statuses")
