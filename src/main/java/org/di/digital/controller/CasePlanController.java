@@ -49,7 +49,7 @@ public class CasePlanController {
 
     @GetMapping("/management/pending")
     @PreAuthorize("hasAnyAuthority('REG_ADMIN', 'ADVANCED_USER')")
-    public ResponseEntity<List<ManagementPlanDto>> getManagementPendingPlans(
+    public ResponseEntity<List<ManagementPendingPlanDto>> getManagementPendingPlans(
             Authentication authentication) {
         return ResponseEntity.ok(
                 planService.getManagementPendingPlans(authentication.getName())
