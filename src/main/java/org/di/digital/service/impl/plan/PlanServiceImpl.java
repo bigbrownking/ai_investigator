@@ -387,12 +387,12 @@ public class PlanServiceImpl implements PlanService {
 
         List<CasePlan> plans;
         if (user.hasRole("ADVANCED_USER")) {
-            plans = casePlanRepository.findByStatusInAndOwnerRegionIdInAndOwnerAdministrationId(
+            plans = casePlanRepository.findByStatusInAndOwnerRegionIdAndOwnerAdministrationId(
                     List.of(PlanStatus.PENDING, PlanStatus.APPROVED_L1, PlanStatus.APPROVED_L2, PlanStatus.APPROVED_L3),
                     regionId,
                     user.getAdministration().getId());
         } else {
-            plans = casePlanRepository.findByStatusInAndOwnerRegionIdIn(
+            plans = casePlanRepository.findByStatusInAndOwnerRegionId(
                     List.of(PlanStatus.APPROVED_L1, PlanStatus.APPROVED_L2, PlanStatus.APPROVED_L3),
                     regionId);
         }
