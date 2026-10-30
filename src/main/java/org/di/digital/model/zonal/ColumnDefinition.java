@@ -9,7 +9,7 @@ import java.util.List;
 @Getter
 @Setter
 @Builder
-@EqualsAndHashCode
+@EqualsAndHashCode 
 @NoArgsConstructor
 @AllArgsConstructor
 public class ColumnDefinition {

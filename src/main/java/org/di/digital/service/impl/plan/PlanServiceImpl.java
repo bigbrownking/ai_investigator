@@ -82,6 +82,7 @@ public class PlanServiceImpl implements PlanService {
     private final PlanActionWriter planActionWriter;
     private final UserUtil userUtil;
     private final PlanResponseAssembler assembler;
+    private final PlanApproverResolver approverResolver;
     private final CaseAccessService caseAccessService;
 
     private final PlanMapper mapper;
@@ -405,7 +406,7 @@ public class PlanServiceImpl implements PlanService {
 
     @Override
     @Transactional(readOnly = true)
-    public List<ManagementPendingPlanDto> getManagementApprovePlans(String email) {
+    public List<ManagementApprovedPlanDto> getManagementApprovePlans(String email) {
         User user = userRepository.findByEmail(email)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), email)));
 
@@ -422,7 +423,7 @@ public class PlanServiceImpl implements PlanService {
         return casePlanRepository
                 .findByStatusAndOwnerRegionIdInOrderByApprovedAtDesc(PlanStatus.APPROVED_L3, regionIds)
                 .stream()
-                .map(p -> mapper.toManagementPendingPlanDto(p, enrichPlanWithStatus(p.getContent())))
+                .map(p -> mapper.toManagementApprovedPlanDto(p, enrichPlanWithStatus(p.getContent())))
                 .toList();
     }
 
@@ -670,9 +671,7 @@ public class PlanServiceImpl implements PlanService {
     }
 
     public String getApproverName(Case caseEntity) {
-        User approver = caseEntity.getPlanApprovedBy();
-        if (approver == null) return null;
-        return approver.getFio();
+        return approverResolver.getApproverName(caseEntity.getCasePlan());
     }
 
     private UserSettingsLanguage currentLang(){

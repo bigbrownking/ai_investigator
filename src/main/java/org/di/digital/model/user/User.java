@@ -146,8 +146,11 @@ public class User {
     public boolean hasRole(String roleName) {
         return roles.stream().anyMatch(r -> r.getName().equals(roleName));
     }
-    public String getFio(){
-        if(name == null || surname == null) return null;
-        return surname + " " + name + " " + fathername;
+    public String getFio() {
+        List<String> parts = new ArrayList<>(3);
+        if (surname != null && !surname.isBlank()) parts.add(surname.trim());
+        if (name != null && !name.isBlank()) parts.add(name.trim());
+        if (fathername != null && !fathername.isBlank()) parts.add(fathername.trim());
+        return String.join(" ", parts);
     }
 }

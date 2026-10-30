@@ -40,6 +40,7 @@ import org.di.digital.repository.LogRepository;
 import org.di.digital.repository.interrogation.CaseInterrogationRepository;
 //import org.di.digital.repository.review.CaseReportRepository;
 import org.di.digital.service.impl.report.CaseReportResolver;
+import org.di.digital.service.impl.plan.PlanApproverResolver;
 import org.di.digital.repository.search.AppealSpecifications;
 import org.di.digital.repository.search.CaseSpecifications;
 import org.di.digital.repository.search.UserSpecifications;
@@ -70,6 +71,7 @@ import java.io.IOException;
 import java.io.InputStream;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Optional;
@@ -102,6 +104,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     private final RejectionReasonStatusRepository rejectionReasonStatusRepository;
 //    private final CaseReportRepository caseReportRepository;
     private final CaseReportResolver caseReportResolver;
+    private final PlanApproverResolver approverResolver;
     private final MinioService minioService;
     private final RegionStatsService regionStatsService;
     private final LocalizationHelper localizationHelper;
@@ -565,6 +568,7 @@ public class RegAdminServiceImpl implements RegAdminService {
     }
 
     @Override
+    @Transactional(readOnly = true)
     public Map<String, Object> getMyRegionPlan(Long adminId, Long caseId) {
         User admin = userRepository.findById(adminId)
                 .orElseThrow(() -> new NotFoundException(NotFoundMessage.USER.localized(currentLang(), adminId.toString())));
@@ -574,7 +578,16 @@ public class RegAdminServiceImpl implements RegAdminService {
 
         userUtil.validateRegionAccess(admin, caseEntity);
 
-        return caseEntity.getPlan();
+        Map<String, Object> plan = caseEntity.getPlan();
+        if (plan == null) {
+            return null;
+        }
+
+        Map<String, Object> response = new LinkedHashMap<>(plan);
+        User reviewer = caseEntity.getPlanReviewedBy();
+        response.put("reviewedBy", reviewer != null ? reviewer.getFio() : null);
+        response.put("approvedBy", approverResolver.getApproverName(caseEntity.getCasePlan()));
+        return response;
     }
     @Override
     @Transactional(readOnly = true)

@@ -17,7 +17,7 @@ public interface PlanService {
     Resource downloadPlanAsWord(String caseNumber, String email);
     PlanSubmitResponse submitPlan(String caseNumber, String email);
     List<ManagementPendingPlanDto> getManagementPendingPlans(String email);
-    List<ManagementPendingPlanDto> getManagementApprovePlans(String email);
+    List<ManagementApprovedPlanDto> getManagementApprovePlans(String email);
     CasePlanResponse updatePlanField(String caseNumber, String email,
                                         int actionNumber, String key, Object value);
     ManualStatusResponse updateActionStatus(String caseNumber, String email, ManualStatusRequest request);

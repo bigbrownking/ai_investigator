@@ -5,7 +5,7 @@ import lombok.*;
 @Getter
 @Setter
 @Builder
-@EqualsAndHashCode
+@EqualsAndHashCode 
 @NoArgsConstructor
 @AllArgsConstructor
 public class SelectOption {

@@ -11,6 +11,8 @@ import java.util.Map;
 @Builder
 public class ManagementPendingPlanDto {
     private String author;
+    private String reviewedBy;
+    private String approvedBy;
     private String caseNumber;
     private String caseTitle;
     private PlanStatus planStatus;

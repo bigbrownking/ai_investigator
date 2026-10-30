@@ -58,7 +58,7 @@ public class CasePlanController {
 
     @GetMapping("/management/approve")
     @PreAuthorize("hasAnyAuthority('REG_ADMIN', 'ADVANCED_USER')")
-    public ResponseEntity<List<ManagementPendingPlanDto>> getManagementApprovePlans(
+    public ResponseEntity<List<ManagementApprovedPlanDto>> getManagementApprovePlans(
             Authentication authentication) {
         return ResponseEntity.ok(
                 planService.getManagementApprovePlans(authentication.getName())
